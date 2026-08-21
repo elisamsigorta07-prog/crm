@@ -1,0 +1,191 @@
+.contactPage {
+  padding: 120px 0 80px 0;
+  background-color: var(--bg-light);
+  min-height: 100vh;
+}
+
+.pageHeader {
+  text-align: center;
+  margin-bottom: var(--spacing-xl);
+}
+
+.pageTitle {
+  font-size: 2.5rem;
+  color: var(--primary-color);
+  margin-bottom: var(--spacing-sm);
+}
+
+.pageSubtitle {
+  font-size: 1.1rem;
+  color: #666;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.contactGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-xl);
+}
+
+@media (min-width: 992px) {
+  .contactGrid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.contactInfoCard {
+  background: white;
+  padding: 2.5rem;
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-md);
+  height: 100%;
+}
+
+.infoTitle {
+  font-size: 1.8rem;
+  color: var(--primary-color);
+  margin-bottom: 2rem;
+}
+
+.infoItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+  margin-bottom: 1.8rem;
+}
+
+.iconWrapper {
+  background-color: var(--bg-light);
+  color: var(--primary-color);
+  padding: 12px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.infoContent h4 {
+  font-size: 1.1rem;
+  color: var(--text-dark);
+  margin-bottom: 5px;
+}
+
+.infoContent p, .infoContent a {
+  color: #555;
+  font-size: 1rem;
+  line-height: 1.6;
+  text-decoration: none;
+}
+
+.infoContent a:hover {
+  color: var(--secondary-color);
+}
+
+.socialMedia {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid #eee;
+}
+
+.socialMedia h4 {
+  font-size: 1.1rem;
+  color: var(--text-dark);
+  margin-bottom: 15px;
+}
+
+.socialLinks {
+  display: flex;
+  gap: 15px;
+}
+
+.socialBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+  color: white;
+  padding: 10px 20px;
+  border-radius: 30px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.socialBtn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 15px rgba(220, 39, 67, 0.4);
+}
+
+.contactFormCard {
+  background: white;
+  padding: 2.5rem;
+  border-radius: var(--border-radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.formTitle {
+  font-size: 1.8rem;
+  color: var(--primary-color);
+  margin-bottom: 1rem;
+}
+
+.formSubtitle {
+  color: #666;
+  margin-bottom: 2rem;
+}
+
+.formGroup {
+  margin-bottom: 1.5rem;
+}
+
+.formGroup label {
+  display: block;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin-bottom: 8px;
+}
+
+.formInput, .formTextarea {
+  width: 100%;
+  padding: 12px 15px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.formInput:focus, .formTextarea:focus {
+  outline: none;
+  border-color: var(--secondary-color);
+  box-shadow: 0 0 0 3px rgba(243, 156, 18, 0.2);
+}
+
+.formTextarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.submitBtn {
+  background-color: var(--secondary-color);
+  color: white;
+  border: none;
+  padding: 14px 24px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  width: 100%;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+
+.submitBtn:hover {
+  background-color: #d68910;
+  transform: translateY(-2px);
+}

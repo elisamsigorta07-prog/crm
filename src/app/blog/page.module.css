@@ -1,0 +1,141 @@
+.blogPage {
+  padding: 120px 0 80px 0;
+  background-color: var(--bg-light);
+  min-height: 100vh;
+}
+
+.pageHeader {
+  text-align: center;
+  margin-bottom: var(--spacing-xl);
+}
+
+.pageTitle {
+  font-size: 2.5rem;
+  color: var(--primary-color);
+  margin-bottom: var(--spacing-sm);
+}
+
+.pageSubtitle {
+  font-size: 1.1rem;
+  color: #666;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.blogGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-lg);
+}
+
+@media (min-width: 768px) {
+  .blogGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .blogGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.blogCard {
+  background: white;
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.blogCard:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-lg);
+}
+
+.imageWrapper {
+  position: relative;
+  width: 100%;
+  height: 220px;
+  overflow: hidden;
+}
+
+.imageWrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.5s ease;
+}
+
+.blogCard:hover .imageWrapper img {
+  transform: scale(1.05);
+}
+
+.categoryBadge {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  background-color: var(--secondary-color);
+  color: var(--primary-color);
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  z-index: 2;
+}
+
+.cardContent {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.metaInfo {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  font-size: 0.85rem;
+  color: #777;
+  margin-bottom: 12px;
+}
+
+.metaItem {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.title {
+  font-size: 1.3rem;
+  color: var(--primary-color);
+  margin-bottom: 10px;
+  line-height: 1.4;
+  font-weight: 700;
+}
+
+.excerpt {
+  color: #555;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin-bottom: 20px;
+  flex-grow: 1;
+}
+
+.readMoreBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--primary-color);
+  font-weight: 600;
+  text-decoration: none;
+  font-size: 0.95rem;
+  transition: color 0.2s ease;
+  margin-top: auto;
+}
+
+.readMoreBtn:hover {
+  color: var(--secondary-color);
+}

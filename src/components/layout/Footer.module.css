@@ -1,0 +1,92 @@
+.footer {
+  background-color: #031924;
+  color: white;
+  padding: var(--spacing-xl) 0 var(--spacing-md) 0;
+  margin-top: auto;
+}
+
+.footerGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--spacing-xl);
+  margin-bottom: var(--spacing-xl);
+}
+
+.footerBrand h3 {
+  font-size: 1.5rem;
+  margin-bottom: var(--spacing-sm);
+  color: white;
+}
+
+.footerBrand p {
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: var(--spacing-md);
+  max-width: 300px;
+}
+
+.footerTitle {
+  font-size: 1.2rem;
+  margin-bottom: var(--spacing-md);
+  color: var(--secondary-color);
+}
+
+.footerLinks {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.footerLinks a {
+  color: rgba(255, 255, 255, 0.8);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.footerLinks a:hover {
+  color: white;
+}
+
+.contactItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.8);
+  margin-bottom: var(--spacing-sm);
+}
+
+.contactIcon {
+  color: var(--secondary-color);
+  flex-shrink: 0;
+}
+
+.footerBottom {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  align-items: center;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9rem;
+}
+
+@media (min-width: 768px) {
+  .footerGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .footerGrid {
+    grid-template-columns: 2fr 1fr 1fr 1.5fr;
+  }
+  
+  .footerBottom {
+    flex-direction: row;
+    justify-content: space-between;
+  }
+}

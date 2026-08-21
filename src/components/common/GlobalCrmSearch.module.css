@@ -1,0 +1,79 @@
+.searchWrapper {
+  position: relative;
+  width: 320px;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 8px 12px 8px 36px;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+  font-size: 0.85rem;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.searchInput:focus {
+  background-color: white;
+  border-color: #3182ce;
+  box-shadow: 0 0 0 3px rgba(49, 130, 206, 0.15);
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #a0aec0;
+}
+
+.dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 6px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  border: 1px solid #edf2f7;
+  max-height: 350px;
+  overflow-y: auto;
+  z-index: 1100;
+  padding: 8px 0;
+}
+
+.dropdownGroupHeader {
+  padding: 6px 16px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #718096;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background-color: #f7fafc;
+}
+
+.dropdownItem {
+  padding: 10px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.dropdownItem:hover {
+  background-color: #ebf8ff;
+}
+
+.itemTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.itemSub {
+  font-size: 0.8rem;
+  color: #718096;
+}

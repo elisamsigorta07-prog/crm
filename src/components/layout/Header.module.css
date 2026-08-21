@@ -1,0 +1,146 @@
+.header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background-color: #031924;
+  box-shadow: var(--shadow-sm);
+  z-index: 1000;
+  height: 80px;
+  display: flex;
+  align-items: center;
+}
+
+.headerContainer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+/* Logo */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.logoIcon {
+  color: var(--secondary-color);
+}
+
+.logoText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.logoSubtitle {
+  font-size: 0.8rem;
+  font-weight: 400;
+  letter-spacing: 2px;
+}
+
+/* Desktop Navigation (Hidden on mobile by default) */
+.nav {
+  display: none;
+}
+
+.navList {
+  display: flex;
+  gap: 2rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.navLink {
+  color: white;
+  font-weight: 500;
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.navLink:hover {
+  color: var(--secondary-color);
+}
+
+/* Actions */
+.actions {
+  display: none;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.phone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: white;
+  text-decoration: none;
+}
+
+/* Mobile Menu Button */
+.mobileMenuBtn {
+  display: flex;
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 8px;
+}
+
+/* Mobile Menu Overlay */
+.mobileMenu {
+  position: fixed;
+  top: 80px;
+  left: 0;
+  width: 100%;
+  height: calc(100vh - 80px);
+  background-color: var(--bg-color);
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  transform: translateX(-100%);
+  transition: transform 0.3s ease-in-out;
+}
+
+.mobileMenu.open {
+  transform: translateX(0);
+}
+
+.mobileNavList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.mobileNavLink {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--primary-color);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--bg-light);
+}
+
+/* Media Queries */
+@media (min-width: 1024px) {
+  .mobileMenuBtn, .mobileMenu {
+    display: none;
+  }
+  
+  .nav, .actions {
+    display: flex;
+  }
+}
