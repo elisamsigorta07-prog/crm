@@ -78,11 +78,17 @@ export default async function ServicePage({ params }: Props) {
                 {service.title} için Alanya'daki en uygun fiyat teklifini dakikalar içinde WhatsApp üzerinden alın.
               </p>
               
-              <button className="btn btn-primary" style={{ width: '100%', marginBottom: '1rem' }}>
-                WhatsApp'tan Yazın
-              </button>
+              <a 
+                href={`https://wa.me/905514387771?text=${encodeURIComponent(`Merhaba, ${service.title} hakkında bilgi ve en uygun fiyat teklifini almak istiyorum.`)}`}
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="btn btn-primary" 
+                style={{ width: '100%', marginBottom: '1rem', textDecoration: 'none', display: 'inline-flex', justifyContent: 'center' }}
+              >
+                WhatsApp'tan Teklif Alın
+              </a>
               
-              <a href="tel:+902421234567" className="btn btn-outline" style={{ width: '100%', display: 'flex' }}>
+              <a href="tel:+905514387771" className="btn btn-outline" style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: '8px' }}>
                 <Phone size={18} /> Bizi Arayın
               </a>
 

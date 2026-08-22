@@ -63,9 +63,15 @@ export default function Header() {
           {/* Language Switcher */}
           <LanguageSwitcher />
 
-          <button className="btn btn-primary" style={{ fontSize: '0.88rem', padding: '9px 22px', borderRadius: '30px' }}>
+          <a 
+            href="https://wa.me/905514387771?text=Merhaba,%20sigorta%20teklifi%20almak%20istiyorum." 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="btn btn-primary" 
+            style={{ fontSize: '0.88rem', padding: '9px 22px', borderRadius: '30px', textDecoration: 'none' }}
+          >
             {t.get_quote}
-          </button>
+          </a>
         </div>
 
         {/* Mobile Menu Button */}
@@ -105,9 +111,16 @@ export default function Header() {
             <Phone size={24} />
             0551 438 77 71
           </a>
-          <button className="btn btn-primary" style={{ width: '100%', padding: '1rem' }}>
+          <a 
+            href="https://wa.me/905514387771?text=Merhaba,%20sigorta%20teklifi%20almak%20istiyorum." 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="btn btn-primary" 
+            style={{ width: '100%', padding: '1rem', textDecoration: 'none', textAlign: 'center', justifyContent: 'center' }}
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
             {t.get_quote}
-          </button>
+          </a>
         </div>
       </div>
 

@@ -151,9 +151,14 @@ export default function Home() {
                 Güvenli, hızlı ve avantajlı çözümler için doğru yerdesiniz.
               </span>
             </div>
-            <Link href="#cozumler" className={styles.whyUsPillBtn}>
+            <a 
+              href="https://wa.me/905514387771?text=Merhaba,%20hızlı%20sigorta%20teklifi%20almak%20istiyorum." 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className={styles.whyUsPillBtn}
+            >
               Hemen Teklif Al <ArrowRight size={18} />
-            </Link>
+            </a>
           </div>
 
         </div>
@@ -256,9 +261,14 @@ export default function Home() {
                 <p className={styles.solutionsDarkSubtitle}>{t.solutions_banner_subtitle}</p>
               </div>
             </div>
-            <Link href="/iletisim" className={styles.solutionsDarkBtn}>
+            <a 
+              href="https://wa.me/905514387771?text=Merhaba,%20sigorta%20çözümleriniz%20hakkında%20teklif%20almak%20istiyorum." 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className={styles.solutionsDarkBtn}
+            >
               {t.solutions_banner_btn} <ArrowRight size={18} />
-            </Link>
+            </a>
           </div>
 
         </div>
@@ -426,9 +436,14 @@ export default function Home() {
                 </div>
               </div>
 
-              <Link href="/iletisim" className={styles.stepLeftBtn}>
+              <a 
+                href="https://wa.me/905514387771?text=Merhaba,%203%20adımda%20hızlı%20sigorta%20teklifi%20almak%20istiyorum." 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className={styles.stepLeftBtn}
+              >
                 {t.hero_cta1} <ArrowRight size={18} />
-              </Link>
+              </a>
             </div>
 
             {/* Right Column: 3 Step Cards Flow */}
