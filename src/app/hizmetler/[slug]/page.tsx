@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import { getServiceById, servicesData } from '@/data/services';
+import { getServiceById, servicesData, aliasMap } from '@/data/services';
 import { Phone, CheckCircle, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import styles from './page.module.css';
@@ -27,9 +27,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export function generateStaticParams() {
-  return servicesData.map((service) => ({
-    slug: service.id,
-  }));
+  const mainParams = servicesData.map((service) => ({ slug: service.id }));
+  const aliasParams = Object.keys(aliasMap).map((slug) => ({ slug }));
+  return [...mainParams, ...aliasParams];
 }
 
 export default async function ServicePage({ params }: Props) {

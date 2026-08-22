@@ -189,6 +189,16 @@ export const servicesData = [
   }
 ];
 
+export const aliasMap: Record<string, string> = {
+  'kasko-ve-trafik': 'kasko',
+  'tamamlayici-saglik': 'saglik-sigortasi',
+  'bireysel-saglik': 'gb-sigortasi',
+  'arac-sigortasi': 'kasko',
+  'ev-sigortasi': 'konut-sigortasi',
+};
+
 export function getServiceById(id: string) {
-  return servicesData.find(service => service.id === id);
+  const targetId = aliasMap[id] || id;
+  return servicesData.find(service => service.id === targetId);
 }
+

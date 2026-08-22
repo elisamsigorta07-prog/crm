@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Building2, Shield, Users, Save, Plus, Trash2 } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
 import styles from '../layout.module.css';
 
 export default function AyarlarPage() {
@@ -31,9 +31,20 @@ export default function AyarlarPage() {
   }, [activeTab]);
 
   const fetchUsers = async () => {
-    const { data, error } = await supabase.from('app_users').select('*').order('created_at', { ascending: false });
-    if (!error && data) {
-      setUsers(data);
+    if (!isSupabaseConfigured()) {
+      setUsers([
+        { id: 1, username: 'admin@elisamsigorta07.com', password: '••••••••', role: 'Yönetici' }
+      ]);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.from('app_users').select('*').order('created_at', { ascending: false });
+      if (!error && data) {
+        setUsers(data);
+      }
+    } catch (err) {
+      console.warn("Supabase kullanıcıları çekilemedi:", err);
     }
   };
 
@@ -43,17 +54,29 @@ export default function AyarlarPage() {
 
     const fullUsername = `${newUsernamePrefix}@elisamsigorta07.com`;
 
-    const { data, error } = await supabase.from('app_users').insert([
-      { username: fullUsername, password: newUserPassword, role: 'Kullanıcı' }
-    ]).select();
-
-    if (error) {
-      alert('Kullanıcı eklenirken hata (Veritabanı tablosu henüz kurulmamış olabilir): ' + error.message);
-    } else if (data) {
-      setUsers([data[0], ...users]);
+    if (!isSupabaseConfigured()) {
+      setUsers([{ id: Date.now(), username: fullUsername, password: newUserPassword, role: 'Kullanıcı' }, ...users]);
       setNewUsernamePrefix('');
       setNewUserPassword('');
-      alert('Kullanıcı başarıyla oluşturuldu.');
+      alert('Kullanıcı yerel listeye eklendi. (Supabase ortam değişkenleri tanımlandığında kalıcı olarak veritabanına yazılacaktır)');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.from('app_users').insert([
+        { username: fullUsername, password: newUserPassword, role: 'Kullanıcı' }
+      ]).select();
+
+      if (error) {
+        alert('Kullanıcı eklenirken hata: ' + error.message);
+      } else if (data) {
+        setUsers([data[0], ...users]);
+        setNewUsernamePrefix('');
+        setNewUserPassword('');
+        alert('Kullanıcı başarıyla oluşturuldu.');
+      }
+    } catch (err) {
+      alert('Veritabanına bağlanılamadı.');
     }
   };
 

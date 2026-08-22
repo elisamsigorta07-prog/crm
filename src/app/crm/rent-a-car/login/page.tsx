@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CarFront, ArrowLeft, LogIn } from 'lucide-react';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
 
 export default function RentCrmLogin() {
   const router = useRouter();
@@ -16,31 +16,40 @@ export default function RentCrmLogin() {
     e.preventDefault();
     setIsLoading(true);
 
+    const cleanUsername = email.trim().toLowerCase();
+    const isFallbackAdmin =
+      (cleanUsername === 'admin@elisamsigorta07.com' ||
+       cleanUsername === 'admin@elisamrent.com' ||
+       cleanUsername === 'admin') &&
+      password === 'elisam2026.1';
+
+    if (isFallbackAdmin) {
+      router.push('/crm/rent-a-car/dashboard');
+      setIsLoading(false);
+      return;
+    }
+
+    if (!isSupabaseConfigured()) {
+      alert("Hatalı kullanıcı adı veya şifre!");
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('app_users')
         .select('*')
-        .eq('username', email)
+        .eq('username', email.trim())
         .eq('password', password)
         .single();
         
       if (data) {
-        // Oturum açıldı
         router.push('/crm/rent-a-car/dashboard');
       } else {
-        // Fallback admin (eğer Supabase tablo yoksa)
-        if (email === 'admin@elisamsigorta07.com' && password === 'elisam2026.1') {
-          router.push('/crm/rent-a-car/dashboard');
-        } else {
-          alert("Hatalı e-posta veya şifre!");
-        }
+        alert("Hatalı e-posta veya şifre!");
       }
     } catch (err) {
-      if (email === 'admin@elisamsigorta07.com' && password === 'elisam2026.1') {
-        router.push('/crm/rent-a-car/dashboard');
-      } else {
-        alert("Sisteme bağlanılamadı veya hatalı giriş.");
-      }
+      alert("Giriş yapılamadı veya hatalı şifre.");
     } finally {
       setIsLoading(false);
     }
@@ -60,17 +69,35 @@ export default function RentCrmLogin() {
 
         <form onSubmit={handleSubmit}>
           <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, color: '#333' }}>E-Posta Adresi</label>
-            <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="personel@elisamrent.com" style={{ width: '100%', padding: '12px 15px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '1rem', outline: 'none' }} />
+            <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, color: '#333' }}>Kullanıcı Adı veya E-Posta</label>
+            <input 
+              type="text" 
+              required 
+              value={email} 
+              onChange={(e) => setEmail(e.target.value)} 
+              placeholder="admin@elisamrent.com veya admin" 
+              style={{ width: '100%', padding: '12px 15px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '1rem', outline: 'none' }} 
+            />
           </div>
           
           <div style={{ marginBottom: '25px' }}>
             <label style={{ display: 'block', marginBottom: '8px', fontWeight: 600, color: '#333' }}>Şifre</label>
-            <input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" style={{ width: '100%', padding: '12px 15px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '1rem', outline: 'none' }} />
+            <input 
+              type="password" 
+              required 
+              value={password} 
+              onChange={(e) => setPassword(e.target.value)} 
+              placeholder="••••••••" 
+              style={{ width: '100%', padding: '12px 15px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '1rem', outline: 'none' }} 
+            />
           </div>
 
-          <button type="submit" style={{ width: '100%', padding: '14px', backgroundColor: '#e67e22', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' }}>
-            Giriş Yap <LogIn size={18} />
+          <button 
+            type="submit" 
+            disabled={isLoading}
+            style={{ width: '100%', padding: '14px', backgroundColor: '#e67e22', color: 'white', border: 'none', borderRadius: '8px', fontSize: '1.1rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', opacity: isLoading ? 0.7 : 1 }}
+          >
+            {isLoading ? 'Giriş Yapılıyor...' : <>Giriş Yap <LogIn size={18} /></>}
           </button>
         </form>
 
@@ -83,3 +110,4 @@ export default function RentCrmLogin() {
     </main>
   );
 }
+

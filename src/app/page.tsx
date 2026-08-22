@@ -56,9 +56,9 @@ export default function Home() {
           {/* Interactive Corner Link Overlays for the 4 Insurance Boxes in ARKA PLAN.png */}
           <div className={styles.heroOverlayGrid}>
             <Link href="/hizmetler/konut-sigortasi" className={styles.heroOverlayBox} title="Konut Sigortası"></Link>
-            <Link href="/hizmetler/kasko-ve-trafik" className={styles.heroOverlayBox} title="Araç Sigortası"></Link>
-            <Link href="/hizmetler/tamamlayici-saglik" className={styles.heroOverlayBox} title="Sağlık Sigortası"></Link>
-            <Link href="/hizmetler/bireysel-saglik" className={styles.heroOverlayBox} title="Bireysel & Aile Sigortaları"></Link>
+            <Link href="/hizmetler/kasko" className={styles.heroOverlayBox} title="Araç Sigortası"></Link>
+            <Link href="/hizmetler/saglik-sigortasi" className={styles.heroOverlayBox} title="Sağlık Sigortası"></Link>
+            <Link href="/hizmetler/gb-sigortasi" className={styles.heroOverlayBox} title="Bireysel & Aile Sigortaları"></Link>
           </div>
         </div>
       </section>
