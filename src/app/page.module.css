@@ -49,6 +49,26 @@
   background: rgba(37, 99, 235, 0.04);
 }
 
+@media (max-width: 768px) {
+  .hero {
+    min-height: 440px;
+    height: 58vh;
+    max-height: 520px;
+  }
+  
+  .heroBannerWrap {
+    height: 100%;
+    min-height: 440px;
+  }
+  
+  .heroBannerImg {
+    height: 100%;
+    min-height: 440px;
+    object-fit: cover;
+    object-position: center center;
+  }
+}
+
 @media (min-width: 768px) {
   .heroTitle {
     font-size: 3.5rem;
@@ -171,7 +191,7 @@
   align-items: center;
   justify-content: center;
   color: #1e3a8a;
-  margin-bottom: 1.25rem;
+  margin: 0 auto 1.25rem auto;
   transition: transform 0.3s ease;
 }
 
@@ -211,10 +231,33 @@
 
 @media (max-width: 768px) {
   .whyUsPillBanner {
-    border-radius: 20px;
+    border-radius: 16px;
     flex-direction: column;
     text-align: center;
-    padding: 1.25rem;
+    padding: 1.5rem 1.25rem;
+    gap: 1.25rem;
+  }
+
+  .whyUsPillLeft {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.75rem;
+  }
+
+  .whyUsPillText {
+    text-align: center;
+    font-size: 0.95rem;
+    line-height: 1.5;
+  }
+
+  .whyUsPillBtn {
+    width: 100%;
+    max-width: 280px;
+    justify-content: center;
+    padding: 0.8rem 1.5rem;
+    background: #0b192c;
+    color: #ffffff !important;
   }
 }
 
@@ -412,21 +455,23 @@
 
 /* Agencies Marquee */
 .marqueeWrapper {
-  background-color: var(--bg-light);
-  padding: 2rem 0;
+  background-color: #ffffff;
+  padding: 1.5rem 0;
   overflow: hidden;
   position: relative;
-  border-bottom: 1px solid rgba(0,0,0,0.05);
+  border-bottom: 1px solid rgba(0,0,0,0.06);
   display: flex;
   white-space: nowrap;
+  width: 100%;
 }
 
 .marqueeContent {
   display: flex;
   align-items: center;
-  gap: 5rem;
-  padding-right: 5rem; /* Gap between the two scrolling blocks */
-  animation: marquee 30s linear infinite;
+  gap: 3.5rem;
+  padding-right: 3.5rem;
+  animation: marquee 25s linear infinite;
+  flex-shrink: 0;
   min-width: 100%;
   justify-content: space-around;
 }
@@ -436,28 +481,60 @@
 }
 
 .marqueeLogo {
-  height: 45px;
+  height: 38px;
+  max-width: 140px;
   width: auto;
   object-fit: contain;
+  filter: grayscale(15%);
   transition: all 0.3s ease;
+  flex-shrink: 0;
 }
 
 .marqueeLogoMedium {
-  height: 68px;
+  height: 48px;
+  max-width: 150px;
   width: auto;
   object-fit: contain;
+  filter: grayscale(15%);
   transition: all 0.3s ease;
+  flex-shrink: 0;
 }
 
 .marqueeLogoLarge {
-  height: 90px;
+  height: 52px;
+  max-width: 160px;
   width: auto;
   object-fit: contain;
+  filter: grayscale(15%);
   transition: all 0.3s ease;
+  flex-shrink: 0;
 }
 
 .marqueeLogo:hover, .marqueeLogoMedium:hover, .marqueeLogoLarge:hover {
-  transform: scale(1.05);
+  filter: grayscale(0%);
+  transform: scale(1.06);
+}
+
+@media (max-width: 768px) {
+  .marqueeWrapper {
+    padding: 1.1rem 0;
+  }
+  .marqueeContent {
+    gap: 2rem;
+    padding-right: 2rem;
+  }
+  .marqueeLogo {
+    height: 30px;
+    max-width: 95px;
+  }
+  .marqueeLogoMedium {
+    height: 36px;
+    max-width: 105px;
+  }
+  .marqueeLogoLarge {
+    height: 38px;
+    max-width: 115px;
+  }
 }
 
 @keyframes marquee {
@@ -651,9 +728,35 @@
 
 @media (max-width: 768px) {
   .solutionsDarkBanner {
+    border-radius: 16px;
     flex-direction: column;
     text-align: center;
-    padding: 2rem 1.5rem;
+    padding: 1.75rem 1.25rem;
+    gap: 1.25rem;
+  }
+
+  .solutionsDarkLeft {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.75rem;
+  }
+
+  .solutionsDarkTitle {
+    font-size: 1.15rem;
+    text-align: center;
+  }
+
+  .solutionsDarkSubtitle {
+    text-align: center;
+    font-size: 0.88rem;
+  }
+
+  .solutionsDarkBtn {
+    width: 100%;
+    max-width: 280px;
+    justify-content: center;
+    padding: 0.8rem 1.5rem;
   }
 }
 
@@ -857,6 +960,14 @@
   z-index: 5;
 }
 
+.claimCardBody {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  width: 100%;
+}
+
 .claimIconBadge {
   width: 78px;
   height: 78px;
@@ -867,7 +978,7 @@
   align-items: center;
   justify-content: center;
   color: #1e3a8a;
-  margin-bottom: 1.25rem;
+  margin: 0 auto 1.25rem auto;
   transition: transform 0.3s ease;
 }
 
@@ -1121,7 +1232,7 @@
   align-items: center;
   justify-content: center;
   color: #1e3a8a;
-  margin-bottom: 1.25rem;
+  margin: 0 auto 1.25rem auto;
   transition: transform 0.3s ease;
 }
 
@@ -1391,7 +1502,7 @@
   position: relative;
   width: 84px;
   height: 84px;
-  margin-bottom: 1.5rem;
+  margin: 0 auto 1.5rem auto;
   display: flex;
   align-items: center;
   justify-content: center;

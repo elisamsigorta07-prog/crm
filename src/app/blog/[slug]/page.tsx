@@ -1,7 +1,7 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
-import { Calendar, Clock, User, ArrowLeft } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { blogPosts } from '@/data/blog';
 import styles from './page.module.css';
 
@@ -48,21 +48,6 @@ export default async function BlogPostPage({ params }: Props) {
         <div className={styles.postHeader}>
           <div className={styles.category}>{post.category}</div>
           <h1 className={styles.title}>{post.title}</h1>
-          
-          <div className={styles.metaInfo}>
-            <div className={styles.metaItem}>
-              <User size={16} />
-              <span>{post.author}</span>
-            </div>
-            <div className={styles.metaItem}>
-              <Calendar size={16} />
-              <span>{new Date(post.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-            </div>
-            <div className={styles.metaItem}>
-              <Clock size={16} />
-              <span>{post.readTime}</span>
-            </div>
-          </div>
         </div>
 
         <div className={styles.heroImage}>
@@ -84,3 +69,4 @@ export default async function BlogPostPage({ params }: Props) {
     </main>
   );
 }
+

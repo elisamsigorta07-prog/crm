@@ -293,7 +293,7 @@ export default function Home() {
                 <div className={styles.claimCard} style={{ borderBottomColor: '#1e293b' }}>
                   <div className={styles.claimNumberBadge}>01</div>
                   
-                  <div>
+                  <div className={styles.claimCardBody}>
                     <div className={styles.claimIconBadge}>
                       <PhoneCall size={34} strokeWidth={1.75} />
                     </div>
@@ -318,7 +318,7 @@ export default function Home() {
                 <div className={styles.claimCard} style={{ borderBottomColor: '#2563eb' }}>
                   <div className={styles.claimNumberBadge}>02</div>
                   
-                  <div>
+                  <div className={styles.claimCardBody}>
                     <div className={styles.claimIconBadge}>
                       <FileText size={34} strokeWidth={1.75} />
                     </div>
@@ -343,7 +343,7 @@ export default function Home() {
                 <div className={styles.claimCard} style={{ borderBottomColor: '#3b82f6' }}>
                   <div className={styles.claimNumberBadge}>03</div>
                   
-                  <div>
+                  <div className={styles.claimCardBody}>
                     <div className={styles.claimIconBadge}>
                       <UserCheck size={34} strokeWidth={1.75} />
                     </div>
@@ -368,7 +368,7 @@ export default function Home() {
                 <div className={styles.claimCard} style={{ borderBottomColor: '#22c55e' }}>
                   <div className={styles.claimNumberBadge}>04</div>
                   
-                  <div>
+                  <div className={styles.claimCardBody}>
                     <div className={styles.claimIconBadge}>
                       <CheckCircle size={34} strokeWidth={1.75} />
                     </div>
@@ -725,8 +725,6 @@ export default function Home() {
                       <div>
                         <div className={styles.homeBlogMetaRow}>
                           <span className={styles.homeBlogCategoryBadge}>{post.category}</span>
-                          <span>•</span>
-                          <span className={styles.homeBlogDate}>{post.date}</span>
                         </div>
                         <h4 className={styles.homeBlogTitle}>{post.title}</h4>
                         <p className={styles.homeBlogExcerpt}>{post.excerpt}</p>

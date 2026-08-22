@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 import Link from 'next/link';
-import { Calendar, Clock, ChevronRight } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { blogPosts } from '@/data/blog';
 import styles from './page.module.css';
 
@@ -31,17 +31,6 @@ export default function BlogPage() {
               </div>
               
               <div className={styles.cardContent}>
-                <div className={styles.metaInfo}>
-                  <div className={styles.metaItem}>
-                    <Calendar size={16} />
-                    <span>{new Date(post.date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-                  </div>
-                  <div className={styles.metaItem}>
-                    <Clock size={16} />
-                    <span>{post.readTime}</span>
-                  </div>
-                </div>
-
                 <h2 className={styles.title}>{post.title}</h2>
                 <p className={styles.excerpt}>{post.excerpt}</p>
                 
@@ -57,3 +46,4 @@ export default function BlogPage() {
     </main>
   );
 }
+
