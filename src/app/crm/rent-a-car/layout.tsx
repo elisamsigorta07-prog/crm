@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
@@ -7,9 +8,11 @@ import {
   CarFront, 
   Users, 
   KeyRound, 
-  LogOut,
-  Settings,
-  BarChart3
+  LogOut, 
+  Settings, 
+  BarChart3,
+  Menu,
+  X
 } from 'lucide-react';
 import styles from './layout.module.css';
 import GlobalCrmSearch from '@/components/common/GlobalCrmSearch';
@@ -20,6 +23,11 @@ export default function RentCrmLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname();
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    setIsMobileNavOpen(false);
+  }, [pathname]);
 
   // If on login page, hide layout
   if (pathname === '/crm/rent-a-car/login') {
@@ -37,11 +45,25 @@ export default function RentCrmLayout({
 
   return (
     <div className={styles.crmLayout}>
+      {/* Mobile Drawer Backdrop */}
+      {isMobileNavOpen && (
+        <div className={styles.backdrop} onClick={() => setIsMobileNavOpen(false)} />
+      )}
+
       {/* Sidebar */}
-      <aside className={styles.sidebar}>
+      <aside className={`${styles.sidebar} ${isMobileNavOpen ? styles.sidebarOpen : ''}`}>
         <div className={styles.sidebarHeader}>
-          <CarFront size={28} color="#e67e22" />
-          <h2>Elisam Rent A Car</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <CarFront size={28} color="#e67e22" />
+            <h2>Elisam Rent</h2>
+          </div>
+          <button 
+            className={styles.mobileCloseBtn} 
+            onClick={() => setIsMobileNavOpen(false)}
+            aria-label="Menüyü Kapat"
+          >
+            <X size={20} />
+          </button>
         </div>
         
         <nav className={styles.nav}>
@@ -52,6 +74,7 @@ export default function RentCrmLayout({
                 key={item.name} 
                 href={item.href} 
                 className={`${styles.navItem} ${isActive ? styles.navItemActive : ''}`}
+                onClick={() => setIsMobileNavOpen(false)}
               >
                 <item.icon size={20} />
                 {item.name}
@@ -69,18 +92,29 @@ export default function RentCrmLayout({
       {/* Main Area */}
       <div className={styles.mainContent}>
         <header className={styles.topbar}>
-          <h1 className={styles.topbarTitle}>
-            {navItems.find(item => item.href === pathname)?.name || 'Rent A Car Paneli'}
-          </h1>
+          <div className={styles.topbarLeft}>
+            <button 
+              className={styles.mobileMenuToggle} 
+              onClick={() => setIsMobileNavOpen(true)}
+              aria-label="Menüyü Aç"
+            >
+              <Menu size={22} />
+            </button>
+            <h1 className={styles.topbarTitle}>
+              {navItems.find(item => item.href === pathname)?.name || 'Rent A Car Paneli'}
+            </h1>
+          </div>
 
-          <GlobalCrmSearch />
-          
-          <div className={styles.userProfile}>
-            <div className={styles.userInfo}>
-              <span className={styles.userName}>Eray Baysal</span>
-              <span className={styles.userRole}>Filo Yöneticisi</span>
+          <div className={styles.topbarRight}>
+            <GlobalCrmSearch />
+            
+            <div className={styles.userProfile}>
+              <div className={styles.userInfo}>
+                <span className={styles.userName}>Eray Baysal</span>
+                <span className={styles.userRole}>Filo Yöneticisi</span>
+              </div>
+              <div className={styles.avatar}>EB</div>
             </div>
-            <div className={styles.avatar}>EB</div>
           </div>
         </header>
 
@@ -91,3 +125,4 @@ export default function RentCrmLayout({
     </div>
   );
 }
+

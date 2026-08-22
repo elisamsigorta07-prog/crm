@@ -93,43 +93,46 @@ export default function SigortaDashboard() {
               Tümünü Gör <ArrowRight size={14} />
             </Link>
           </div>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Poliçe No</th>
-                <th>Müşteri Adı</th>
-                <th>Tür</th>
-                <th>Şirket</th>
-                <th>Bitiş</th>
-                <th>Detay</th>
-              </tr>
-            </thead>
-            <tbody>
-              {expiringPolicies.length === 0 ? (
+          <div className={styles.tableResponsive}>
+            <table className={styles.table}>
+              <thead>
                 <tr>
-                  <td colSpan={7} style={{ padding: '30px', textAlign: 'center', color: '#94a3b8' }}>
-                    Yaklaşan yenileme poliçesi bulunmamaktadır.
-                  </td>
+                  <th>Poliçe No</th>
+                  <th>Müşteri Adı</th>
+                  <th>Tür</th>
+                  <th>Şirket</th>
+                  <th>Bitiş</th>
+                  <th>Tutar</th>
+                  <th>Detay</th>
                 </tr>
-              ) : (
-                expiringPolicies.map((policy) => (
-                  <tr key={policy.id} onClick={() => setSelectedPolicy(policy)} style={{ cursor: 'pointer' }}>
-                    <td className={styles.policyId}>{policy.id}</td>
-                    <td style={{ fontWeight: 600, color: '#2d3748' }}>{policy.customerName}</td>
-                    <td>{policy.type}</td>
-                    <td>{policy.company}</td>
-                    <td>{policy.endDate}</td>
-                    <td style={{ fontWeight: 700, color: '#2b6cb0' }}>{policy.premium.toLocaleString('tr-TR')} ₺</td>
-                    <td>
-                      <button style={{ padding: '4px 10px', backgroundColor: '#ebf8ff', color: '#3182ce', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        <Eye size={12} /> Gör
-                      </button>
+              </thead>
+              <tbody>
+                {expiringPolicies.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} style={{ padding: '30px', textAlign: 'center', color: '#94a3b8' }}>
+                      Yaklaşan yenileme poliçesi bulunmamaktadır.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  expiringPolicies.map((policy) => (
+                    <tr key={policy.id} onClick={() => setSelectedPolicy(policy)} style={{ cursor: 'pointer' }}>
+                      <td className={styles.policyId}>{policy.id}</td>
+                      <td style={{ fontWeight: 600, color: '#2d3748' }}>{policy.customerName}</td>
+                      <td>{policy.type}</td>
+                      <td>{policy.company}</td>
+                      <td>{policy.endDate}</td>
+                      <td style={{ fontWeight: 700, color: '#2b6cb0' }}>{policy.premium.toLocaleString('tr-TR')} ₺</td>
+                      <td>
+                        <button style={{ padding: '4px 10px', backgroundColor: '#ebf8ff', color: '#3182ce', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Eye size={12} /> Gör
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Audit Log Feed */}

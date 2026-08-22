@@ -93,37 +93,39 @@ export default function RentDashboard() {
               Tümünü Gör <ArrowRight size={14} />
             </Link>
           </div>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Sözleşme No</th>
-                <th>Araç & Plaka</th>
-                <th>Müşteri</th>
-                <th>Teslim Tarihi</th>
-                <th>Tutar</th>
-                <th>İncele</th>
-              </tr>
-            </thead>
-            <tbody>
-              {bookings.map((b) => (
-                <tr key={b.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedBooking(b)}>
-                  <td style={{ fontWeight: 600, color: '#e67e22', fontFamily: 'monospace' }}>{b.id}</td>
-                  <td>
-                    <div style={{ fontWeight: 600, color: '#2d3748' }}>{b.vehicleName}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#718096', fontFamily: 'monospace' }}>{b.vehiclePlate}</div>
-                  </td>
-                  <td style={{ fontWeight: 600 }}>{b.customerName}</td>
-                  <td><span className={`${styles.badge} ${styles.badgeOrange}`}>{b.returnDate}</span></td>
-                  <td style={{ fontWeight: 700, color: '#276749' }}>{b.totalAmount.toLocaleString('tr-TR')} ₺</td>
-                  <td>
-                    <button style={{ padding: '4px 10px', backgroundColor: '#fffaf0', color: '#dd6b20', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                      <Eye size={12} /> Detay
-                    </button>
-                  </td>
+          <div className={styles.tableResponsive}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>Sözleşme No</th>
+                  <th>Araç & Plaka</th>
+                  <th>Müşteri</th>
+                  <th>Teslim Tarihi</th>
+                  <th>Tutar</th>
+                  <th>İncele</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {bookings.map((b) => (
+                  <tr key={b.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedBooking(b)}>
+                    <td style={{ fontWeight: 600, color: '#e67e22', fontFamily: 'monospace' }}>{b.id}</td>
+                    <td>
+                      <div style={{ fontWeight: 600, color: '#2d3748' }}>{b.vehicleName}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#718096', fontFamily: 'monospace' }}>{b.vehiclePlate}</div>
+                    </td>
+                    <td style={{ fontWeight: 600 }}>{b.customerName}</td>
+                    <td><span className={`${styles.badge} ${styles.badgeOrange}`}>{b.returnDate}</span></td>
+                    <td style={{ fontWeight: 700, color: '#276749' }}>{b.totalAmount.toLocaleString('tr-TR')} ₺</td>
+                    <td>
+                      <button style={{ padding: '4px 10px', backgroundColor: '#fffaf0', color: '#dd6b20', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Eye size={12} /> Detay
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Audit Log Feed */}

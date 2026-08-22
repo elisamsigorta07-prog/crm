@@ -1,6 +1,7 @@
 .searchWrapper {
   position: relative;
-  width: 320px;
+  width: 280px;
+  max-width: 100%;
 }
 
 .searchInput {
@@ -31,8 +32,9 @@
 .dropdown {
   position: absolute;
   top: 100%;
-  left: 0;
   right: 0;
+  width: 320px;
+  max-width: calc(100vw - 32px);
   margin-top: 6px;
   background: white;
   border-radius: 12px;
@@ -77,3 +79,26 @@
   font-size: 0.8rem;
   color: #718096;
 }
+
+@media (max-width: 768px) {
+  .searchWrapper {
+    width: 140px;
+    transition: width 0.2s ease;
+  }
+
+  .searchWrapper:focus-within {
+    width: 180px;
+  }
+
+  .searchInput {
+    padding: 6px 8px 6px 30px;
+    font-size: 0.78rem;
+  }
+
+  .searchIcon {
+    left: 8px;
+    width: 14px;
+    height: 14px;
+  }
+}
+
