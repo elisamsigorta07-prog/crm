@@ -1,12 +1,33 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Building2, Shield, Users, Save, Plus, Trash2 } from 'lucide-react';
+import { Building2, Shield, Users, Save, Plus, Trash2, Bell } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
 import styles from '../layout.module.css';
 
 export default function AyarlarPage() {
-  const [activeTab, setActiveTab] = useState<'acente' | 'sirketler' | 'kullanicilar'>('acente');
+  const [activeTab, setActiveTab] = useState<'acente' | 'sirketler' | 'kullanicilar' | 'hatirlatmalar'>('acente');
+
+  // Reminder settings state (localStorage backed)
+  const loadReminders = () => {
+    if (typeof window === 'undefined') return { r1: true, r1Days: 30, r2: true, r2Days: 7, r3: true, r3Days: 1 };
+    try { return JSON.parse(localStorage.getItem('elisam_reminders') || 'null') || { r1: true, r1Days: 30, r2: true, r2Days: 7, r3: true, r3Days: 1 }; } catch { return { r1: true, r1Days: 30, r2: true, r2Days: 7, r3: true, r3Days: 1 }; }
+  };
+  const [r1, setR1] = useState(() => loadReminders().r1);
+  const [r1Days, setR1Days] = useState(() => loadReminders().r1Days);
+  const [r2, setR2] = useState(() => loadReminders().r2);
+  const [r2Days, setR2Days] = useState(() => loadReminders().r2Days);
+  const [r3, setR3] = useState(() => loadReminders().r3);
+  const [r3Days, setR3Days] = useState(() => loadReminders().r3Days);
+  const [reminderSaved, setReminderSaved] = useState(false);
+
+  const handleSaveReminders = (e: React.FormEvent) => {
+    e.preventDefault();
+    const data = { r1, r1Days, r2, r2Days, r3, r3Days };
+    if (typeof window !== 'undefined') localStorage.setItem('elisam_reminders', JSON.stringify(data));
+    setReminderSaved(true);
+    setTimeout(() => setReminderSaved(false), 2500);
+  };
 
   // Agency info state
   const [agencyName, setAgencyName] = useState('Elisam Sigorta Aracılık Hizmetleri');
@@ -161,6 +182,25 @@ export default function AyarlarPage() {
           >
             <Users size={18} /> Kullanıcı & Personel Yönetimi
           </button>
+
+          <button 
+            onClick={() => setActiveTab('hatirlatmalar')}
+            style={{ 
+              padding: '12px 4px', 
+              background: 'none', 
+              border: 'none', 
+              borderBottom: activeTab === 'hatirlatmalar' ? '2px solid #3498db' : '2px solid transparent',
+              color: activeTab === 'hatirlatmalar' ? '#3498db' : '#718096',
+              fontWeight: activeTab === 'hatirlatmalar' ? 600 : 500,
+              cursor: 'pointer',
+              fontSize: '0.95rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <Bell size={18} /> Hatırlatma Ayarları
+          </button>
         </div>
 
         {/* Tab 1: Agency Profile */}
@@ -300,6 +340,72 @@ export default function AyarlarPage() {
                 )}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Tab 4: Hatırlatmalar */}
+        {activeTab === 'hatirlatmalar' && (
+          <div style={{ maxWidth: '600px' }}>
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#2d3748', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Bell size={18} color="#3498db" /> Poliçe Bitiş Hatırlatmaları
+              </h3>
+              <p style={{ fontSize: '0.88rem', color: '#718096' }}>
+                Poliçesi sona ermek üzere olan müşteriler, ayarladığınız süreler kadar öncesinden Dashboard&apos;da otomatik olarak listelenir.
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveReminders}>
+              {/* Reminder Row Helper */}
+              {[
+                { enabled: r1, setEnabled: setR1, days: r1Days, setDays: setR1Days, label: '1. Hatırlatma' },
+                { enabled: r2, setEnabled: setR2, days: r2Days, setDays: setR2Days, label: '2. Hatırlatma' },
+                { enabled: r3, setEnabled: setR3, days: r3Days, setDays: setR3Days, label: '3. Hatırlatma' },
+              ].map(({ enabled, setEnabled, days, setDays, label }) => (
+                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px', padding: '16px', backgroundColor: enabled ? '#f0f9ff' : '#f8fafc', borderRadius: '10px', border: `1px solid ${enabled ? '#bee3f8' : '#e2e8f0'}` }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', minWidth: '140px' }}>
+                    <input
+                      type="checkbox"
+                      checked={enabled}
+                      onChange={(e) => setEnabled(e.target.checked)}
+                      style={{ width: '18px', height: '18px', accentColor: '#3498db', cursor: 'pointer' }}
+                    />
+                    <span style={{ fontWeight: 600, color: '#2d3748', fontSize: '0.9rem' }}>{label}</span>
+                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, opacity: enabled ? 1 : 0.4, pointerEvents: enabled ? 'auto' : 'none' }}>
+                    <input
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={days}
+                      onChange={(e) => setDays(Number(e.target.value))}
+                      style={{ width: '80px', padding: '8px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none', fontWeight: 700, fontSize: '1rem', textAlign: 'center' }}
+                    />
+                    <span style={{ color: '#4a5568', fontSize: '0.9rem' }}>gün önce bildir</span>
+                    <span style={{ fontSize: '0.8rem', color: '#718096' }}>
+                      {days === 1 ? '(bitiş günü)' : days <= 7 ? `(${days} gün kala)` : days <= 31 ? `(${Math.round(days/7)} hafta kala)` : `(${Math.round(days/30)} ay kala)`}
+                    </span>
+                  </div>
+                </div>
+              ))}
+
+              <div style={{ marginTop: '24px', padding: '16px', backgroundColor: '#fffaf0', borderRadius: '10px', border: '1px solid #feebc8' }}>
+                <h4 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#744210', marginBottom: '8px' }}>📋 Hatırlatma Yöntemi</h4>
+                <p style={{ fontSize: '0.85rem', color: '#92400e' }}>
+                  Aktif hatırlatmalar, Dashboard &rarr; &ldquo;Yaklaşan Yenilemeler&rdquo; bölümünde otomatik olarak listelenir.
+                  WhatsApp hatırlatması için müşteri sayfasından doğrudan mesaj gönderin.
+                </p>
+              </div>
+
+              <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <button type="submit" className={styles.btnCrm} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                  <Save size={18} /> Ayarları Kaydet
+                </button>
+                {reminderSaved && (
+                  <span style={{ color: '#38a169', fontWeight: 600, fontSize: '0.9rem' }}>✓ Kaydedildi!</span>
+                )}
+              </div>
+            </form>
           </div>
         )}
       </div>

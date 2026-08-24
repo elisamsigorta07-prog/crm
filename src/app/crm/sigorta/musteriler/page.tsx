@@ -22,6 +22,7 @@ export default function MusterilerPage() {
   const [email, setEmail] = useState('');
   const [identityNo, setIdentityNo] = useState('');
   const [address, setAddress] = useState('');
+  const [birthDate, setBirthDate] = useState('');
   const [notes, setNotes] = useState('');
   
   // Extended fields
@@ -52,6 +53,7 @@ export default function MusterilerPage() {
     setEmail('');
     setIdentityNo('');
     setAddress('');
+    setBirthDate('');
     setNotes('');
     setInsuranceType('Kasko');
     setPolicyStartDate('');
@@ -77,6 +79,7 @@ export default function MusterilerPage() {
     setEmail(cust.email === '-' ? '' : cust.email);
     setIdentityNo(cust.identityNo === '-' ? '' : cust.identityNo);
     setAddress(cust.address);
+    setBirthDate(cust.birthDate || '');
     setNotes(cust.notes || '');
     setInsuranceType(cust.insuranceType || 'Kasko');
     setPolicyStartDate(cust.policyStartDate || '');
@@ -158,6 +161,7 @@ export default function MusterilerPage() {
         email: email || '-',
         identityNo: identityNo || '-',
         address: address || 'Alanya / Antalya',
+        birthDate: birthDate || c.birthDate,
         notes: notes || c.notes,
         insuranceType, policyStartDate, policyEndDate, plate, documentSerial, vehicleUsage, vehicleBrand, vehicleType, vehicleModelYear, vehicleRegistrationDate, vehicleValue
       } : c));
@@ -170,6 +174,7 @@ export default function MusterilerPage() {
         email: email || '-',
         identityNo: identityNo || '-',
         address: address || 'Alanya / Antalya',
+        birthDate: birthDate || undefined,
         notes: notes || 'Yeni müşteri kaydı.',
         createdAt: new Date().toLocaleDateString('tr-TR'),
         insuranceType, policyStartDate, policyEndDate, plate, documentSerial, vehicleUsage, vehicleBrand, vehicleType, vehicleModelYear, vehicleRegistrationDate, vehicleValue
@@ -394,6 +399,9 @@ export default function MusterilerPage() {
                 <div style={{ fontSize: '0.8rem', color: '#718096', marginBottom: '4px' }}>Telefon & E-Posta</div>
                 <div style={{ fontWeight: 600, color: '#2d3748', fontSize: '0.9rem' }}>{selectedCustomer.phone}</div>
                 <div style={{ fontSize: '0.8rem', color: '#718096' }}>{selectedCustomer.email}</div>
+                {selectedCustomer.birthDate && (
+                  <div style={{ fontSize: '0.8rem', color: '#718096', marginTop: '4px' }}>🎂 {selectedCustomer.birthDate}</div>
+                )}
               </div>
               <div style={{ backgroundColor: '#ebf8ff', padding: '15px', borderRadius: '10px', border: '1px solid #bee3f8' }}>
                 <div style={{ fontSize: '0.8rem', color: '#2b6cb0', marginBottom: '4px' }}>Toplam Prim Harcaması</div>
@@ -565,6 +573,11 @@ export default function MusterilerPage() {
               <div style={{ marginBottom: '15px' }}>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>TC Kimlik No / Vergi No</label>
                 <input type="text" value={identityNo} onChange={(e) => setIdentityNo(e.target.value)} placeholder="11 haneli TC veya VKN" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }} />
+              </div>
+
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Doğum Tarihi</label>
+                <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }} />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>

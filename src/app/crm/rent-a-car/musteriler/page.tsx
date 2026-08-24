@@ -20,6 +20,7 @@ export default function RentMusterilerPage() {
   const [email, setEmail] = useState('');
   const [licenseNo, setLicenseNo] = useState('');
   const [licenseClass, setLicenseClass] = useState('B');
+  const [birthDate, setBirthDate] = useState('');
 
   const handleAddCustomer = (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +35,7 @@ export default function RentMusterilerPage() {
       email: email || '-',
       licenseNo: licenseNo || 'TR-999999',
       licenseClass: licenseClass || 'B',
+      birthDate: birthDate || undefined,
       totalRentals: 0,
     };
 
@@ -46,6 +48,7 @@ export default function RentMusterilerPage() {
     setPhone('');
     setEmail('');
     setLicenseNo('');
+    setBirthDate('');
   };
 
   const filteredCustomers = customers.filter((c) => {
@@ -189,6 +192,9 @@ export default function RentMusterilerPage() {
                 <div style={{ fontSize: '0.8rem', color: '#dd6b20' }}>Ülke & Pasaport/TC</div>
                 <div style={{ fontWeight: 700, color: '#2d3748', fontSize: '1rem', marginTop: '2px' }}>{selectedCustomer.country}</div>
                 <div style={{ fontSize: '0.85rem', color: '#718096', fontFamily: 'monospace' }}>{selectedCustomer.identityOrPassport}</div>
+                {selectedCustomer.birthDate && (
+                  <div style={{ fontSize: '0.8rem', color: '#718096', marginTop: '4px' }}>🎂 D.T: {selectedCustomer.birthDate}</div>
+                )}
               </div>
 
               <div style={{ backgroundColor: '#fffaf0', padding: '14px', borderRadius: '10px', border: '1px solid #feebc8' }}>
@@ -274,7 +280,7 @@ export default function RentMusterilerPage() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Telefon *</label>
                   <input type="tel" required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+90 5XX..." style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }} />
@@ -283,6 +289,11 @@ export default function RentMusterilerPage() {
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>E-Posta</label>
                   <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@domain.com" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }} />
                 </div>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Doğum Tarihi</label>
+                <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }} />
               </div>
 
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>

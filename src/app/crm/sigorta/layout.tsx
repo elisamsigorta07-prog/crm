@@ -57,10 +57,10 @@ export default function SigortaCrmLayout({
       {/* Sidebar */}
       <aside className={`${styles.sidebar} ${isMobileNavOpen ? styles.sidebarOpen : ''}`}>
         <div className={styles.sidebarHeader}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'inherit' }}>
             <ShieldCheck size={28} color="#3498db" />
             <h2>Sigorta CRM</h2>
-          </div>
+          </Link>
           <button 
             className={styles.mobileCloseBtn} 
             onClick={() => setIsMobileNavOpen(false)}

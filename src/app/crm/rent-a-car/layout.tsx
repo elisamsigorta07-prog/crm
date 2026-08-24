@@ -53,10 +53,10 @@ export default function RentCrmLayout({
       {/* Sidebar */}
       <aside className={`${styles.sidebar} ${isMobileNavOpen ? styles.sidebarOpen : ''}`}>
         <div className={styles.sidebarHeader}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', color: 'inherit' }}>
             <CarFront size={28} color="#e67e22" />
             <h2>Elisam Rent</h2>
-          </div>
+          </Link>
           <button 
             className={styles.mobileCloseBtn} 
             onClick={() => setIsMobileNavOpen(false)}

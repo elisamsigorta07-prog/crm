@@ -3,7 +3,7 @@ export const servicesData = [
     id: "konut-sigortasi",
     title: "Konut Sigortası",
     shortDescription: "Evinizi ve değerlerinizi olası risklere karşı güvence altına alın.",
-    image: "https://images.unsplash.com/photo-1518780664697-55e3ad937233?w=800&q=80",
+    image: "/services/konut-sigortasi.jpg",
     bannerImage: "/banners/EV KORUMA.png",
     icon: "HomeIcon",
     content: `
@@ -28,7 +28,7 @@ export const servicesData = [
     id: "dask",
     title: "DASK (Zorunlu Deprem Sigortası)",
     shortDescription: "Olası deprem risklerine karşı evinizi güvence altına alın.",
-    image: "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800&q=80",
+    image: "/services/dask.jpg",
     icon: "Building",
     content: `
       <h2>DASK (Zorunlu Deprem Sigortası) Nedir?</h2>
@@ -49,7 +49,7 @@ export const servicesData = [
     id: "isyeri-sigortasi",
     title: "İşyeri Sigortası",
     shortDescription: "İşletmenizi olası risklere karşı güvence altına alın.",
-    image: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=800&q=80",
+    image: "/services/isyeri-sigortasi.jpg",
     icon: "Briefcase",
     content: `
       <h2>İşyeri ve KOBİ Sigortası</h2>

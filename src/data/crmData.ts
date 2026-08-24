@@ -6,6 +6,7 @@ export interface Customer {
   phone: string;
   email: string;
   address: string;
+  birthDate?: string;  // Doğum Tarihi
   notes?: string;
   createdAt: string;
   // Yeni eklenen Araç ve Sigorta bilgileri

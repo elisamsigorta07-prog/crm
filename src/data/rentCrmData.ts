@@ -22,6 +22,7 @@ export interface RentCustomer {
   email: string;
   licenseNo: string;
   licenseClass: string;
+  birthDate?: string;  // Doğum Tarihi
   totalRentals: number;
 }
 
