@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState } from 'react';
 import { Search, Plus, FileCheck, X, ClipboardPaste, CheckCircle, XCircle, ArrowRight } from 'lucide-react';
@@ -53,8 +53,22 @@ export default function TekliflerPage() {
     if (parsedTckn) setTc(parsedTckn);
     const parsedPhone = extract(/Telefon:\s*(.*)/i);
     if (parsedPhone) setPhone(parsedPhone);
-    const parsedBirth = extract(/Do[gu]um Tarihi:\s*(.*)/i);
-    if (parsedBirth) setBirthDate(parsedBirth);
+    const parsedBirth = extract(/(?:Do[ğg\u011f\u011e]um|Dogum)\s*Tarihi:\s*(.*)/i);
+    if (parsedBirth) {
+      if (parsedBirth.includes('.')) {
+        const parts = parsedBirth.split('.');
+        if (parts.length === 3) {
+          const d = parts[0].trim().padStart(2, '0');
+          const m = parts[1].trim().padStart(2, '0');
+          const y = parts[2].trim();
+          setBirthDate(`${y}-${m}-${d}`);
+        } else {
+          setBirthDate(parsedBirth);
+        }
+      } else {
+        setBirthDate(parsedBirth);
+      }
+    }
     const parsedPlate = extract(/Plaka:\s*(.*)/i);
     if (parsedPlate) setPlate(parsedPlate);
     const parsedPrice = extract(/(?:Prim|Tutar|Teklif):\s*([0-9.,]+)/i);

@@ -109,7 +109,40 @@ export default function MusterilerPage() {
     };
 
     const parsedName = extract(/Ad \/ Soy Ad:\s*(.*)/i);
-    if (parsedName) setName(parsedName);
+    if (parsedName) {
+      setName(parsedName);
+      if (/(?:ŞİRKETİ|LİMİTED|LTD|A\.Ş|SANAYİ|TİCARET|AŞ|HOLDİNG|ORTAKLIĞI|KOOPERATİF)/i.test(parsedName)) {
+        setType('Kurumsal');
+      }
+    }
+
+    // Doğum Tarihi (Doğum Tarihi / Dogum Tarihi) -> Convert DD.MM.YYYY to YYYY-MM-DD for date input
+    const parsedBirth = extract(/(?:Do[ğg\u011f\u011e]um|Dogum)\s*Tarihi:\s*(.*)/i);
+    if (parsedBirth) {
+      if (parsedBirth.includes('.')) {
+        const parts = parsedBirth.split('.');
+        if (parts.length === 3) {
+          const d = parts[0].trim().padStart(2, '0');
+          const m = parts[1].trim().padStart(2, '0');
+          const y = parts[2].trim();
+          setBirthDate(`${y}-${m}-${d}`);
+        } else {
+          setBirthDate(parsedBirth);
+        }
+      } else if (parsedBirth.includes('/')) {
+        const parts = parsedBirth.split('/');
+        if (parts.length === 3) {
+          const d = parts[0].trim().padStart(2, '0');
+          const m = parts[1].trim().padStart(2, '0');
+          const y = parts[2].trim();
+          setBirthDate(`${y}-${m}-${d}`);
+        } else {
+          setBirthDate(parsedBirth);
+        }
+      } else {
+        setBirthDate(parsedBirth);
+      }
+    }
 
     const parsedPolicyNo = extract(/Poliçe (?:No|Numarası):\s*(.*)/i);
     if (parsedPolicyNo) setPolicyNo(parsedPolicyNo);
@@ -149,9 +182,15 @@ export default function MusterilerPage() {
 
     const parsedVal = extract(/Araç Kasko Değeri:\s*(.*)/i);
     if (parsedVal) setVehicleValue(parsedVal);
-    
-    // set phone placeholder if auto parsed
-    if (!phone) setPhone('05-- --- -- --'); 
+
+    const parsedPhone = extract(/(?:Telefon|Tel|Gsm):\s*(.*)/i);
+    if (parsedPhone) setPhone(parsedPhone);
+    else if (!phone) setPhone('05-- --- -- --'); 
+
+    const parsedProfession = extract(/Meslek:\s*(.*)/i);
+    if (parsedProfession && !notes) {
+      setNotes(`Meslek: ${parsedProfession}`);
+    } 
   };
 
   const handleSaveCustomer = (e: React.FormEvent) => {
