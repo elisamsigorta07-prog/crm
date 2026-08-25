@@ -45,132 +45,82 @@ export default function Home() {
 
   return (
     <>
-      {/* Minimalist, Modern & Ferah Hero Section */}
-      <section className={styles.heroSection}>
-        <div className={styles.heroBgGlow1}></div>
-        <div className={styles.heroBgGlow2}></div>
-        
-        <div className="container">
-          <div className={styles.heroInner}>
+      {/* Aydınlık & Gerçekçi Sigorta Hero Bölümü */}
+      <section className={styles.brightHero}>
+        {/* Arka Planda Aydınlık, Canlı Sigorta Teması (Kaza/Polis, Fanus Evler, Hastane) */}
+        <div className={styles.brightHeroBgWrap}>
+          <img 
+            src="/hero-bg.jpg" 
+            alt="Elisam Sigorta - Trafik, Kasko, Konut ve Sağlık Sigortası" 
+            className={styles.brightHeroBgImg}
+          />
+          <div className={styles.brightHeroOverlay}></div>
+        </div>
+
+        <div className="container" style={{ position: 'relative', zIndex: 3 }}>
+          <div className={styles.brightHeroContent}>
             
-            {/* Left Column: Typography & CTAs */}
-            <div className={styles.heroLeft}>
-              <div className={styles.heroPillBadge}>
+            {/* Sol Taraf - Ferah Bilgi Kartı */}
+            <div className={styles.brightHeroCard}>
+              <div className={styles.heroPillBadgeLight}>
                 <span className={styles.heroLiveDot}></span>
                 <span>Elisam Sigorta Aracılık Hizmetleri • Alanya</span>
               </div>
 
-              <h1 className={styles.heroMainTitle}>
-                Geleceğinizi Güvenle İnşa Edin, <br />
-                <span className={styles.heroGradientText}>Tüm Riskleri Birlikte Yönetelim.</span>
+              <h1 className={styles.brightHeroTitle}>
+                Hayatın Her Anında <br />
+                <span className={styles.brightHeroHighlight}>Tam Güvence Yanınızda.</span>
               </h1>
 
-              <p className={styles.heroMainDesc}>
-                Kasko, Trafik, DASK, Konut ve Sağlık sigortalarında Türkiye&apos;nin en seçkin 15+ sigorta şirketinden en avantajlı fiyat tekliflerini anında karşılaştırın.
+              <p className={styles.brightHeroSubtitle}>
+                Kaza ve trafikten sağlığınıza, evinizden işyerinize kadar tüm risklere karşı 15+ lider sigorta şirketinden en avantajlı fiyat tekliflerini anında karşılaştırın.
               </p>
 
-              {/* Action Buttons */}
-              <div className={styles.heroBtnGroup}>
+              {/* Aksiyon Butonları */}
+              <div className={styles.brightHeroBtnGroup}>
                 <a 
                   href="https://wa.me/905514387771?text=Merhaba,%20sigorta%20teklifi%20almak%20istiyorum." 
                   target="_blank" 
                   rel="noopener noreferrer" 
-                  className={styles.heroPrimaryBtn}
+                  className={styles.brightHeroPrimaryBtn}
                 >
                   <span>💬 WhatsApp&apos;tan Hızlı Teklif Al</span>
                   <ArrowRight size={18} />
                 </a>
 
-                <Link href="#cozumler" className={styles.heroSecondaryBtn}>
-                  <Shield size={18} />
-                  <span>Sigorta Çözümlerimiz</span>
+                <a href="tel:05514387771" className={styles.brightHeroPhoneBtn}>
+                  <PhoneCall size={18} />
+                  <span>0551 438 77 71</span>
+                </a>
+              </div>
+
+              {/* Hızlı Kategori Butonları */}
+              <div className={styles.brightHeroQuickPills}>
+                <Link href="/hizmetler/kasko" className={styles.quickPill}>
+                  <Car size={16} color="#2563eb" />
+                  <span>Kasko & Trafik</span>
+                </Link>
+                <Link href="/hizmetler/konut-sigortasi" className={styles.quickPill}>
+                  <HomeIcon size={16} color="#059669" />
+                  <span>Konut & DASK</span>
+                </Link>
+                <Link href="/hizmetler/saglik-sigortasi" className={styles.quickPill}>
+                  <HeartPulse size={16} color="#dc2626" />
+                  <span>Sağlık Sigortası</span>
+                </Link>
+                <Link href="/hizmetler/isyeri-sigortasi" className={styles.quickPill}>
+                  <Briefcase size={16} color="#d97706" />
+                  <span>İşyeri & KOBİ</span>
                 </Link>
               </div>
 
-              {/* Trust Features Row */}
-              <div className={styles.heroTrustRow}>
-                <div className={styles.heroTrustItem}>
-                  <div className={styles.heroTrustIcon}>✓</div>
-                  <div>
-                    <strong>15+ Güçlü Şirket</strong>
-                    <span>En iyi fiyat garantisi</span>
-                  </div>
-                </div>
-                <div className={styles.heroTrustItem}>
-                  <div className={styles.heroTrustIcon}>✓</div>
-                  <div>
-                    <strong>7/24 Hasar Desteği</strong>
-                    <span>Kaza anında yanınızda</span>
-                  </div>
-                </div>
-                <div className={styles.heroTrustItem}>
-                  <div className={styles.heroTrustIcon}>✓</div>
-                  <div>
-                    <strong>Anında Poliçe</strong>
-                    <span>Dakikalar içinde hazır</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column: 4 Minimalist Glass Cards */}
-            <div className={styles.heroRight}>
-              <div className={styles.heroCardsGrid}>
-                <Link href="/hizmetler/kasko" className={styles.heroGlassCard}>
-                  <div className={styles.heroCardIconWrap} style={{ background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa' }}>
-                    <Car size={26} strokeWidth={1.8} />
-                  </div>
-                  <div className={styles.heroCardInfo}>
-                    <span className={styles.heroCardTag}>Kasko & Trafik</span>
-                    <h3 className={styles.heroCardTitle}>Araç Sigortaları</h3>
-                    <p className={styles.heroCardSub}>Yolda tam güvence & 7/24 yol yardım</p>
-                  </div>
-                  <div className={styles.heroCardArrow}>
-                    <ArrowRight size={16} />
-                  </div>
-                </Link>
-
-                <Link href="/hizmetler/konut-sigortasi" className={styles.heroGlassCard}>
-                  <div className={styles.heroCardIconWrap} style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399' }}>
-                    <HomeIcon size={26} strokeWidth={1.8} />
-                  </div>
-                  <div className={styles.heroCardInfo}>
-                    <span className={styles.heroCardTag}>Konut & DASK</span>
-                    <h3 className={styles.heroCardTitle}>Ev & Deprem</h3>
-                    <p className={styles.heroCardSub}>Eviniz ve eşyalarınız için tam koruma</p>
-                  </div>
-                  <div className={styles.heroCardArrow}>
-                    <ArrowRight size={16} />
-                  </div>
-                </Link>
-
-                <Link href="/hizmetler/saglik-sigortasi" className={styles.heroGlassCard}>
-                  <div className={styles.heroCardIconWrap} style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171' }}>
-                    <HeartPulse size={26} strokeWidth={1.8} />
-                  </div>
-                  <div className={styles.heroCardInfo}>
-                    <span className={styles.heroCardTag}>Özel & TSS</span>
-                    <h3 className={styles.heroCardTitle}>Sağlık Sigortası</h3>
-                    <p className={styles.heroCardSub}>En seçkin özel hastanelerde güvence</p>
-                  </div>
-                  <div className={styles.heroCardArrow}>
-                    <ArrowRight size={16} />
-                  </div>
-                </Link>
-
-                <Link href="/hizmetler/isyeri-sigortasi" className={styles.heroGlassCard}>
-                  <div className={styles.heroCardIconWrap} style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#fbbf24' }}>
-                    <Briefcase size={26} strokeWidth={1.8} />
-                  </div>
-                  <div className={styles.heroCardInfo}>
-                    <span className={styles.heroCardTag}>KOBİ & İşyeri</span>
-                    <h3 className={styles.heroCardTitle}>Ticari Paketler</h3>
-                    <p className={styles.heroCardSub}>İşletmeniz ve ticari varlıklarınız</p>
-                  </div>
-                  <div className={styles.heroCardArrow}>
-                    <ArrowRight size={16} />
-                  </div>
-                </Link>
+              {/* Güven Rozetleri */}
+              <div className={styles.brightHeroTrust}>
+                <span>✓ 15+ Sigorta Şirketi</span>
+                <span className={styles.trustDivider}>•</span>
+                <span>✓ 7/24 Kesintisiz Hasar Desteği</span>
+                <span className={styles.trustDivider}>•</span>
+                <span>✓ Anında Poliçe Kesimi</span>
               </div>
             </div>
 
