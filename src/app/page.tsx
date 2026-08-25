@@ -45,162 +45,94 @@ export default function Home() {
 
   return (
     <>
-      {/* Ultra Modern & Ferah Showcase Hero Section */}
-      <section className={styles.modernHero}>
+      {/* Yeni Modern Arched Hero Section (Referans Tasarım Birebir) */}
+      <section className={styles.archHero}>
         <div className="container">
-          
-          {/* Üst Başlık & Eylem Alanı */}
-          <div className={styles.modernHeroHeader}>
-            <div className={styles.modernPillBadge}>
-              <span className={styles.heroLiveDot}></span>
-              <span>Elisam Sigorta Aracılık Hizmetleri • Alanya</span>
+          <div className={styles.archHeroGrid}>
+            
+            {/* Sol Taraf - Tipografi & Aksiyon */}
+            <div className={styles.archHeroLeft}>
+              <div className={styles.archHeroEyebrow}>
+                GÜVENCENİZİ BİZİMLE SAĞLAYIN
+              </div>
+
+              <h1 className={styles.archHeroTitle}>
+                Hayatın Her Anında <br />
+                <span className={styles.archHeroHighlight}>Tam Güvence Yanınızda.</span>
+              </h1>
+
+              <p className={styles.archHeroSubtitle}>
+                Kaza ve trafikten sağlığınıza, evinizden işyerinize kadar tüm risklere karşı 15+ lider sigorta şirketinden en avantajlı fiyat tekliflerini anında karşılaştırın.
+              </p>
+
+              {/* Aksiyon Butonları */}
+              <div className={styles.archHeroBtnGroup}>
+                <a 
+                  href="https://wa.me/905514387771?text=Merhaba,%20sigorta%20teklifi%20almak%20istiyorum." 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className={styles.archPrimaryBtn}
+                >
+                  <span style={{ fontSize: '1.1rem' }}>💬</span>
+                  <span>WhatsApp&apos;tan Hızlı Teklif Al</span>
+                </a>
+
+                <a href="tel:05514387771" className={styles.archPhoneBtn}>
+                  <PhoneCall size={17} />
+                  <span>0551 438 77 71</span>
+                </a>
+              </div>
+
+              {/* Hızlı Kategori Butonları */}
+              <div className={styles.archQuickPills}>
+                <Link href="/hizmetler/kasko" className={styles.archPill}>
+                  <Car size={15} color="#2563eb" />
+                  <span>Kasko & Trafik</span>
+                </Link>
+                <Link href="/hizmetler/konut-sigortasi" className={styles.archPill}>
+                  <HomeIcon size={15} color="#059669" />
+                  <span>Konut & DASK</span>
+                </Link>
+                <Link href="/hizmetler/saglik-sigortasi" className={styles.archPill}>
+                  <HeartPulse size={15} color="#dc2626" />
+                  <span>Sağlık Sigortası</span>
+                </Link>
+                <Link href="/hizmetler/isyeri-sigortasi" className={styles.archPill}>
+                  <Briefcase size={15} color="#d97706" />
+                  <span>İşyeri & KOBİ</span>
+                </Link>
+              </div>
             </div>
 
-            <h1 className={styles.modernHeroTitle}>
-              Hayatın Her Anında <br className={styles.heroTitleBreak} />
-              <span className={styles.modernHeroGradient}>Tam Güvence Yanınızda.</span>
-            </h1>
+            {/* Sağ Taraf - Yuvarlak Kemer (Arch) İçinde Cam Fanus Görseli & Yüzen Rozet */}
+            <div className={styles.archHeroRight}>
+              
+              {/* Arka Plandaki Mavi Dekoratif Kemer & Gölge */}
+              <div className={styles.archBackdropGlow}></div>
+              
+              {/* Kemerli Görsel Çerçevesi */}
+              <div className={styles.archFrame}>
+                <img 
+                  src="/hero-dome.jpg" 
+                  alt="Elisam Sigorta - Güvenli Gelecek ve Tam Koruma" 
+                  className={styles.archImg}
+                />
+              </div>
 
-            <p className={styles.modernHeroSubtitle}>
-              Kaza ve trafikten sağlığınıza, evinizden işyerinize kadar tüm risklere karşı 15+ lider sigorta şirketinden en avantajlı fiyat tekliflerini anında karşılaştırın.
-            </p>
+              {/* Yüzen Güven Rozet Kartı (Referans Görseldeki Birebir Kart) */}
+              <div className={styles.archFloatingBadge}>
+                <div className={styles.archBadgeIconWrap}>
+                  <ShieldCheck size={26} strokeWidth={2} color="#2563eb" />
+                </div>
+                <div className={styles.archBadgeText}>
+                  <strong>Güvenliğiniz Bizim Önceliğimiz</strong>
+                  <span>Hızlı, kolay ve şeffaf sigorta çözümleri.</span>
+                </div>
+              </div>
 
-            {/* CTA Butonları */}
-            <div className={styles.modernHeroBtnGroup}>
-              <a 
-                href="https://wa.me/905514387771?text=Merhaba,%20sigorta%20teklifi%20almak%20istiyorum." 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className={styles.modernPrimaryBtn}
-              >
-                <span>💬 WhatsApp&apos;tan Hızlı Teklif Al</span>
-                <ArrowRight size={18} />
-              </a>
-
-              <a href="tel:05514387771" className={styles.modernPhoneBtn}>
-                <PhoneCall size={18} />
-                <span>0551 438 77 71</span>
-              </a>
             </div>
+
           </div>
-
-          {/* Merkezde Görsel Sahnesi (Floating İnteraktif Etiketler ile) */}
-          <div className={styles.modernHeroShowcase}>
-            <div className={styles.modernHeroDomeWrap}>
-              <img 
-                src="/hero-dome.jpg" 
-                alt="Elisam Sigorta - Fanus İçi Tam Koruma" 
-                className={styles.modernHeroDomeImg}
-              />
-
-              {/* Floating Smart Badges on Image */}
-              <div className={`${styles.floatingTag} ${styles.tagLeft}`}>
-                <div className={styles.tagIcon} style={{ background: '#eff6ff', color: '#2563eb' }}>
-                  <Car size={16} />
-                </div>
-                <div>
-                  <strong>Kasko & Trafik</strong>
-                  <span>Kaza & Yol Yardım</span>
-                </div>
-              </div>
-
-              <div className={`${styles.floatingTag} ${styles.tagCenter}`}>
-                <div className={styles.tagIcon} style={{ background: '#ecfdf5', color: '#059669' }}>
-                  <HomeIcon size={16} />
-                </div>
-                <div>
-                  <strong>Konut & DASK</strong>
-                  <span>Ev & Deprem Koruması</span>
-                </div>
-              </div>
-
-              <div className={`${styles.floatingTag} ${styles.tagRight}`}>
-                <div className={styles.tagIcon} style={{ background: '#fef2f2', color: '#dc2626' }}>
-                  <HeartPulse size={16} />
-                </div>
-                <div>
-                  <strong>Sağlık Sigortası</strong>
-                  <span>Özel Hastane Ağı</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Alt Kısım: 4 Hızlı Hizmet Kartı */}
-          <div className={styles.modernHeroCardsRow}>
-            <Link href="/hizmetler/kasko" className={styles.modernServiceCard}>
-              <div className={styles.modernCardIcon} style={{ background: '#eff6ff', color: '#2563eb' }}>
-                <Car size={22} strokeWidth={2} />
-              </div>
-              <div className={styles.modernCardContent}>
-                <h3>Kasko & Trafik</h3>
-                <p>En uygun fiyat garantisi & 7/24 yol yardım desteği</p>
-              </div>
-              <div className={styles.modernCardArrow}>
-                <ArrowRight size={16} />
-              </div>
-            </Link>
-
-            <Link href="/hizmetler/konut-sigortasi" className={styles.modernServiceCard}>
-              <div className={styles.modernCardIcon} style={{ background: '#ecfdf5', color: '#059669' }}>
-                <HomeIcon size={22} strokeWidth={2} />
-              </div>
-              <div className={styles.modernCardContent}>
-                <h3>Konut & DASK</h3>
-                <p>Eviniz, eşyalarınız ve değerleriniz için tam güvence</p>
-              </div>
-              <div className={styles.modernCardArrow}>
-                <ArrowRight size={16} />
-              </div>
-            </Link>
-
-            <Link href="/hizmetler/saglik-sigortasi" className={styles.modernServiceCard}>
-              <div className={styles.modernCardIcon} style={{ background: '#fef2f2', color: '#dc2626' }}>
-                <HeartPulse size={22} strokeWidth={2} />
-              </div>
-              <div className={styles.modernCardContent}>
-                <h3>Sağlık Sigortası</h3>
-                <p>Özel ve tamamlayıcı sağlıkta seçkin hastane ağı</p>
-              </div>
-              <div className={styles.modernCardArrow}>
-                <ArrowRight size={16} />
-              </div>
-            </Link>
-
-            <Link href="/hizmetler/isyeri-sigortasi" className={styles.modernServiceCard}>
-              <div className={styles.modernCardIcon} style={{ background: '#fffbeb', color: '#d97706' }}>
-                <Briefcase size={22} strokeWidth={2} />
-              </div>
-              <div className={styles.modernCardContent}>
-                <h3>İşyeri & KOBİ</h3>
-                <p>Ticari faaliyetleriniz ve işletmeniz için tam koruma</p>
-              </div>
-              <div className={styles.modernCardArrow}>
-                <ArrowRight size={16} />
-              </div>
-            </Link>
-          </div>
-
-          {/* Güven Bandı */}
-          <div className={styles.modernTrustBar}>
-            <div className={styles.modernTrustItem}>
-              <span className={styles.trustCheckBadge}>✓</span>
-              <span><strong>15+ Lider</strong> Sigorta Şirketi</span>
-            </div>
-            <div className={styles.modernTrustItem}>
-              <span className={styles.trustCheckBadge}>✓</span>
-              <span><strong>7/24 Kesintisiz</strong> Hasar Destek</span>
-            </div>
-            <div className={styles.modernTrustItem}>
-              <span className={styles.trustCheckBadge}>✓</span>
-              <span><strong>Anında Online</strong> Poliçe Kesimi</span>
-            </div>
-            <div className={styles.modernTrustItem}>
-              <span className={styles.trustCheckBadge}>✓</span>
-              <span><strong>En İyi Fiyat</strong> Garantisi</span>
-            </div>
-          </div>
-
         </div>
       </section>
 
