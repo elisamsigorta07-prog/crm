@@ -29,6 +29,65 @@ export default function AyarlarPage() {
     setTimeout(() => setReminderSaved(false), 2500);
   };
 
+  // Telegram bot state
+  const loadTelegramConfig = () => {
+    if (typeof window === 'undefined') return { botToken: '', chatId: '', notifyExpiry: true, notifyInstallments: true, notifyNewPolicy: true };
+    try { return JSON.parse(localStorage.getItem('elisam_telegram_config') || 'null') || { botToken: '', chatId: '', notifyExpiry: true, notifyInstallments: true, notifyNewPolicy: true }; } catch { return { botToken: '', chatId: '', notifyExpiry: true, notifyInstallments: true, notifyNewPolicy: true }; }
+  };
+  const [botToken, setBotToken] = useState(() => loadTelegramConfig().botToken);
+  const [chatId, setChatId] = useState(() => loadTelegramConfig().chatId);
+  const [notifyExpiry, setNotifyExpiry] = useState(() => loadTelegramConfig().notifyExpiry);
+  const [notifyInstallments, setNotifyInstallments] = useState(() => loadTelegramConfig().notifyInstallments);
+  const [notifyNewPolicy, setNotifyNewPolicy] = useState(() => loadTelegramConfig().notifyNewPolicy);
+  const [telegramStatus, setTelegramStatus] = useState<string | null>(null);
+  const [isTestingTelegram, setIsTestingTelegram] = useState(false);
+
+  const handleSaveTelegram = (e: React.FormEvent) => {
+    e.preventDefault();
+    const data = { botToken, chatId, notifyExpiry, notifyInstallments, notifyNewPolicy };
+    if (typeof window !== 'undefined') localStorage.setItem('elisam_telegram_config', JSON.stringify(data));
+    setReminderSaved(true);
+    setTimeout(() => setReminderSaved(false), 2500);
+  };
+
+  const handleTestTelegram = async () => {
+    if (!botToken || !chatId) {
+      alert('Lütfen önce Telegram Bot Token ve Chat ID bilgilerinizi girin.');
+      return;
+    }
+    setIsTestingTelegram(true);
+    setTelegramStatus(null);
+    try {
+      const message = `🔔 *Elisam Sigorta CRM - Test Bildirimi*\n\n✅ Telegram Bot entegrasyonu başarıyla kuruldu!\n⏰ Zaman: ${new Date().toLocaleString('tr-TR')}\n\nPoliçe bitişleri ve taksit hatırlatmaları bu kanala otomatik olarak iletilecektir.`;
+      const url = `https://api.telegram.org/bot${botToken.trim()}/sendMessage`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId.trim(),
+          text: message,
+          parse_mode: 'Markdown'
+        })
+      });
+      const resData = await res.json();
+      if (resData.ok) {
+        setTelegramStatus('success');
+      } else {
+        setTelegramStatus(`error: ${resData.description || 'Bağlantı kurulamadı.'}`);
+      }
+    } catch (err: any) {
+      setTelegramStatus(`error: ${err.message || 'Ağ hatası oluştu.'}`);
+    } finally {
+      setIsTestingTelegram(false);
+    }
+  };
+
+  const handleSaveAllReminders = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSaveReminders(e);
+    handleSaveTelegram(e);
+  };
+
   // Agency info state
   const [agencyName, setAgencyName] = useState('Elisam Sigorta Aracılık Hizmetleri');
   const [taxNo, setTaxNo] = useState('1234567890');
@@ -343,68 +402,169 @@ export default function AyarlarPage() {
           </div>
         )}
 
-        {/* Tab 4: Hatırlatmalar */}
+        {/* Tab 4: Hatırlatmalar & Telegram Bot */}
         {activeTab === 'hatirlatmalar' && (
-          <div style={{ maxWidth: '600px' }}>
-            <div style={{ marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#2d3748', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Bell size={18} color="#3498db" /> Poliçe Bitiş Hatırlatmaları
-              </h3>
-              <p style={{ fontSize: '0.88rem', color: '#718096' }}>
-                Poliçesi sona ermek üzere olan müşteriler, ayarladığınız süreler kadar öncesinden Dashboard&apos;da otomatik olarak listelenir.
-              </p>
-            </div>
+          <div style={{ maxWidth: '720px' }}>
+            
+            {/* Form */}
+            <form onSubmit={handleSaveAllReminders}>
+              
+              {/* 1. Kısım: Uygulama İçi Hatırlatma Günleri */}
+              <div style={{ marginBottom: '28px', paddingBottom: '24px', borderBottom: '1px solid #edf2f7' }}>
+                <div style={{ marginBottom: '18px' }}>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#2d3748', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <Bell size={20} color="#3498db" /> 1. Poliçe Bitiş Hatırlatma Sıklığı
+                  </h3>
+                  <p style={{ fontSize: '0.85rem', color: '#718096' }}>
+                    Poliçesi sona ermek üzere olan müşteriler, belirlediğiniz süreler kadar önce sistemde ve bildirimlerde öne çıkarılır.
+                  </p>
+                </div>
 
-            <form onSubmit={handleSaveReminders}>
-              {/* Reminder Row Helper */}
-              {[
-                { enabled: r1, setEnabled: setR1, days: r1Days, setDays: setR1Days, label: '1. Hatırlatma' },
-                { enabled: r2, setEnabled: setR2, days: r2Days, setDays: setR2Days, label: '2. Hatırlatma' },
-                { enabled: r3, setEnabled: setR3, days: r3Days, setDays: setR3Days, label: '3. Hatırlatma' },
-              ].map(({ enabled, setEnabled, days, setDays, label }) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px', padding: '16px', backgroundColor: enabled ? '#f0f9ff' : '#f8fafc', borderRadius: '10px', border: `1px solid ${enabled ? '#bee3f8' : '#e2e8f0'}` }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', minWidth: '140px' }}>
-                    <input
-                      type="checkbox"
-                      checked={enabled}
-                      onChange={(e) => setEnabled(e.target.checked)}
-                      style={{ width: '18px', height: '18px', accentColor: '#3498db', cursor: 'pointer' }}
+                {/* Reminder Row Helper */}
+                {[
+                  { enabled: r1, setEnabled: setR1, days: r1Days, setDays: setR1Days, label: '1. Hatırlatma' },
+                  { enabled: r2, setEnabled: setR2, days: r2Days, setDays: setR2Days, label: '2. Hatırlatma' },
+                  { enabled: r3, setEnabled: setR3, days: r3Days, setDays: setR3Days, label: '3. Hatırlatma' },
+                ].map(({ enabled, setEnabled, days, setDays, label }) => (
+                  <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px', padding: '14px 16px', backgroundColor: enabled ? '#f0f9ff' : '#f8fafc', borderRadius: '10px', border: `1px solid ${enabled ? '#bee3f8' : '#e2e8f0'}` }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', minWidth: '130px' }}>
+                      <input
+                        type="checkbox"
+                        checked={enabled}
+                        onChange={(e) => setEnabled(e.target.checked)}
+                        style={{ width: '18px', height: '18px', accentColor: '#3498db', cursor: 'pointer' }}
+                      />
+                      <span style={{ fontWeight: 600, color: '#2d3748', fontSize: '0.9rem' }}>{label}</span>
+                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, opacity: enabled ? 1 : 0.4, pointerEvents: enabled ? 'auto' : 'none' }}>
+                      <input
+                        type="number"
+                        min={1}
+                        max={365}
+                        value={days}
+                        onChange={(e) => setDays(Number(e.target.value))}
+                        style={{ width: '75px', padding: '8px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none', fontWeight: 700, fontSize: '0.95rem', textAlign: 'center' }}
+                      />
+                      <span style={{ color: '#4a5568', fontSize: '0.88rem' }}>gün önce bildir</span>
+                      <span style={{ fontSize: '0.8rem', color: '#718096' }}>
+                        {days === 1 ? '(bitiş günü)' : days <= 7 ? `(${days} gün kala)` : days <= 31 ? `(${Math.round(days/7)} hafta kala)` : `(${Math.round(days/30)} ay kala)`}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 2. Kısım: Telegram Botu Entegrasyonu */}
+              <div style={{ marginBottom: '28px', padding: '20px', backgroundColor: '#f0fdf4', borderRadius: '14px', border: '1px solid #bbf7d0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#166534', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '1.3rem' }}>🤖</span> Telegram Bildirim Botu Entegrasyonu
+                  </h3>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '4px 10px', borderRadius: '20px', backgroundColor: botToken && chatId ? '#dcfce7' : '#fef3c7', color: botToken && chatId ? '#15803d' : '#b45309' }}>
+                    {botToken && chatId ? '🟢 Entegre Edildi' : '🟡 Kurulum Bekliyor'}
+                  </span>
+                </div>
+
+                <p style={{ fontSize: '0.86rem', color: '#15803d', lineHeight: '1.5', marginBottom: '18px' }}>
+                  Poliçe bitişleri, yaklaşan ödemeler ve geciken taksitler anında Telegram grubunuza veya özel botunuza otomatik mesaj olarak gönderilir.
+                </p>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '14px', marginBottom: '18px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#166534', marginBottom: '6px' }}>Telegram Bot Token</label>
+                    <input 
+                      type="text"
+                      value={botToken}
+                      onChange={(e) => setBotToken(e.target.value)}
+                      placeholder="Örn: 7829418294:AAHF279182hkshf9812..."
+                      style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1px solid #86efac', outline: 'none', fontFamily: 'monospace', fontSize: '0.9rem', backgroundColor: '#ffffff' }}
                     />
-                    <span style={{ fontWeight: 600, color: '#2d3748', fontSize: '0.9rem' }}>{label}</span>
-                  </label>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, opacity: enabled ? 1 : 0.4, pointerEvents: enabled ? 'auto' : 'none' }}>
-                    <input
-                      type="number"
-                      min={1}
-                      max={365}
-                      value={days}
-                      onChange={(e) => setDays(Number(e.target.value))}
-                      style={{ width: '80px', padding: '8px 10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none', fontWeight: 700, fontSize: '1rem', textAlign: 'center' }}
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#166534', marginBottom: '6px' }}>Telegram Chat ID / Grup ID</label>
+                    <input 
+                      type="text"
+                      value={chatId}
+                      onChange={(e) => setChatId(e.target.value)}
+                      placeholder="Örn: 591823901 veya -1009182741"
+                      style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1px solid #86efac', outline: 'none', fontFamily: 'monospace', fontSize: '0.9rem', backgroundColor: '#ffffff' }}
                     />
-                    <span style={{ color: '#4a5568', fontSize: '0.9rem' }}>gün önce bildir</span>
-                    <span style={{ fontSize: '0.8rem', color: '#718096' }}>
-                      {days === 1 ? '(bitiş günü)' : days <= 7 ? `(${days} gün kala)` : days <= 31 ? `(${Math.round(days/7)} hafta kala)` : `(${Math.round(days/30)} ay kala)`}
-                    </span>
                   </div>
                 </div>
-              ))}
 
-              <div style={{ marginTop: '24px', padding: '16px', backgroundColor: '#fffaf0', borderRadius: '10px', border: '1px solid #feebc8' }}>
-                <h4 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#744210', marginBottom: '8px' }}>📋 Hatırlatma Yöntemi</h4>
-                <p style={{ fontSize: '0.85rem', color: '#92400e' }}>
-                  Aktif hatırlatmalar, Dashboard &rarr; &ldquo;Yaklaşan Yenilemeler&rdquo; bölümünde otomatik olarak listelenir.
-                  WhatsApp hatırlatması için müşteri sayfasından doğrudan mesaj gönderin.
-                </p>
+                {/* Bildirim Seçenekleri */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '18px', backgroundColor: '#ffffff', padding: '12px 16px', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.86rem', color: '#166534', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={notifyExpiry} onChange={(e) => setNotifyExpiry(e.target.checked)} style={{ accentColor: '#16a34a' }} />
+                    <strong>Poliçe Yenileme Bildirimleri</strong> (Yaklaşan poliçeleri otomatik ilet)
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.86rem', color: '#166534', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={notifyInstallments} onChange={(e) => setNotifyInstallments(e.target.checked)} style={{ accentColor: '#16a34a' }} />
+                    <strong>Taksit & Borç Bildirimleri</strong> (Vadesi gelen/geçen taksitleri ilet)
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.86rem', color: '#166534', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={notifyNewPolicy} onChange={(e) => setNotifyNewPolicy(e.target.checked)} style={{ accentColor: '#16a34a' }} />
+                    <strong>Yeni Poliçe Kesim Bildirimi</strong> (Sistemde yeni poliçe oluşturulduğunda bildir)
+                  </label>
+                </div>
+
+                {/* Telegram Test Butonu */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                  <button 
+                    type="button" 
+                    onClick={handleTestTelegram} 
+                    disabled={isTestingTelegram}
+                    style={{ 
+                      padding: '10px 18px', 
+                      backgroundColor: '#15803d', 
+                      color: '#ffffff', 
+                      border: 'none', 
+                      borderRadius: '8px', 
+                      fontWeight: 700, 
+                      fontSize: '0.88rem', 
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px'
+                    }}
+                  >
+                    {isTestingTelegram ? '⏳ Test Gönderiliyor...' : '📲 Telegram Bağlantısını Test Et'}
+                  </button>
+
+                  {telegramStatus === 'success' && (
+                    <span style={{ color: '#15803d', fontWeight: 700, fontSize: '0.88rem' }}>
+                      ✅ Harika! Test bildirimi Telegram&apos;a başarıyla ulaştı.
+                    </span>
+                  )}
+                  {telegramStatus && telegramStatus.startsWith('error') && (
+                    <span style={{ color: '#dc2626', fontWeight: 600, fontSize: '0.85rem' }}>
+                      ❌ Hata: {telegramStatus.replace('error: ', '')}
+                    </span>
+                  )}
+                </div>
+
+                {/* Bot Kurulum Rehberi */}
+                <div style={{ marginTop: '16px', padding: '12px 14px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  <strong style={{ fontSize: '0.82rem', color: '#334155', display: 'block', marginBottom: '6px' }}>💡 3 Adımda Bot Kurulumu:</strong>
+                  <ol style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: '#64748b', lineHeight: '1.6' }}>
+                    <li>Telegram&apos;da <code>@BotFather</code> hesabına gidin, <code>/newbot</code> yazarak bot oluşturup <strong>Token</strong> alın.</li>
+                    <li>Botunuzu grubunuza veya özel sohbetinize ekleyip bir mesaj yazın. <code>@userinfobot</code> ile <strong>Chat ID</strong> nizi öğrenin.</li>
+                    <li>Yukarıdaki kutulara yapıştırıp &ldquo;Test Et&rdquo; butonuna basın.</li>
+                  </ol>
+                </div>
               </div>
 
-              <div style={{ marginTop: '20px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <button type="submit" className={styles.btnCrm} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                  <Save size={18} /> Ayarları Kaydet
+              {/* Kaydet Butonu */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                <button type="submit" className={styles.btnCrm} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 24px', fontSize: '0.95rem' }}>
+                  <Save size={18} /> Tüm Hatırlatma & Telegram Ayarlarını Kaydet
                 </button>
                 {reminderSaved && (
-                  <span style={{ color: '#38a169', fontWeight: 600, fontSize: '0.9rem' }}>✓ Kaydedildi!</span>
+                  <span style={{ color: '#16a34a', fontWeight: 700, fontSize: '0.92rem' }}>✓ Ayarlar Başarıyla Kaydedildi!</span>
                 )}
               </div>
+
             </form>
           </div>
         )}

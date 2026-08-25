@@ -26,6 +26,7 @@ export default function MusterilerPage() {
   const [notes, setNotes] = useState('');
   
   // Extended fields
+  const [policyNo, setPolicyNo] = useState('');
   const [insuranceType, setInsuranceType] = useState('Kasko');
   const [policyStartDate, setPolicyStartDate] = useState('');
   const [policyEndDate, setPolicyEndDate] = useState('');
@@ -55,6 +56,7 @@ export default function MusterilerPage() {
     setAddress('');
     setBirthDate('');
     setNotes('');
+    setPolicyNo('');
     setInsuranceType('Kasko');
     setPolicyStartDate('');
     setPolicyEndDate('');
@@ -81,6 +83,7 @@ export default function MusterilerPage() {
     setAddress(cust.address);
     setBirthDate(cust.birthDate || '');
     setNotes(cust.notes || '');
+    setPolicyNo(cust.policyNo || '');
     setInsuranceType(cust.insuranceType || 'Kasko');
     setPolicyStartDate(cust.policyStartDate || '');
     setPolicyEndDate(cust.policyEndDate || '');
@@ -107,6 +110,9 @@ export default function MusterilerPage() {
 
     const parsedName = extract(/Ad \/ Soy Ad:\s*(.*)/i);
     if (parsedName) setName(parsedName);
+
+    const parsedPolicyNo = extract(/Poliçe (?:No|Numarası):\s*(.*)/i);
+    if (parsedPolicyNo) setPolicyNo(parsedPolicyNo);
 
     const parsedTckn = extract(/Tckn\/Vergi No:\s*(.*)/i);
     if (parsedTckn) setIdentityNo(parsedTckn);
@@ -163,7 +169,7 @@ export default function MusterilerPage() {
         address: address || 'Alanya / Antalya',
         birthDate: birthDate || c.birthDate,
         notes: notes || c.notes,
-        insuranceType, policyStartDate, policyEndDate, plate, documentSerial, vehicleUsage, vehicleBrand, vehicleType, vehicleModelYear, vehicleRegistrationDate, vehicleValue
+        policyNo, insuranceType, policyStartDate, policyEndDate, plate, documentSerial, vehicleUsage, vehicleBrand, vehicleType, vehicleModelYear, vehicleRegistrationDate, vehicleValue
       } : c));
     } else {
       const newCustomer: Customer = {
@@ -177,7 +183,7 @@ export default function MusterilerPage() {
         birthDate: birthDate || undefined,
         notes: notes || 'Yeni müşteri kaydı.',
         createdAt: new Date().toLocaleDateString('tr-TR'),
-        insuranceType, policyStartDate, policyEndDate, plate, documentSerial, vehicleUsage, vehicleBrand, vehicleType, vehicleModelYear, vehicleRegistrationDate, vehicleValue
+        policyNo, insuranceType, policyStartDate, policyEndDate, plate, documentSerial, vehicleUsage, vehicleBrand, vehicleType, vehicleModelYear, vehicleRegistrationDate, vehicleValue
       };
       setCustomers([newCustomer, ...customers]);
     }
@@ -595,16 +601,22 @@ export default function MusterilerPage() {
               <div style={{ marginTop: '20px', marginBottom: '20px', padding: '15px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #edf2f7' }}>
                 <h3 style={{ fontSize: '0.95rem', fontWeight: 600, color: '#2d3748', marginBottom: '15px' }}>Sigorta ve Araç Bilgileri</h3>
                 
-                <div style={{ marginBottom: '15px' }}>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Sigorta Türü</label>
-                  <select value={insuranceType} onChange={(e) => setInsuranceType(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }}>
-                    <option value="Kasko">Kasko</option>
-                    <option value="Trafik">Trafik</option>
-                    <option value="Özel Sağlık">Özel Sağlık</option>
-                    <option value="DASK">DASK</option>
-                    <option value="Konut">Konut</option>
-                    <option value="İşyeri">İşyeri</option>
-                  </select>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '15px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Poliçe Numarası</label>
+                    <input type="text" value={policyNo} onChange={(e) => setPolicyNo(e.target.value)} placeholder="Örn: 312984920/0" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none', fontWeight: 600, fontFamily: 'monospace' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Sigorta Türü</label>
+                    <select value={insuranceType} onChange={(e) => setInsuranceType(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }}>
+                      <option value="Kasko">Kasko</option>
+                      <option value="Trafik">Trafik</option>
+                      <option value="Özel Sağlık">Özel Sağlık</option>
+                      <option value="DASK">DASK</option>
+                      <option value="Konut">Konut</option>
+                      <option value="İşyeri">İşyeri</option>
+                    </select>
+                  </div>
                 </div>
 
                 {(insuranceType === 'Kasko' || insuranceType === 'Trafik') && (

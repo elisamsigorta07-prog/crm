@@ -14,12 +14,16 @@ export default function PolicelerPage() {
   const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
 
   // Form state
+  const [policyNo, setPolicyNo] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
   const [type, setType] = useState<Policy['type']>('Trafik');
   const [company, setCompany] = useState<Policy['company']>('HDI Sigorta');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState('2024-11-01');
+  const [endDate, setEndDate] = useState(new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0]);
   const [premium, setPremium] = useState('');
+  const [paidAmount, setPaidAmount] = useState('');
+  const [paymentType, setPaymentType] = useState<'Peşin / Tek Çekim' | 'Taksitli'>('Peşin / Tek Çekim');
+  const [installmentCount, setInstallmentCount] = useState<number>(3);
   const [commissionRate, setCommissionRate] = useState('15');
   const [paymentStatus, setPaymentStatus] = useState<Policy['paymentStatus']>('Ödendi');
   const [notes, setNotes] = useState('');
@@ -29,18 +33,30 @@ export default function PolicelerPage() {
     if (!selectedCustomerId || !premium) return;
 
     const matchedCustomer = customers.find(c => c.id === selectedCustomerId);
+    const prem = Number(premium);
+    const paid = Number(paidAmount) || (paymentType === 'Peşin / Tek Çekim' ? prem : Math.round(prem / installmentCount));
+    const remaining = Math.max(0, prem - paid);
+
+    const generatedPolicyNo = policyNo.trim() || `POL-${Math.floor(100000 + Math.random() * 900000)}`;
 
     const newPol: Policy = {
-      id: `POL-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: generatedPolicyNo,
+      policyNo: generatedPolicyNo,
       customerId: selectedCustomerId,
       customerName: matchedCustomer ? matchedCustomer.name : 'Bilinmeyen Müşteri',
+      customerPhone: matchedCustomer ? matchedCustomer.phone : '',
+      customerTc: matchedCustomer ? matchedCustomer.identityNo : '',
       type,
       company,
       startDate: startDate ? new Date(startDate).toLocaleDateString('tr-TR') : '01.01.2024',
       endDate: endDate ? new Date(endDate).toLocaleDateString('tr-TR') : '01.01.2025',
-      premium: Number(premium),
+      premium: prem,
+      paidAmount: paid,
+      remainingAmount: remaining,
+      paymentType,
+      installmentCount: paymentType === 'Taksitli' ? installmentCount : 1,
       commissionRate: Number(commissionRate) || 15,
-      paymentStatus,
+      paymentStatus: remaining === 0 ? 'Ödendi' : (paid > 0 ? 'Kısmi Ödendi' : 'Bekliyor'),
       status: 'Aktif',
       notes: notes || 'Yeni poliçe kaydı.'
     };
@@ -49,7 +65,9 @@ export default function PolicelerPage() {
     setIsAddModalOpen(false);
 
     // Reset Form
+    setPolicyNo('');
     setPremium('');
+    setPaidAmount('');
     setNotes('');
   };
 
@@ -349,6 +367,18 @@ export default function PolicelerPage() {
                 </select>
               </div>
 
+              {/* Poliçe Numarası Manuel Giriş */}
+              <div style={{ marginBottom: '15px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Poliçe Numarası (Manuel Yazın)</label>
+                <input 
+                  type="text" 
+                  value={policyNo} 
+                  onChange={(e) => setPolicyNo(e.target.value)} 
+                  placeholder="Örn: 312984920/0 veya AK-2024-912" 
+                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none', fontWeight: 600, fontFamily: 'monospace' }} 
+                />
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Poliçe Türü</label>
@@ -371,20 +401,59 @@ export default function PolicelerPage() {
                     <option value="Allianz">Allianz</option>
                     <option value="Anadolu Sigorta">Anadolu Sigorta</option>
                     <option value="Quick Sigorta">Quick Sigorta</option>
+                    <option value="Emaa Sigorta">Emaa Sigorta</option>
                   </select>
                 </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Brüt Prim (₺) *</label>
-                  <input type="number" required value={premium} onChange={(e) => setPremium(e.target.value)} placeholder="Örn: 14500" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }} />
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Toplam Brüt Prim (₺) *</label>
+                  <input type="number" required value={premium} onChange={(e) => setPremium(e.target.value)} placeholder="Örn: 14500" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none', fontWeight: 700 }} />
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Komisyon Oranı (%)</label>
                   <input type="number" value={commissionRate} onChange={(e) => setCommissionRate(e.target.value)} placeholder="15" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }} />
                 </div>
+              </div>
+
+              {/* Ödeme Türü ve Taksit Seçenekleri */}
+              <div style={{ padding: '12px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #edf2f7', marginBottom: '15px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Ödeme Şekli</label>
+                    <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as any)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none', fontWeight: 600 }}>
+                      <option value="Peşin / Tek Çekim">Peşin / Tek Çekim</option>
+                      <option value="Taksitli">Taksitli Ödeme</option>
+                    </select>
+                  </div>
+
+                  {paymentType === 'Taksitli' ? (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Taksit Sayısı</label>
+                      <select value={installmentCount} onChange={(e) => setInstallmentCount(Number(e.target.value))} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none', fontWeight: 600 }}>
+                        <option value={2}>2 Taksit</option>
+                        <option value={3}>3 Taksit</option>
+                        <option value={4}>4 Taksit</option>
+                        <option value={6}>6 Taksit</option>
+                        <option value={9}>9 Taksit</option>
+                        <option value={12}>12 Taksit</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Tahsil Edilen Tutar (₺)</label>
+                      <input type="number" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} placeholder={premium || "0"} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }} />
+                    </div>
+                  )}
+                </div>
+
+                {paymentType === 'Taksitli' && premium && (
+                  <div style={{ fontSize: '0.8rem', color: '#2b6cb0', fontWeight: 600, backgroundColor: '#ebf8ff', padding: '8px 12px', borderRadius: '6px' }}>
+                    💡 Aylık Taksit: ~{(Number(premium) / installmentCount).toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ₺ x {installmentCount} Ay
+                  </div>
+                )}
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>

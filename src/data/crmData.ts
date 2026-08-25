@@ -1,3 +1,11 @@
+export interface Installment {
+  installmentNo: number;
+  amount: number;
+  dueDate: string; // Vade Tarihi (DD.MM.YYYY veya YYYY-MM-DD)
+  paidDate?: string;
+  status: 'Ödendi' | 'Bekliyor' | 'Gecikmede';
+}
+
 export interface Customer {
   id: string;
   name: string;
@@ -9,7 +17,8 @@ export interface Customer {
   birthDate?: string;  // Doğum Tarihi
   notes?: string;
   createdAt: string;
-  // Yeni eklenen Araç ve Sigorta bilgileri
+  // Araç ve Sigorta bilgileri
+  policyNo?: string;   // Poliçe Numarası (Kullanıcının girdiği)
   insuranceType?: string;
   policyStartDate?: string;
   policyEndDate?: string;
@@ -25,15 +34,23 @@ export interface Customer {
 
 export interface Policy {
   id: string;
+  policyNo?: string; // Poliçe Numarası (Kullanıcının girdiği resmi numara)
   customerId: string;
   customerName: string;
+  customerPhone?: string;
+  customerTc?: string;
   type: 'Trafik' | 'Kasko' | 'DASK' | 'Konut' | 'Özel Sağlık' | 'İşyeri';
-  company: 'HDI Sigorta' | 'Ak Sigorta' | 'Sompo Sigorta' | 'Allianz' | 'Anadolu Sigorta' | 'Quick Sigorta';
+  company: 'HDI Sigorta' | 'Ak Sigorta' | 'Sompo Sigorta' | 'Allianz' | 'Anadolu Sigorta' | 'Quick Sigorta' | 'Emaa Sigorta';
   startDate: string;
   endDate: string;
-  premium: number; // Gross premium in TL
-  commissionRate: number; // e.g. 15 for 15%
-  paymentStatus: 'Ödendi' | 'Bekliyor' | 'Taksitli';
+  premium: number; // Toplam Brüt Prim (TL)
+  paidAmount: number; // Şimdiye kadar tahsil edilen (TL)
+  remainingAmount: number; // Kalan bakiye / borç (TL)
+  commissionRate: number; // örn %15
+  paymentType: 'Peşin / Tek Çekim' | 'Taksitli';
+  installmentCount?: number; // Taksit sayısı (1-12)
+  installments?: Installment[]; // Taksit dökümü
+  paymentStatus: 'Ödendi' | 'Bekliyor' | 'Taksitli' | 'Kısmi Ödendi' | 'Gecikmede';
   status: 'Aktif' | 'Yaklaşıyor' | 'Biten';
   notes?: string;
 }
@@ -48,7 +65,9 @@ export interface FinancialTransaction {
   partyName: string; // Müşteri veya Kurum/Firma Adı
   partyType: 'Müşteri' | 'Sigorta Şirketi' | 'Tedarikçi/Diğer';
   policyId?: string;
-  category: 'Poliçe Primi Tahsilatı' | 'Şirket Hakediş Ödemesi' | 'Acente Komisyonu' | 'Ofis & Operasyon' | 'Personel & Maaş' | 'Diğer';
+  policyNo?: string;
+  customerId?: string;
+  category: 'Poliçe Primi Tahsilatı' | 'Poliçe Taksit Ödemesi' | 'Şirket Hakediş Ödemesi' | 'Acente Komisyonu' | 'Ofis & Operasyon' | 'Personel & Maaş' | 'Diğer';
   amount: number;
   paymentMethod: 'Kredi Kartı' | 'Banka Havalesi / EFT' | 'Nakit' | 'Çek / Senet';
   date: string;

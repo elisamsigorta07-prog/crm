@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Search, 
   Plus, 
@@ -11,805 +11,911 @@ import {
   TrendingUp, 
   TrendingDown, 
   Clock, 
-  ArrowUpRight, 
-  ArrowDownRight, 
   Printer, 
   CheckCircle2, 
   AlertCircle, 
   FileText, 
-  Building2, 
   User, 
   Calendar,
   CreditCard,
   Banknote,
-  Receipt
+  Send,
+  MessageCircle,
+  ChevronRight,
+  ShieldCheck
 } from 'lucide-react';
 import { 
-  FinancialTransaction, 
-  initialFinancialTransactionsData, 
   Customer, 
   initialCustomersData, 
   Policy, 
-  initialPoliciesData 
+  initialPoliciesData,
+  Installment
 } from '@/data/crmData';
 import styles from '../layout.module.css';
 
+// Müşteri Borç / Taksit Kaydı
+export interface CustomerDebtRecord {
+  id: string;
+  customerId: string;
+  customerName: string;
+  customerPhone: string;
+  customerTc?: string;
+  policyNo: string;
+  insuranceType: string;
+  company: string;
+  totalAmount: number;      // Toplam Prim / Borç Tutarı
+  paidAmount: number;       // Ödenen Tutar
+  remainingAmount: number;  // Kalan Bakiye
+  paymentType: 'Peşin / Tek Çekim' | 'Taksitli';
+  installmentCount: number;
+  installments: Installment[];
+  status: 'Ödendi' | 'Kısmi Ödendi' | 'Gecikmede' | 'Bekliyor';
+  startDate: string;
+  notes?: string;
+}
+
+// Kasa İşlem Kaydı
+export interface CashLog {
+  id: string;
+  date: string;
+  customerName: string;
+  policyNo: string;
+  amount: number;
+  paymentMethod: 'Kredi Kartı' | 'Banka Havalesi / EFT' | 'Nakit' | 'Çek / Senet';
+  type: 'Tahsilat' | 'Gider / İade';
+  description: string;
+}
+
 export default function SigortaFinansPage() {
-  const [transactions, setTransactions] = useState<FinancialTransaction[]>(initialFinancialTransactionsData);
-  const [customers] = useState<Customer[]>(initialCustomersData);
-  const [policies] = useState<Policy[]>(initialPoliciesData);
-
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'hepsi' | 'tahsilat' | 'odeme' | 'bekleyen' | 'cari'>('hepsi');
-  const [categoryFilter, setCategoryFilter] = useState<string>('Hepsi');
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState<FinancialTransaction | null>(null);
-
-  // Form State for New Transaction
-  const [type, setType] = useState<'Tahsilat' | 'Ödeme'>('Tahsilat');
-  const [partyType, setPartyType] = useState<'Müşteri' | 'Sigorta Şirketi' | 'Tedarikçi/Diğer'>('Müşteri');
-  const [partyName, setPartyName] = useState('');
-  const [policyId, setPolicyId] = useState('');
-  const [category, setCategory] = useState<FinancialTransaction['category']>('Poliçe Primi Tahsilatı');
-  const [amount, setAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<FinancialTransaction['paymentMethod']>('Kredi Kartı');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [dueDate, setDueDate] = useState('');
-  const [status, setStatus] = useState<FinancialTransaction['status']>('Tahsil Edildi');
-  const [description, setDescription] = useState('');
-
-  // Auto-fill policy info when selected
-  const handlePolicyChange = (pId: string) => {
-    setPolicyId(pId);
-    if (!pId) return;
-    const matchedPol = policies.find(p => p.id === pId);
-    if (matchedPol) {
-      setPartyName(matchedPol.customerName);
-      setPartyType('Müşteri');
-      setAmount(matchedPol.premium.toString());
-      setDescription(`${matchedPol.id} numaralı ${matchedPol.type} poliçesi tahsilatı.`);
+  // Local storage state for persistent records
+  const loadDebtRecords = (): CustomerDebtRecord[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const saved = localStorage.getItem('elisam_debt_records');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
     }
   };
 
-  const handleAddTransaction = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!partyName || !amount) return;
+  const loadCashLogs = (): CashLog[] => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const saved = localStorage.getItem('elisam_cash_logs');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  };
 
-    const newTx: FinancialTransaction = {
-      id: `FIN-${Math.floor(1000 + Math.random() * 9000)}`,
-      type,
-      partyType,
-      partyName,
-      policyId: policyId || undefined,
-      category,
-      amount: Number(amount),
-      paymentMethod,
-      date: date ? new Date(date).toLocaleDateString('tr-TR') : new Date().toLocaleDateString('tr-TR'),
-      dueDate: dueDate ? new Date(dueDate).toLocaleDateString('tr-TR') : undefined,
-      status: type === 'Tahsilat' ? (status === 'Ödendi' ? 'Tahsil Edildi' : status) : (status === 'Tahsil Edildi' ? 'Ödendi' : status),
-      description: description || `${type} kaydı oluşturuldu.`
+  const [records, setRecords] = useState<CustomerDebtRecord[]>(loadDebtRecords);
+  const [cashLogs, setCashLogs] = useState<CashLog[]>(loadCashLogs);
+  const [customers] = useState<Customer[]>(initialCustomersData);
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState<'tumu' | 'kalan' | 'geciken' | 'odendi' | 'kasa'>('tumu');
+  
+  // Modals
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isCollectModalOpen, setIsCollectModalOpen] = useState(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState<CustomerDebtRecord | null>(null);
+
+  // New Record Form State
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [customCustomerName, setCustomCustomerName] = useState('');
+  const [customCustomerPhone, setCustomCustomerPhone] = useState('');
+  const [customCustomerTc, setCustomCustomerTc] = useState('');
+  const [policyNo, setPolicyNo] = useState('');
+  const [insuranceType, setInsuranceType] = useState('Kasko');
+  const [company, setCompany] = useState('HDI Sigorta');
+  const [totalAmount, setTotalAmount] = useState('');
+  const [initialPaidAmount, setInitialPaidAmount] = useState('');
+  const [paymentType, setPaymentType] = useState<'Peşin / Tek Çekim' | 'Taksitli'>('Peşin / Tek Çekim');
+  const [installmentCount, setInstallmentCount] = useState<number>(3);
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [notes, setNotes] = useState('');
+
+  // Collect Payment Modal State
+  const [collectAmount, setCollectAmount] = useState('');
+  const [collectMethod, setCollectMethod] = useState<'Kredi Kartı' | 'Banka Havalesi / EFT' | 'Nakit'>('Kredi Kartı');
+  const [collectNote, setCollectNote] = useState('');
+
+  // Save to localStorage when state updates
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('elisam_debt_records', JSON.stringify(records));
+    }
+  }, [records]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('elisam_cash_logs', JSON.stringify(cashLogs));
+    }
+  }, [cashLogs]);
+
+  // Handle Customer Selection in New Record Modal
+  const handleCustomerSelect = (cId: string) => {
+    setSelectedCustomerId(cId);
+    if (cId === 'custom') {
+      setCustomCustomerName('');
+      setCustomCustomerPhone('');
+      setCustomCustomerTc('');
+      return;
+    }
+    const found = customers.find(c => c.id === cId);
+    if (found) {
+      setCustomCustomerName(found.name);
+      setCustomCustomerPhone(found.phone);
+      setCustomCustomerTc(found.identityNo || '');
+      if (found.policyNo) setPolicyNo(found.policyNo);
+      if (found.insuranceType) setInsuranceType(found.insuranceType);
+    }
+  };
+
+  // Create Installments Helper
+  const generateInstallments = (total: number, count: number, start: string, initialPaid: number): Installment[] => {
+    const installments: Installment[] = [];
+    const monthlyAmt = Math.round(total / count);
+    const sDate = start ? new Date(start) : new Date();
+
+    let paidRemaining = initialPaid;
+
+    for (let i = 1; i <= count; i++) {
+      const dueDate = new Date(sDate);
+      dueDate.setMonth(dueDate.getMonth() + (i - 1));
+      const formattedDue = dueDate.toLocaleDateString('tr-TR');
+
+      const isOverdue = dueDate < new Date() && paidRemaining < monthlyAmt;
+      const isPaid = paidRemaining >= monthlyAmt;
+      
+      if (isPaid) {
+        paidRemaining -= monthlyAmt;
+      }
+
+      installments.push({
+        installmentNo: i,
+        amount: i === count ? (total - monthlyAmt * (count - 1)) : monthlyAmt,
+        dueDate: formattedDue,
+        status: isPaid ? 'Ödendi' : (isOverdue ? 'Gecikmede' : 'Bekliyor'),
+        paidDate: isPaid ? new Date().toLocaleDateString('tr-TR') : undefined
+      });
+    }
+
+    return installments;
+  };
+
+  // Add New Debt / Policy Record
+  const handleAddRecord = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customCustomerName || !totalAmount) return;
+
+    const total = Number(totalAmount);
+    const paid = Number(initialPaidAmount) || (paymentType === 'Peşin / Tek Çekim' ? total : 0);
+    const remaining = Math.max(0, total - paid);
+
+    const instCount = paymentType === 'Taksitli' ? installmentCount : 1;
+    const installments = generateInstallments(total, instCount, startDate, paid);
+
+    const generatedPolicyNo = policyNo.trim() || `POL-${Math.floor(100000 + Math.random() * 900000)}`;
+
+    const newRecord: CustomerDebtRecord = {
+      id: `REC-${Math.floor(1000 + Math.random() * 9000)}`,
+      customerId: selectedCustomerId || 'CUSTOM',
+      customerName: customCustomerName,
+      customerPhone: customCustomerPhone || '-',
+      customerTc: customCustomerTc || '-',
+      policyNo: generatedPolicyNo,
+      insuranceType,
+      company,
+      totalAmount: total,
+      paidAmount: paid,
+      remainingAmount: remaining,
+      paymentType,
+      installmentCount: instCount,
+      installments,
+      status: remaining === 0 ? 'Ödendi' : (paid > 0 ? 'Kısmi Ödendi' : 'Bekliyor'),
+      startDate: startDate ? new Date(startDate).toLocaleDateString('tr-TR') : new Date().toLocaleDateString('tr-TR'),
+      notes: notes || 'Poliçe ödeme kaydı.'
     };
 
-    setTransactions([newTx, ...transactions]);
+    setRecords([newRecord, ...records]);
+
+    // If initial payment was made, add to cash log
+    if (paid > 0) {
+      const newCashLog: CashLog = {
+        id: `LOG-${Math.floor(1000 + Math.random() * 9000)}`,
+        date: new Date().toLocaleDateString('tr-TR'),
+        customerName: customCustomerName,
+        policyNo: generatedPolicyNo,
+        amount: paid,
+        paymentMethod: 'Kredi Kartı',
+        type: 'Tahsilat',
+        description: `${generatedPolicyNo} nolu ${insuranceType} poliçesi peşinat/ilk tahsilatı.`
+      };
+      setCashLogs([newCashLog, ...cashLogs]);
+    }
+
     setIsAddModalOpen(false);
 
     // Reset Form
-    setPartyName('');
-    setPolicyId('');
-    setAmount('');
-    setDescription('');
-    setDueDate('');
+    setCustomCustomerName('');
+    setCustomCustomerPhone('');
+    setCustomCustomerTc('');
+    setPolicyNo('');
+    setTotalAmount('');
+    setInitialPaidAmount('');
+    setNotes('');
   };
 
-  const handleMarkAsPaid = (txId: string) => {
-    setTransactions(prev => prev.map(tx => {
-      if (tx.id === txId) {
-        return {
-          ...tx,
-          status: tx.type === 'Tahsilat' ? 'Tahsil Edildi' : 'Ödendi'
-        };
+  // Handle Collecting Partial or Installment Payment
+  const handleCollectPayment = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRecord || !collectAmount) return;
+
+    const amt = Number(collectAmount);
+    if (amt <= 0) return;
+
+    const newPaid = selectedRecord.paidAmount + amt;
+    const newRemaining = Math.max(0, selectedRecord.totalAmount - newPaid);
+
+    // Update installments status
+    let remainingPaidPool = newPaid;
+    const updatedInstallments = selectedRecord.installments.map(inst => {
+      if (remainingPaidPool >= inst.amount) {
+        remainingPaidPool -= inst.amount;
+        return { ...inst, status: 'Ödendi' as const, paidDate: inst.paidDate || new Date().toLocaleDateString('tr-TR') };
+      } else {
+        return { ...inst, status: (inst.status === 'Ödendi' ? 'Bekliyor' : inst.status) as any };
       }
-      return tx;
-    }));
-    if (selectedTransaction && selectedTransaction.id === txId) {
-      setSelectedTransaction(prev => prev ? {
-        ...prev,
-        status: prev.type === 'Tahsilat' ? 'Tahsil Edildi' : 'Ödendi'
-      } : null);
+    });
+
+    const updatedRecord: CustomerDebtRecord = {
+      ...selectedRecord,
+      paidAmount: newPaid,
+      remainingAmount: newRemaining,
+      status: newRemaining === 0 ? 'Ödendi' : 'Kısmi Ödendi',
+      installments: updatedInstallments
+    };
+
+    setRecords(records.map(r => r.id === selectedRecord.id ? updatedRecord : r));
+
+    // Log to Cash Book
+    const newLog: CashLog = {
+      id: `LOG-${Math.floor(1000 + Math.random() * 9000)}`,
+      date: new Date().toLocaleDateString('tr-TR'),
+      customerName: selectedRecord.customerName,
+      policyNo: selectedRecord.policyNo,
+      amount: amt,
+      paymentMethod: collectMethod,
+      type: 'Tahsilat',
+      description: collectNote || `${selectedRecord.policyNo} nolu poliçeye ait ${amt.toLocaleString('tr-TR')} ₺ tahsilat.`
+    };
+    setCashLogs([newLog, ...cashLogs]);
+
+    setIsCollectModalOpen(false);
+    setSelectedRecord(null);
+    setCollectAmount('');
+    setCollectNote('');
+  };
+
+  // WhatsApp Reminder Generator
+  const sendWhatsAppReminder = (rec: CustomerDebtRecord) => {
+    const cleanPhone = rec.customerPhone.replace(/\s+/g, '').replace(/^0/, '90');
+    const msg = `Sayın ${rec.customerName},\n\nElisam Sigorta acentemizden bildirilmektedir.\n${rec.policyNo} numaralı ${rec.insuranceType} poliçenize ait kalan borç / taksit tutarınız: *${rec.remainingAmount.toLocaleString('tr-TR')} ₺*'dir.\n\nÖdemenizi güvenle gerçekleştirmek için bizimle iletişime geçebilirsiniz:\n📞 0551 438 77 71\nElisam Sigorta • Alanya`;
+    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+  };
+
+  // Telegram Reminder Generator (uses config from Ayarlar)
+  const sendTelegramReminder = async (rec: CustomerDebtRecord) => {
+    try {
+      const config = JSON.parse(localStorage.getItem('elisam_telegram_config') || '{}');
+      if (!config.botToken || !config.chatId) {
+        alert('Lütfen önce Ayarlar -> Hatırlatmalar & Telegram bölümünden Bot Token ve Chat ID bilgilerinizi kaydedin.');
+        return;
+      }
+
+      const text = `💳 *Ödeme / Taksit Hatırlatması*\n\n👤 *Müşteri:* ${rec.customerName}\n📱 *Telefon:* ${rec.customerPhone}\n📄 *Poliçe No:* \`${rec.policyNo}\` (${rec.insuranceType} - ${rec.company})\n💰 *Toplam Prim:* ${rec.totalAmount.toLocaleString('tr-TR')} ₺\n🟢 *Ödenen:* ${rec.paidAmount.toLocaleString('tr-TR')} ₺\n🔴 *Kalan Borç:* ${rec.remainingAmount.toLocaleString('tr-TR')} ₺\n📅 *Ödeme Tipi:* ${rec.paymentType} (${rec.installmentCount} Taksit)\n\n⏰ *Hatırlatma Zamanı:* ${new Date().toLocaleString('tr-TR')}`;
+
+      const res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: config.chatId, text, parse_mode: 'Markdown' })
+      });
+      const data = await res.json();
+      if (data.ok) {
+        alert(`✓ ${rec.customerName} müşterisine ait borç özeti Telegram kanalınıza başarıyla iletildi!`);
+      } else {
+        alert(`Telegram Hatası: ${data.description}`);
+      }
+    } catch (err: any) {
+      alert('Telegram mesajı gönderilemedi: ' + err.message);
     }
   };
 
   // Calculations
-  const totalTahsilat = transactions
-    .filter(t => t.type === 'Tahsilat' && t.status === 'Tahsil Edildi')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const totalOdeme = transactions
-    .filter(t => t.type === 'Ödeme' && t.status === 'Ödendi')
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const netKasa = totalTahsilat - totalOdeme;
-
-  const totalBekleyen = transactions
-    .filter(t => t.status === 'Bekliyor' || t.status === 'Gecikmede')
-    .reduce((sum, t) => sum + t.amount, 0);
+  const totalTahakkuk = records.reduce((s, r) => s + r.totalAmount, 0);
+  const totalTahsilEdilen = records.reduce((s, r) => s + r.paidAmount, 0);
+  const totalKalanAlacak = records.reduce((s, r) => s + r.remainingAmount, 0);
+  const totalGeciken = records
+    .filter(r => r.status === 'Gecikmede' || (r.remainingAmount > 0 && r.installments.some(i => i.status === 'Gecikmede')))
+    .reduce((s, r) => s + r.remainingAmount, 0);
 
   // Filtered List
-  const filteredTransactions = transactions.filter(t => {
-    const matchesSearch = t.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          t.partyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          t.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          (t.policyId && t.policyId.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredRecords = records.filter(r => {
+    const matchesSearch = r.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          r.policyNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                          r.customerPhone.includes(searchTerm) ||
+                          (r.customerTc && r.customerTc.includes(searchTerm));
 
-    const matchesCategory = categoryFilter === 'Hepsi' || t.category === categoryFilter;
-
-    if (activeTab === 'tahsilat') return matchesSearch && matchesCategory && t.type === 'Tahsilat';
-    if (activeTab === 'odeme') return matchesSearch && matchesCategory && t.type === 'Ödeme';
-    if (activeTab === 'bekleyen') return matchesSearch && matchesCategory && (t.status === 'Bekliyor' || t.status === 'Gecikmede');
-    
-    return matchesSearch && matchesCategory;
-  });
-
-  // Calculate Balances per Customer / Company for Cari Tab
-  const partyBalances = Array.from(new Set(transactions.map(t => t.partyName))).map(name => {
-    const partyTxs = transactions.filter(t => t.partyName === name);
-    const tahsilEdilen = partyTxs.filter(t => t.type === 'Tahsilat' && t.status === 'Tahsil Edildi').reduce((s, t) => s + t.amount, 0);
-    const odenen = partyTxs.filter(t => t.type === 'Ödeme' && t.status === 'Ödendi').reduce((s, t) => s + t.amount, 0);
-    const bekleyen = partyTxs.filter(t => t.status === 'Bekliyor' || t.status === 'Gecikmede').reduce((s, t) => s + t.amount, 0);
-    const partyType = partyTxs[0]?.partyType || 'Müşteri';
-
-    return {
-      name,
-      partyType,
-      tahsilEdilen,
-      odenen,
-      bekleyen,
-      txCount: partyTxs.length
-    };
+    if (activeTab === 'kalan') return matchesSearch && r.remainingAmount > 0;
+    if (activeTab === 'geciken') return matchesSearch && (r.status === 'Gecikmede' || r.installments.some(i => i.status === 'Gecikmede'));
+    if (activeTab === 'odendi') return matchesSearch && r.remainingAmount === 0;
+    return matchesSearch;
   });
 
   return (
     <div>
-      {/* Header & Main Actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px' }}>
+      {/* Page Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', flexWrap: 'wrap', gap: '15px' }}>
         <div>
-          <h2 style={{ fontSize: '1.6rem', fontWeight: 700, color: '#1e293b' }}>Finans & Cari Yönetimi</h2>
-          <p style={{ color: '#64748b', fontSize: '0.95rem' }}>Kimden ne alındı, kime ne ödendi, kasa ve cari bakiyelerinizi anlık takip edin.</p>
+          <h1 style={{ fontSize: '1.65rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
+            Müşteri Ödeme, Taksit & Borç Takibi
+          </h1>
+          <p style={{ color: '#64748b', fontSize: '0.92rem', marginTop: '4px', margin: 0 }}>
+            Kimin ne kadar ödemesi var, kimin kaç taksiti kalmış tek ekrandan anlık takip edin ve tahsilat yapın.
+          </p>
         </div>
 
         <button 
-          onClick={() => setIsAddModalOpen(true)} 
-          className="btn btn-primary"
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 20px', borderRadius: '8px', fontWeight: 600 }}
+          onClick={() => setIsAddModalOpen(true)}
+          className={styles.btnCrm}
+          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 22px', fontSize: '0.95rem' }}
         >
-          <Plus size={18} /> Yeni Finansal İşlem Ekle
+          <Plus size={18} /> Yeni Poliçe Ödeme / Taksit Kaydı Ekle
         </button>
       </div>
 
-      {/* Financial Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+      {/* KPI Stat Cards */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '25px' }}>
         
-        {/* Total Collections (Gelir) */}
-        <div className={styles.card} style={{ borderLeft: '4px solid #22c55e', display: 'flex', alignItems: 'center', gap: '15px', padding: '20px' }}>
-          <div style={{ background: '#dcfce7', color: '#16a34a', width: '52px', height: '52px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <TrendingUp size={26} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Toplam Tahsilat (Gelir)</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>₺{totalTahsilat.toLocaleString('tr-TR')}</div>
-            <div style={{ fontSize: '0.75rem', color: '#16a34a', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-              <ArrowDownRight size={14} /> Müşteri Tahsilatları
+        {/* Toplam Satış Hacmi */}
+        <div className={styles.card} style={{ borderLeft: '4px solid #3b82f6', padding: '18px 20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Toplam Satış Hacmi</span>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <TrendingUp size={20} />
             </div>
+          </div>
+          <div style={{ fontSize: '1.6rem', fontWeight: 850, color: '#0f172a' }}>
+            {totalTahakkuk.toLocaleString('tr-TR')} ₺
+          </div>
+          <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>
+            {records.length} adet kayıtlı poliçe
           </div>
         </div>
 
-        {/* Total Payments (Gider) */}
-        <div className={styles.card} style={{ borderLeft: '4px solid #ef4444', display: 'flex', alignItems: 'center', gap: '15px', padding: '20px' }}>
-          <div style={{ background: '#fee2e2', color: '#dc2626', width: '52px', height: '52px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <TrendingDown size={26} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Toplam Ödeme (Gider)</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0f172a' }}>₺{totalOdeme.toLocaleString('tr-TR')}</div>
-            <div style={{ fontSize: '0.75rem', color: '#dc2626', display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
-              <ArrowUpRight size={14} /> Şirket Hakediş & Giderler
+        {/* Toplam Tahsil Edilen */}
+        <div className={styles.card} style={{ borderLeft: '4px solid #10b981', padding: '18px 20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Tahsil Edilen (Kasada)</span>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <CheckCircle2 size={20} />
             </div>
+          </div>
+          <div style={{ fontSize: '1.6rem', fontWeight: 850, color: '#059669' }}>
+            {totalTahsilEdilen.toLocaleString('tr-TR')} ₺
+          </div>
+          <div style={{ fontSize: '0.78rem', color: '#059669', marginTop: '4px', fontWeight: 600 }}>
+            ✓ Kasaya giren net tutar
           </div>
         </div>
 
-        {/* Net Cash Flow */}
-        <div className={styles.card} style={{ borderLeft: '4px solid #2563eb', display: 'flex', alignItems: 'center', gap: '15px', padding: '20px' }}>
-          <div style={{ background: '#dbeafe', color: '#2563eb', width: '52px', height: '52px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Wallet size={26} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Net Kasa / Bakiye</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: netKasa >= 0 ? '#1e3a8a' : '#dc2626' }}>₺{netKasa.toLocaleString('tr-TR')}</div>
-            <div style={{ fontSize: '0.75rem', color: '#2563eb', marginTop: '2px' }}>
-              Net Acente Nakit Akışı
+        {/* Kalan Müşteri Alacakları */}
+        <div className={styles.card} style={{ borderLeft: '4px solid #ef4444', padding: '18px 20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Kalan Müşteri Borçları</span>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#fef2f2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Wallet size={20} />
             </div>
+          </div>
+          <div style={{ fontSize: '1.6rem', fontWeight: 850, color: '#dc2626' }}>
+            {totalKalanAlacak.toLocaleString('tr-TR')} ₺
+          </div>
+          <div style={{ fontSize: '0.78rem', color: '#dc2626', marginTop: '4px', fontWeight: 600 }}>
+            {records.filter(r => r.remainingAmount > 0).length} müşteride açık bakiye
           </div>
         </div>
 
-        {/* Pending Receivables */}
-        <div className={styles.card} style={{ borderLeft: '4px solid #f59e0b', display: 'flex', alignItems: 'center', gap: '15px', padding: '20px' }}>
-          <div style={{ background: '#fef3c7', color: '#d97706', width: '52px', height: '52px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Clock size={26} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.85rem', color: '#64748b', fontWeight: 600 }}>Bekleyen / Vadesi Gelen</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#b45309' }}>₺{totalBekleyen.toLocaleString('tr-TR')}</div>
-            <div style={{ fontSize: '0.75rem', color: '#d97706', marginTop: '2px' }}>
-              Tahsilat & Ödeme Bekleyenler
+        {/* Geciken / Vadesi Dolan Taksitler */}
+        <div className={styles.card} style={{ borderLeft: '4px solid #f59e0b', padding: '18px 20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Geciken Taksitler</span>
+            <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#fffbeb', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <AlertCircle size={20} />
             </div>
+          </div>
+          <div style={{ fontSize: '1.6rem', fontWeight: 850, color: '#d97706' }}>
+            {totalGeciken.toLocaleString('tr-TR')} ₺
+          </div>
+          <div style={{ fontSize: '0.78rem', color: '#d97706', marginTop: '4px' }}>
+            Vadesi geçmiş ödemeler
           </div>
         </div>
 
       </div>
 
-      {/* Filter Tabs & Search Bar */}
-      <div className={styles.card} style={{ marginBottom: '25px', padding: '15px 20px' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '15px' }}>
-          
-          {/* Main Tabs */}
-          <div style={{ display: 'flex', gap: '8px', background: '#f1f5f9', padding: '4px', borderRadius: '10px' }}>
-            <button 
-              onClick={() => setActiveTab('hepsi')}
+      {/* Main Content Card */}
+      <div className={styles.card}>
+        
+        {/* Navigation Tabs */}
+        <div style={{ display: 'flex', gap: '16px', borderBottom: '1px solid #edf2f7', marginBottom: '20px', overflowX: 'auto' }}>
+          {[
+            { key: 'tumu', label: `Tüm Müşteri Kayıtları (${records.length})` },
+            { key: 'kalan', label: `Borcu Kalanlar / Taksitli (${records.filter(r => r.remainingAmount > 0).length})` },
+            { key: 'geciken', label: `Vadesi Geçenler (${records.filter(r => r.status === 'Gecikmede' || r.installments.some(i => i.status === 'Gecikmede')).length})` },
+            { key: 'odendi', label: `Tamamı Ödenenler (${records.filter(r => r.remainingAmount === 0).length})` },
+            { key: 'kasa', label: `Kasa Defteri / Tahsilat Geçmişi (${cashLogs.length})` }
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key as any)}
               style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
+                padding: '12px 6px',
+                background: 'none',
                 border: 'none',
-                fontWeight: 600,
-                fontSize: '0.88rem',
+                borderBottom: activeTab === tab.key ? '3px solid #2563eb' : '3px solid transparent',
+                color: activeTab === tab.key ? '#2563eb' : '#64748b',
+                fontWeight: activeTab === tab.key ? 750 : 600,
+                fontSize: '0.92rem',
                 cursor: 'pointer',
-                background: activeTab === 'hepsi' ? '#ffffff' : 'transparent',
-                color: activeTab === 'hepsi' ? '#1e293b' : '#64748b',
-                boxShadow: activeTab === 'hepsi' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
+                whiteSpace: 'nowrap'
               }}
             >
-              Tüm Hareketler ({transactions.length})
+              {tab.label}
             </button>
+          ))}
+        </div>
 
-            <button 
-              onClick={() => setActiveTab('tahsilat')}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                fontWeight: 600,
-                fontSize: '0.88rem',
-                cursor: 'pointer',
-                background: activeTab === 'tahsilat' ? '#ffffff' : 'transparent',
-                color: activeTab === 'tahsilat' ? '#16a34a' : '#64748b',
-                boxShadow: activeTab === 'tahsilat' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-              }}
-            >
-              📥 Tahsilatlar (Gelir)
-            </button>
-
-            <button 
-              onClick={() => setActiveTab('odeme')}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                fontWeight: 600,
-                fontSize: '0.88rem',
-                cursor: 'pointer',
-                background: activeTab === 'odeme' ? '#ffffff' : 'transparent',
-                color: activeTab === 'odeme' ? '#dc2626' : '#64748b',
-                boxShadow: activeTab === 'odeme' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-              }}
-            >
-              📤 Ödemeler (Gider)
-            </button>
-
-            <button 
-              onClick={() => setActiveTab('bekleyen')}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                fontWeight: 600,
-                fontSize: '0.88rem',
-                cursor: 'pointer',
-                background: activeTab === 'bekleyen' ? '#ffffff' : 'transparent',
-                color: activeTab === 'bekleyen' ? '#b45309' : '#64748b',
-                boxShadow: activeTab === 'bekleyen' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-              }}
-            >
-              ⏳ Bekleyen / Vadeliler
-            </button>
-
-            <button 
-              onClick={() => setActiveTab('cari')}
-              style={{
-                padding: '8px 16px',
-                borderRadius: '8px',
-                border: 'none',
-                fontWeight: 600,
-                fontSize: '0.88rem',
-                cursor: 'pointer',
-                background: activeTab === 'cari' ? '#ffffff' : 'transparent',
-                color: activeTab === 'cari' ? '#2563eb' : '#64748b',
-                boxShadow: activeTab === 'cari' ? '0 2px 4px rgba(0,0,0,0.05)' : 'none'
-              }}
-            >
-              👥 Cari Hesap Özetleri
-            </button>
-          </div>
-
-          {/* Search Input & Category Filter */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <select 
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              style={{ padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', outline: 'none' }}
-            >
-              <option value="Hepsi">Tüm Kategoriler</option>
-              <option value="Poliçe Primi Tahsilatı">Poliçe Tahsilatı</option>
-              <option value="Şirket Hakediş Ödemesi">Şirket Hakedişi</option>
-              <option value="Acente Komisyonu">Acente Komisyonu</option>
-              <option value="Ofis & Operasyon">Ofis & Operasyon</option>
-              <option value="Personel & Maaş">Personel & Maaş</option>
-              <option value="Diğer">Diğer</option>
-            </select>
-
-            <div style={{ position: 'relative' }}>
-              <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+        {/* Search & Actions */}
+        {activeTab !== 'kasa' && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '14px', flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: '280px' }}>
+              <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
               <input 
-                type="text" 
-                placeholder="Kişi, şirket, poliçe veya açıklama ara..."
+                type="text"
+                placeholder="Müşteri adı, TC kimlik, telefon veya poliçe no ara..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ padding: '9px 12px 9px 36px', width: '260px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.88rem', outline: 'none' }}
+                style={{ width: '100%', padding: '11px 12px 11px 42px', borderRadius: '10px', border: '1px solid #e2e8f0', outline: 'none', fontSize: '0.95rem' }}
               />
             </div>
           </div>
+        )}
 
-        </div>
-      </div>
-
-      {/* CONTENT AREA: TAB 1-4 (TRANSACTIONS TABLE) OR TAB 5 (CARI SUMMARY) */}
-      {activeTab !== 'cari' ? (
-        <div className={styles.card} style={{ padding: 0, overflow: 'hidden' }}>
+        {/* TAB 1: MÜŞTERİ BORÇ & TAKSİT TABLOSU */}
+        {activeTab !== 'kasa' && (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 600 }}>
-                  <th style={{ padding: '14px 18px' }}>İşlem ID</th>
-                  <th style={{ padding: '14px 18px' }}>Tür</th>
-                  <th style={{ padding: '14px 18px' }}>Muhatap (Kimden / Kime)</th>
-                  <th style={{ padding: '14px 18px' }}>Kategori & Bağlantı</th>
-                  <th style={{ padding: '14px 18px' }}>Ödeme Yöntemi</th>
-                  <th style={{ padding: '14px 18px' }}>Tarih / Vade</th>
-                  <th style={{ padding: '14px 18px', textAlign: 'right' }}>Tutar</th>
-                  <th style={{ padding: '14px 18px' }}>Durum</th>
-                  <th style={{ padding: '14px 18px', textAlign: 'center' }}>İşlem</th>
+                <tr style={{ backgroundColor: '#f8fafc' }}>
+                  <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Müşteri Bilgisi</th>
+                  <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Poliçe No / Tür</th>
+                  <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Toplam Prim</th>
+                  <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Ödenen Tutar</th>
+                  <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Kalan Borç</th>
+                  <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Ödeme Planı</th>
+                  <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Durum</th>
+                  <th style={{ textAlign: 'center', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Aksiyonlar</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredTransactions.length === 0 ? (
+                {filteredRecords.length > 0 ? (
+                  filteredRecords.map(rec => {
+                    const paidInstallments = rec.installments.filter(i => i.status === 'Ödendi').length;
+                    return (
+                      <tr key={rec.id} style={{ borderBottom: '1px solid #edf2f7' }}>
+                        
+                        {/* Müşteri */}
+                        <td style={{ padding: '14px 16px' }}>
+                          <div style={{ fontWeight: 750, color: '#0f172a', fontSize: '0.95rem' }}>{rec.customerName}</div>
+                          <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '2px' }}>
+                            📞 {rec.customerPhone} {rec.customerTc !== '-' && `• TC: ${rec.customerTc}`}
+                          </div>
+                        </td>
+
+                        {/* Poliçe No */}
+                        <td style={{ padding: '14px 16px' }}>
+                          <div style={{ fontWeight: 700, color: '#1e40af', fontFamily: 'monospace', fontSize: '0.92rem' }}>
+                            {rec.policyNo}
+                          </div>
+                          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                            {rec.insuranceType} • {rec.company}
+                          </div>
+                        </td>
+
+                        {/* Toplam Tutar */}
+                        <td style={{ padding: '14px 16px', fontWeight: 700, color: '#0f172a' }}>
+                          {rec.totalAmount.toLocaleString('tr-TR')} ₺
+                        </td>
+
+                        {/* Ödenen */}
+                        <td style={{ padding: '14px 16px', fontWeight: 700, color: '#059669' }}>
+                          {rec.paidAmount.toLocaleString('tr-TR')} ₺
+                        </td>
+
+                        {/* Kalan Borç */}
+                        <td style={{ padding: '14px 16px' }}>
+                          {rec.remainingAmount > 0 ? (
+                            <span style={{ padding: '4px 10px', borderRadius: '8px', backgroundColor: '#fef2f2', color: '#dc2626', fontWeight: 800, fontSize: '0.95rem' }}>
+                              {rec.remainingAmount.toLocaleString('tr-TR')} ₺
+                            </span>
+                          ) : (
+                            <span style={{ padding: '4px 10px', borderRadius: '8px', backgroundColor: '#ecfdf5', color: '#059669', fontWeight: 700, fontSize: '0.85rem' }}>
+                              ✓ Borcu Yok
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Ödeme Planı */}
+                        <td style={{ padding: '14px 16px' }}>
+                          <div style={{ fontSize: '0.86rem', fontWeight: 600, color: '#334155' }}>
+                            {rec.paymentType}
+                          </div>
+                          {rec.paymentType === 'Taksitli' && (
+                            <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                              {paidInstallments} / {rec.installmentCount} Taksit Ödendi
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Durum */}
+                        <td style={{ padding: '14px 16px' }}>
+                          <span style={{
+                            padding: '4px 10px',
+                            borderRadius: '20px',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            backgroundColor: rec.remainingAmount === 0 ? '#dcfce7' : (rec.paidAmount > 0 ? '#eff6ff' : '#fef3c7'),
+                            color: rec.remainingAmount === 0 ? '#15803d' : (rec.paidAmount > 0 ? '#1d4ed8' : '#b45309')
+                          }}>
+                            {rec.remainingAmount === 0 ? 'Ödendi' : (rec.paidAmount > 0 ? 'Kısmi Ödendi' : 'Ödeme Bekliyor')}
+                          </span>
+                        </td>
+
+                        {/* Aksiyonlar */}
+                        <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                            
+                            {/* Tahsilat Yap Butonu */}
+                            {rec.remainingAmount > 0 && (
+                              <button
+                                onClick={() => {
+                                  setSelectedRecord(rec);
+                                  setCollectAmount(rec.paymentType === 'Taksitli' ? String(Math.min(rec.remainingAmount, Math.round(rec.totalAmount / rec.installmentCount))) : String(rec.remainingAmount));
+                                  setIsCollectModalOpen(true);
+                                }}
+                                style={{
+                                  padding: '7px 12px',
+                                  backgroundColor: '#16a34a',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '8px',
+                                  fontWeight: 700,
+                                  fontSize: '0.82rem',
+                                  cursor: 'pointer',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px'
+                                }}
+                              >
+                                💳 Tahsilat Yap
+                              </button>
+                            )}
+
+                            {/* Taksit Planı Butonu */}
+                            <button
+                              onClick={() => {
+                                setSelectedRecord(rec);
+                                setIsScheduleModalOpen(true);
+                              }}
+                              style={{
+                                padding: '7px 11px',
+                                backgroundColor: '#f1f5f9',
+                                color: '#334155',
+                                border: '1px solid #cbd5e1',
+                                borderRadius: '8px',
+                                fontWeight: 600,
+                                fontSize: '0.82rem',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              📋 Plan
+                            </button>
+
+                            {/* WhatsApp Hatırlat */}
+                            {rec.remainingAmount > 0 && rec.customerPhone !== '-' && (
+                              <button
+                                onClick={() => sendWhatsAppReminder(rec)}
+                                title="WhatsApp'tan borç hatırlatma mesajı gönder"
+                                style={{
+                                  padding: '7px 10px',
+                                  backgroundColor: '#25d366',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '8px',
+                                  fontWeight: 600,
+                                  fontSize: '0.82rem',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                💬
+                              </button>
+                            )}
+
+                            {/* Telegram'a Bildir */}
+                            {rec.remainingAmount > 0 && (
+                              <button
+                                onClick={() => sendTelegramReminder(rec)}
+                                title="Telegram botunuza borç özetini gönder"
+                                style={{
+                                  padding: '7px 10px',
+                                  backgroundColor: '#0088cc',
+                                  color: '#ffffff',
+                                  border: 'none',
+                                  borderRadius: '8px',
+                                  fontWeight: 600,
+                                  fontSize: '0.82rem',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                🤖
+                              </button>
+                            )}
+
+                            {/* Sil */}
+                            <button
+                              onClick={() => {
+                                if (confirm(`${rec.customerName} müşterisinin ödeme kaydını silmek istiyor musunuz?`)) {
+                                  setRecords(records.filter(r => r.id !== rec.id));
+                                }
+                              }}
+                              style={{
+                                padding: '7px 9px',
+                                backgroundColor: '#fff',
+                                color: '#ef4444',
+                                border: '1px solid #fecaca',
+                                borderRadius: '8px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              🗑️
+                            </button>
+
+                          </div>
+                        </td>
+
+                      </tr>
+                    );
+                  })
+                ) : (
                   <tr>
-                    <td colSpan={9} style={{ padding: '40px', textAlign: 'center', color: '#94a3b8' }}>
-                      Kriterlere uygun finansal işlem kaydı bulunamadı.
+                    <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                      Kayıtlı finans/borç kaydı bulunamadı. &ldquo;Yeni Poliçe Ödeme / Taksit Kaydı Ekle&rdquo; butonundan ekleyebilirsiniz.
                     </td>
                   </tr>
-                ) : (
-                  filteredTransactions.map((tx) => (
-                    <tr key={tx.id} style={{ borderBottom: '1px solid #f1f5f9', transition: 'background 0.15s ease' }}>
-                      
-                      {/* ID */}
-                      <td style={{ padding: '14px 18px', fontWeight: 700, color: '#1e293b' }}>
-                        {tx.id}
-                      </td>
-
-                      {/* Type Badge */}
-                      <td style={{ padding: '14px 18px' }}>
-                        {tx.type === 'Tahsilat' ? (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: '20px', fontWeight: 700, fontSize: '0.78rem' }}>
-                            <ArrowDownRight size={14} /> Tahsilat
-                          </span>
-                        ) : (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', background: '#fee2e2', color: '#b91c1c', padding: '4px 10px', borderRadius: '20px', fontWeight: 700, fontSize: '0.78rem' }}>
-                            <ArrowUpRight size={14} /> Ödeme
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Party Name */}
-                      <td style={{ padding: '14px 18px' }}>
-                        <div style={{ fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          {tx.partyType === 'Müşteri' && <User size={14} color="#64748b" />}
-                          {tx.partyType === 'Sigorta Şirketi' && <Building2 size={14} color="#2563eb" />}
-                          {tx.partyName}
-                        </div>
-                        <div style={{ fontSize: '0.78rem', color: '#94a3b8' }}>{tx.partyType}</div>
-                      </td>
-
-                      {/* Category & Policy */}
-                      <td style={{ padding: '14px 18px' }}>
-                        <div style={{ color: '#334155', fontWeight: 600 }}>{tx.category}</div>
-                        {tx.policyId && (
-                          <span style={{ fontSize: '0.75rem', background: '#eff6ff', color: '#2563eb', padding: '2px 6px', borderRadius: '4px', fontWeight: 600, display: 'inline-block', marginTop: '2px' }}>
-                            Poliçe: {tx.policyId}
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Payment Method */}
-                      <td style={{ padding: '14px 18px', color: '#475569' }}>
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          {tx.paymentMethod === 'Kredi Kartı' && <CreditCard size={14} color="#2563eb" />}
-                          {tx.paymentMethod === 'Banka Havalesi / EFT' && <Banknote size={14} color="#16a34a" />}
-                          {tx.paymentMethod === 'Nakit' && <Receipt size={14} color="#d97706" />}
-                          {tx.paymentMethod}
-                        </span>
-                      </td>
-
-                      {/* Date */}
-                      <td style={{ padding: '14px 18px' }}>
-                        <div style={{ color: '#334155', fontWeight: 500 }}>{tx.date}</div>
-                        {tx.dueDate && (
-                          <div style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: 600 }}>Vade: {tx.dueDate}</div>
-                        )}
-                      </td>
-
-                      {/* Amount */}
-                      <td style={{ padding: '14px 18px', textAlign: 'right', fontWeight: 800, fontSize: '0.98rem', color: tx.type === 'Tahsilat' ? '#16a34a' : '#dc2626' }}>
-                        {tx.type === 'Tahsilat' ? '+' : '-'}₺{tx.amount.toLocaleString('tr-TR')}
-                      </td>
-
-                      {/* Status */}
-                      <td style={{ padding: '14px 18px' }}>
-                        {tx.status === 'Tahsil Edildi' && (
-                          <span style={{ background: '#dcfce7', color: '#15803d', padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            <CheckCircle2 size={13} /> Tahsil Edildi
-                          </span>
-                        )}
-                        {tx.status === 'Ödendi' && (
-                          <span style={{ background: '#e0f2fe', color: '#0369a1', padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            <CheckCircle2 size={13} /> Ödendi
-                          </span>
-                        )}
-                        {tx.status === 'Bekliyor' && (
-                          <span style={{ background: '#fef3c7', color: '#b45309', padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            <Clock size={13} /> Bekliyor
-                          </span>
-                        )}
-                        {tx.status === 'Gecikmede' && (
-                          <span style={{ background: '#fee2e2', color: '#b91c1c', padding: '4px 10px', borderRadius: '6px', fontSize: '0.78rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                            <AlertCircle size={13} /> Gecikmede
-                          </span>
-                        )}
-                      </td>
-
-                      {/* Actions */}
-                      <td style={{ padding: '14px 18px', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}>
-                          <button 
-                            onClick={() => setSelectedTransaction(tx)}
-                            title="Makbuz & Detay"
-                            style={{ background: '#f1f5f9', border: '1px solid #cbd5e1', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', color: '#1e293b', fontWeight: 600, fontSize: '0.88rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                          >
-                            <FileText size={15} color="#2563eb" /> İncele
-                          </button>
-
-                          <button 
-                            onClick={() => {
-                              setSelectedTransaction(tx);
-                              // Populate edit fields
-                              setType(tx.type);
-                              setPartyType(tx.partyType);
-                              setPartyName(tx.partyName);
-                              setPolicyId(tx.policyId || '');
-                              setCategory(tx.category);
-                              setAmount(tx.amount.toString());
-                              setPaymentMethod(tx.paymentMethod);
-                              setStatus(tx.status);
-                              setDescription(tx.description);
-                              setIsAddModalOpen(true);
-                            }}
-                            title="İşlemi Düzenle"
-                            style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', color: '#1d4ed8', fontWeight: 600, fontSize: '0.88rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                          >
-                            ✏️ Düzenle
-                          </button>
-
-                          {(tx.status === 'Bekliyor' || tx.status === 'Gecikmede') && (
-                            <button 
-                              onClick={() => handleMarkAsPaid(tx.id)}
-                              title={tx.type === 'Tahsilat' ? 'Tahsil Edildi İşaretle' : 'Ödendi İşaretle'}
-                              style={{ background: '#dcfce7', border: '1px solid #86efac', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', color: '#15803d', fontWeight: 700, fontSize: '0.88rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-                            >
-                              <CheckCircle2 size={15} /> {tx.type === 'Tahsilat' ? 'Tahsil Et' : 'Öde'}
-                            </button>
-                          )}
-                        </div>
-                      </td>
-
-                    </tr>
-                  ))
                 )}
               </tbody>
             </table>
           </div>
-        </div>
-      ) : (
-        /* CARI SUMMARY TAB (Party Balances Summary) */
-        <div className={styles.card} style={{ padding: '20px' }}>
-          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: '#1e293b', marginBottom: '15px' }}>
-            Müşteri & Şirket Cari Hesap Bakiyeleri Özeti
-          </h3>
+        )}
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.9rem' }}>
-              <thead>
-                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', color: '#475569', fontWeight: 600 }}>
-                  <th style={{ padding: '12px 16px' }}>Cari / Unvan</th>
-                  <th style={{ padding: '12px 16px' }}>Cari Tipi</th>
-                  <th style={{ padding: '12px 16px' }}>İşlem Sayısı</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Toplam Tahsil Edilen</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Toplam Ödenen</th>
-                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Bekleyen Bakiye</th>
-                </tr>
-              </thead>
-              <tbody>
-                {partyBalances.map((party, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '14px 16px', fontWeight: 700, color: '#0f172a' }}>
-                      {party.name}
-                    </td>
-                    <td style={{ padding: '14px 16px' }}>
-                      <span style={{ fontSize: '0.78rem', padding: '3px 8px', borderRadius: '4px', background: party.partyType === 'Müşteri' ? '#e0f2fe' : '#fef3c7', color: party.partyType === 'Müşteri' ? '#0369a1' : '#b45309', fontWeight: 600 }}>
-                        {party.partyType}
-                      </span>
-                    </td>
-                    <td style={{ padding: '14px 16px', color: '#64748b' }}>
-                      {party.txCount} İşlem
-                    </td>
-                    <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 700, color: '#16a34a' }}>
-                      ₺{party.tahsilEdilen.toLocaleString('tr-TR')}
-                    </td>
-                    <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 700, color: '#dc2626' }}>
-                      ₺{party.odenen.toLocaleString('tr-TR')}
-                    </td>
-                    <td style={{ padding: '14px 16px', textAlign: 'right', fontWeight: 800, color: party.bekleyen > 0 ? '#b45309' : '#64748b' }}>
-                      ₺{party.bekleyen.toLocaleString('tr-TR')}
-                    </td>
+        {/* TAB 2: KASA DEFTERİ (TAHSİLAT GEÇMİŞİ) */}
+        {activeTab === 'kasa' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
+                Kasa Giriş / Çıkış Defteri ({cashLogs.length} İşlem)
+              </h3>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f8fafc' }}>
+                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>İşlem No / Tarih</th>
+                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Müşteri Adı</th>
+                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Poliçe No</th>
+                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Ödeme Yöntemi</th>
+                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Açıklama</th>
+                    <th style={{ textAlign: 'right', padding: '12px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Tahsil Edilen Tutar</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {cashLogs.length > 0 ? (
+                    cashLogs.map(log => (
+                      <tr key={log.id} style={{ borderBottom: '1px solid #edf2f7' }}>
+                        <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>
+                          <span style={{ fontWeight: 700, color: '#1e40af', fontFamily: 'monospace' }}>{log.id}</span>
+                          <div style={{ color: '#64748b', fontSize: '0.78rem' }}>{log.date}</div>
+                        </td>
+                        <td style={{ padding: '12px 16px', fontWeight: 700, color: '#0f172a' }}>{log.customerName}</td>
+                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontWeight: 600, color: '#475569' }}>{log.policyNo}</td>
+                        <td style={{ padding: '12px 16px', fontSize: '0.86rem', color: '#334155' }}>{log.paymentMethod}</td>
+                        <td style={{ padding: '12px 16px', fontSize: '0.85rem', color: '#64748b' }}>{log.description}</td>
+                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#059669', fontSize: '1rem' }}>
+                          +{log.amount.toLocaleString('tr-TR')} ₺
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
+                        Henüz kasa tahsilat kaydı bulunmuyor.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* MODAL 1: ADD NEW TRANSACTION */}
+      </div>
+
+      {/* MODAL 1: YENİ POLİÇE / BORÇ KAYDI EKLEME */}
       {isAddModalOpen && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
-          <div style={{ background: '#ffffff', borderRadius: '16px', width: '100%', maxWidth: '650px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '16px', width: '100%', maxWidth: '580px', maxHeight: '90vh', overflowY: 'auto', padding: '28px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
             
-            {/* Modal Header */}
-            <div style={{ padding: '20px 24px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <div style={{ background: '#eff6ff', padding: '8px', borderRadius: '10px', color: '#2563eb' }}>
-                  <Wallet size={22} />
-                </div>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: '#0f172a' }}>Yeni Finansal İşlem Ekle</h3>
-              </div>
-              <button onClick={() => setIsAddModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
-                <X size={20} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #edf2f7', paddingBottom: '12px' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <ShieldCheck size={22} color="#2563eb" /> Yeni Poliçe Ödeme / Taksit Kaydı
+              </h2>
+              <button onClick={() => setIsAddModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
+                <X size={22} />
               </button>
             </div>
 
-            {/* Modal Form */}
-            <form onSubmit={handleAddTransaction} style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            <form onSubmit={handleAddRecord}>
               
-              {/* Type Switcher */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>İşlem Yönü *</label>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                  <button 
-                    type="button" 
-                    onClick={() => { setType('Tahsilat'); setCategory('Poliçe Primi Tahsilatı'); }}
-                    style={{
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: type === 'Tahsilat' ? '2px solid #16a34a' : '1px solid #cbd5e1',
-                      background: type === 'Tahsilat' ? '#f0fdf4' : '#ffffff',
-                      color: type === 'Tahsilat' ? '#15803d' : '#64748b',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    <ArrowDownRight size={18} /> 📥 Tahsilat (Gelir / Kimden Alındı)
-                  </button>
-
-                  <button 
-                    type="button" 
-                    onClick={() => { setType('Ödeme'); setCategory('Şirket Hakediş Ödemesi'); }}
-                    style={{
-                      padding: '12px',
-                      borderRadius: '8px',
-                      border: type === 'Ödeme' ? '2px solid #dc2626' : '1px solid #cbd5e1',
-                      background: type === 'Ödeme' ? '#fef2f2' : '#ffffff',
-                      color: type === 'Ödeme' ? '#b91c1c' : '#64748b',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    <ArrowUpRight size={18} /> 📤 Ödeme (Gider / Kime Verildi)
-                  </button>
-                </div>
-              </div>
-
-              {/* Policy Auto-Select */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Bağlantılı Poliçe (Opsiyonel)</label>
+              {/* Müşteri Seçimi */}
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                  Kayıtlı Müşteri Seçin veya Manuel Girin *
+                </label>
                 <select 
-                  value={policyId}
-                  onChange={(e) => handlePolicyChange(e.target.value)}
-                  style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
+                  value={selectedCustomerId} 
+                  onChange={(e) => handleCustomerSelect(e.target.value)}
+                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontWeight: 600, backgroundColor: '#f8fafc' }}
                 >
-                  <option value="">Poliçe Seçmeyiniz (Genel İşlem)</option>
-                  {policies.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.id} - {p.customerName} ({p.company} {p.type} - ₺{p.premium.toLocaleString('tr-TR')})
-                    </option>
+                  <option value="custom">-- Manuel Müşteri Bilgisi Yazacağım --</option>
+                  {customers.map(c => (
+                    <option key={c.id} value={c.id}>{c.name} ({c.type} - {c.phone})</option>
                   ))}
                 </select>
               </div>
 
-              {/* Party Info */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
+              {/* Manuel Müşteri Alanları */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Muhatap Tipi</label>
-                  <select 
-                    value={partyType}
-                    onChange={(e) => setPartyType(e.target.value as any)}
-                    style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
-                  >
-                    <option value="Müşteri">Müşteri</option>
-                    <option value="Sigorta Şirketi">Sigorta Şirketi</option>
-                    <option value="Tedarikçi/Diğer">Tedarikçi / Diğer</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Kimden Alındı / Kime Verildi? *</label>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Müşteri Ad Soyad *</label>
                   <input 
-                    type="text"
-                    required
-                    placeholder="Müşteri veya Şirket Adı yazın..."
-                    value={partyName}
-                    onChange={(e) => setPartyName(e.target.value)}
-                    style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
+                    type="text" 
+                    required 
+                    value={customCustomerName} 
+                    onChange={(e) => setCustomCustomerName(e.target.value)} 
+                    placeholder="Örn: Ahmet Yılmaz" 
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }} 
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Telefon Numarası</label>
+                  <input 
+                    type="text" 
+                    value={customCustomerPhone} 
+                    onChange={(e) => setCustomCustomerPhone(e.target.value)} 
+                    placeholder="05XX XXX XX XX" 
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }} 
                   />
                 </div>
               </div>
 
-              {/* Amount & Category */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              {/* Poliçe Numarası & Türü */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px', marginBottom: '16px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Tutar (TL) *</label>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>Poliçe Numarası (Manuel Yazın)</label>
                   <input 
-                    type="number"
-                    required
-                    placeholder="0.00"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', fontWeight: 700, outline: 'none' }}
+                    type="text" 
+                    value={policyNo} 
+                    onChange={(e) => setPolicyNo(e.target.value)} 
+                    placeholder="Örn: 312984920/0 veya AK-2024-912" 
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontWeight: 700, fontFamily: 'monospace' }} 
                   />
                 </div>
-
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Kategori</label>
-                  <select 
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value as any)}
-                    style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
-                  >
-                    <option value="Poliçe Primi Tahsilatı">Poliçe Primi Tahsilatı</option>
-                    <option value="Şirket Hakediş Ödemesi">Şirket Hakediş Ödemesi</option>
-                    <option value="Acente Komisyonu">Acente Komisyonu</option>
-                    <option value="Ofis & Operasyon">Ofis & Operasyon</option>
-                    <option value="Personel & Maaş">Personel & Maaş</option>
-                    <option value="Diğer">Diğer</option>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Sigorta Türü</label>
+                  <select value={insuranceType} onChange={(e) => setInsuranceType(e.target.value)} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}>
+                    <option value="Kasko">Kasko</option>
+                    <option value="Trafik">Trafik</option>
+                    <option value="Özel Sağlık">Özel Sağlık</option>
+                    <option value="DASK">DASK</option>
+                    <option value="Konut">Konut</option>
+                    <option value="İşyeri">İşyeri</option>
                   </select>
                 </div>
               </div>
 
-              {/* Payment Method & Status */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Ödeme Yöntemi</label>
-                  <select 
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value as any)}
-                    style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
-                  >
-                    <option value="Kredi Kartı">Kredi Kartı</option>
-                    <option value="Banka Havalesi / EFT">Banka Havalesi / EFT</option>
-                    <option value="Nakit">Nakit</option>
-                    <option value="Çek / Senet">Çek / Senet</option>
-                  </select>
+              {/* Toplam Prim & Peşin / Taksit */}
+              <div style={{ padding: '14px', backgroundColor: '#f0f9ff', borderRadius: '12px', border: '1px solid #bae6fd', marginBottom: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 750, color: '#0369a1', marginBottom: '4px' }}>Toplam Prim / Borç Tutarı (₺) *</label>
+                    <input 
+                      type="number" 
+                      required 
+                      value={totalAmount} 
+                      onChange={(e) => setTotalAmount(e.target.value)} 
+                      placeholder="Örn: 15000" 
+                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #7dd3fc', outline: 'none', fontWeight: 800, fontSize: '1.05rem' }} 
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 750, color: '#0369a1', marginBottom: '4px' }}>Ödeme Şekli</label>
+                    <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as any)} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #7dd3fc', outline: 'none', fontWeight: 700 }}>
+                      <option value="Peşin / Tek Çekim">Peşin / Tek Çekim</option>
+                      <option value="Taksitli">Taksitli Ödeme</option>
+                    </select>
+                  </div>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>İşlem Durumu</label>
-                  <select 
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value as any)}
-                    style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
-                  >
-                    <option value="Tahsil Edildi">Tahsil Edildi / Ödendi</option>
-                    <option value="Bekliyor">Bekliyor (Vadeli)</option>
-                    <option value="Gecikmede">Gecikmede</option>
-                  </select>
-                </div>
+                {paymentType === 'Taksitli' ? (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#0369a1', marginBottom: '4px' }}>Taksit Sayısı</label>
+                    <select value={installmentCount} onChange={(e) => setInstallmentCount(Number(e.target.value))} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #7dd3fc', outline: 'none', fontWeight: 700 }}>
+                      <option value={2}>2 Taksit</option>
+                      <option value={3}>3 Taksit</option>
+                      <option value={4}>4 Taksit</option>
+                      <option value={6}>6 Taksit</option>
+                      <option value={9}>9 Taksit</option>
+                      <option value={12}>12 Taksit</option>
+                    </select>
+                    {totalAmount && (
+                      <div style={{ marginTop: '8px', fontSize: '0.82rem', color: '#0284c7', fontWeight: 700 }}>
+                        💡 Her ay ödenecek taksit: {(Number(totalAmount) / installmentCount).toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ₺
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#0369a1', marginBottom: '4px' }}>Peşin Tahsil Edilen Tutar (₺)</label>
+                    <input 
+                      type="number" 
+                      value={initialPaidAmount} 
+                      onChange={(e) => setInitialPaidAmount(e.target.value)} 
+                      placeholder={totalAmount || "Örn: 15000"} 
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #7dd3fc', outline: 'none', fontWeight: 700 }} 
+                    />
+                  </div>
+                )}
               </div>
 
-              {/* Dates */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>İşlem Tarihi</label>
-                  <input 
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Vade Tarihi (Varsa)</label>
-                  <input 
-                    type="date"
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
-                    style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none' }}
-                  />
-                </div>
-              </div>
-
-              {/* Description */}
-              <div>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Açıklama & Notlar</label>
+              {/* Not */}
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Ödeme Notu / Açıklama</label>
                 <textarea 
-                  rows={3}
-                  placeholder="İşlem ile ilgili dekont no, makbuz notu vb..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.9rem', outline: 'none', resize: 'vertical' }}
-                />
+                  value={notes} 
+                  onChange={(e) => setNotes(e.target.value)} 
+                  placeholder="Örn: 2. taksit 15 Eylül'de ödenecek..." 
+                  rows={2} 
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}
+                ></textarea>
               </div>
 
-              {/* Submit Buttons */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-                <button 
-                  type="button" 
-                  onClick={() => setIsAddModalOpen(false)}
-                  style={{ padding: '10px 18px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', cursor: 'pointer', fontWeight: 600, color: '#64748b' }}
-                >
-                  İptal
-                </button>
-
-                <button 
-                  type="submit"
-                  className="btn btn-primary"
-                  style={{ padding: '10px 24px', borderRadius: '8px', fontWeight: 700 }}
-                >
-                  İşlemi Kaydet
-                </button>
+              {/* Butonlar */}
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setIsAddModalOpen(false)} style={{ padding: '10px 18px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f1f5f9', cursor: 'pointer', fontWeight: 600 }}>İptal</button>
+                <button type="submit" className={styles.btnCrm} style={{ padding: '10px 22px' }}>Kaydet ve Listeye Ekle</button>
               </div>
 
             </form>
@@ -817,111 +923,154 @@ export default function SigortaFinansPage() {
         </div>
       )}
 
-      {/* MODAL 2: TRANSACTION DETAIL & RECEIPT */}
-      {selectedTransaction && (
-        <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
-          <div style={{ background: '#ffffff', borderRadius: '16px', width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+      {/* MODAL 2: TAHSİLAT YAP (PARÇALI VEYA TAKSİT ÖDEMESİ ALMA) */}
+      {isCollectModalOpen && selectedRecord && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '16px', width: '100%', maxWidth: '480px', padding: '28px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
             
-            {/* Printable Receipt Header */}
-            <div style={{ padding: '24px', background: selectedTransaction.type === 'Tahsilat' ? '#f0fdf4' : '#fef2f2', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid #edf2f7', paddingBottom: '12px' }}>
               <div>
-                <span style={{ fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '1px', color: selectedTransaction.type === 'Tahsilat' ? '#16a34a' : '#dc2626' }}>
-                  ELİSAM SİGORTA FINANS MAKBUZU
-                </span>
-                <h3 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#0f172a', marginTop: '4px' }}>
-                  {selectedTransaction.id}
-                </h3>
-                <div style={{ fontSize: '0.85rem', color: '#64748b', marginTop: '2px' }}>
-                  Tarih: {selectedTransaction.date}
-                </div>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#16a34a' }}>TAHSİLAT İŞLEMİ</span>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: '2px 0 0 0' }}>
+                  {selectedRecord.customerName}
+                </h2>
               </div>
-
-              <button onClick={() => setSelectedTransaction(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}>
+              <button onClick={() => setIsCollectModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
                 <X size={22} />
               </button>
             </div>
 
-            {/* Receipt Details Body */}
-            <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', background: '#f8fafc', padding: '16px', borderRadius: '10px', border: '1px solid #e2e8f0' }}>
-                <div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>İşlem Yönü:</div>
-                  <div style={{ fontWeight: 700, color: selectedTransaction.type === 'Tahsilat' ? '#16a34a' : '#dc2626' }}>
-                    {selectedTransaction.type === 'Tahsilat' ? '📥 TAHSİLAT (GELİR)' : '📤 ÖDEME (GİDER)'}
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>İşlem Durumu:</div>
-                  <div style={{ fontWeight: 700, color: '#0f172a' }}>
-                    {selectedTransaction.status}
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Muhatap (Kimden/Kime):</div>
-                  <div style={{ fontWeight: 700, color: '#0f172a' }}>{selectedTransaction.partyName} ({selectedTransaction.partyType})</div>
-                </div>
-
-                <div>
-                  <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Ödeme Yöntemi:</div>
-                  <div style={{ fontWeight: 600, color: '#0f172a' }}>{selectedTransaction.paymentMethod}</div>
-                </div>
-              </div>
-
-              {/* Amount Display Box */}
-              <div style={{ textAlign: 'center', padding: '20px', background: '#0f172a', color: '#ffffff', borderRadius: '12px' }}>
-                <div style={{ fontSize: '0.85rem', textTransform: 'uppercase', color: '#94a3b8', letterSpacing: '1px' }}>İşlem Tutarı</div>
-                <div style={{ fontSize: '2.2rem', fontWeight: 800, marginTop: '4px', color: selectedTransaction.type === 'Tahsilat' ? '#4ade80' : '#f87171' }}>
-                  ₺{selectedTransaction.amount.toLocaleString('tr-TR')}
-                </div>
-              </div>
-
-              {/* Policy & Category Notes */}
+            {/* Bakiye Özeti */}
+            <div style={{ padding: '14px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '18px', display: 'flex', justifyContent: 'space-between' }}>
               <div>
-                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Kategori & Bağlantılı Poliçe</div>
-                <div style={{ fontSize: '0.95rem', color: '#1e293b', fontWeight: 600 }}>{selectedTransaction.category}</div>
-                {selectedTransaction.policyId && (
-                  <div style={{ marginTop: '4px', color: '#2563eb', fontWeight: 600 }}>Poliçe Referans No: {selectedTransaction.policyId}</div>
-                )}
+                <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Poliçe Toplamı</div>
+                <div style={{ fontWeight: 750, color: '#0f172a' }}>{selectedRecord.totalAmount.toLocaleString('tr-TR')} ₺</div>
               </div>
-
               <div>
-                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>İşlem Açıklaması</div>
-                <div style={{ background: '#f1f5f9', padding: '12px', borderRadius: '8px', fontSize: '0.9rem', color: '#334155' }}>
-                  {selectedTransaction.description}
-                </div>
+                <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Şimdiye Kadar Ödenen</div>
+                <div style={{ fontWeight: 750, color: '#059669' }}>{selectedRecord.paidAmount.toLocaleString('tr-TR')} ₺</div>
+              </div>
+              <div>
+                <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Kalan Borç</div>
+                <div style={{ fontWeight: 850, color: '#dc2626' }}>{selectedRecord.remainingAmount.toLocaleString('tr-TR')} ₺</div>
+              </div>
+            </div>
+
+            <form onSubmit={handleCollectPayment}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 750, color: '#0f172a', marginBottom: '6px' }}>
+                  Tahsil Edilecek Tutar (₺) *
+                </label>
+                <input 
+                  type="number" 
+                  required 
+                  max={selectedRecord.remainingAmount}
+                  value={collectAmount} 
+                  onChange={(e) => setCollectAmount(e.target.value)} 
+                  placeholder="0" 
+                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '2px solid #16a34a', outline: 'none', fontWeight: 850, fontSize: '1.2rem', color: '#16a34a' }} 
+                />
               </div>
 
-              {/* Modal Actions */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid #e2e8f0' }}>
-                {(selectedTransaction.status === 'Bekliyor' || selectedTransaction.status === 'Gecikmede') ? (
-                  <button 
-                    onClick={() => handleMarkAsPaid(selectedTransaction.id)}
-                    style={{ background: '#dcfce7', border: 'none', padding: '10px 16px', borderRadius: '8px', cursor: 'pointer', color: '#15803d', fontWeight: 700, fontSize: '0.88rem', display: 'flex', alignItems: 'center', gap: '6px' }}
-                  >
-                    <CheckCircle2 size={16} /> {selectedTransaction.type === 'Tahsilat' ? 'Tahsil Edildi Yap' : 'Ödendi Yap'}
-                  </button>
-                ) : <div></div>}
-
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button 
-                    onClick={() => window.print()}
-                    style={{ padding: '9px 15px', borderRadius: '8px', border: '1px solid #cbd5e1', background: '#ffffff', cursor: 'pointer', fontWeight: 600, color: '#334155', display: 'flex', alignItems: 'center', gap: '6px' }}
-                  >
-                    <Printer size={16} /> Makbuz Yazdır
-                  </button>
-
-                  <button 
-                    onClick={() => setSelectedTransaction(null)}
-                    style={{ padding: '9px 18px', borderRadius: '8px', border: 'none', background: '#0f172a', color: '#ffffff', cursor: 'pointer', fontWeight: 600 }}
-                  >
-                    Kapat
-                  </button>
-                </div>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Ödeme Yöntemi</label>
+                <select 
+                  value={collectMethod} 
+                  onChange={(e) => setCollectMethod(e.target.value as any)} 
+                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontWeight: 600 }}
+                >
+                  <option value="Kredi Kartı">Kredi Kartı (Pos)</option>
+                  <option value="Banka Havalesi / EFT">Banka Havalesi / EFT</option>
+                  <option value="Nakit">Nakit Para</option>
+                </select>
               </div>
 
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Açıklama / Makbuz Notu</label>
+                <input 
+                  type="text" 
+                  value={collectNote} 
+                  onChange={(e) => setCollectNote(e.target.value)} 
+                  placeholder="Örn: 2. taksit tahsilatı yapıldı..." 
+                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }} 
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button type="button" onClick={() => setIsCollectModalOpen(false)} style={{ padding: '10px 18px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f1f5f9', cursor: 'pointer', fontWeight: 600 }}>İptal</button>
+                <button type="submit" style={{ padding: '10px 22px', backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 750, cursor: 'pointer' }}>
+                  ✓ Tahsilatı Kaydet ve Kasaya Ekle
+                </button>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: TAKSİT PLANI DETAYI */}
+      {isScheduleModalOpen && selectedRecord && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '16px', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto', padding: '28px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+            
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid #edf2f7', paddingBottom: '12px' }}>
+              <div>
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#2563eb' }}>TAKSİT VE ÖDEME PLANI</span>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: '2px 0 0 0' }}>
+                  {selectedRecord.customerName}
+                </h2>
+                <div style={{ fontSize: '0.82rem', color: '#64748b' }}>Poliçe No: {selectedRecord.policyNo} ({selectedRecord.insuranceType})</div>
+              </div>
+              <button onClick={() => setIsScheduleModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
+                <X size={22} />
+              </button>
+            </div>
+
+            {/* Taksit Listesi */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+              {selectedRecord.installments.map((inst) => (
+                <div 
+                  key={inst.installmentNo}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '12px 16px',
+                    borderRadius: '10px',
+                    backgroundColor: inst.status === 'Ödendi' ? '#f0fdf4' : (inst.status === 'Gecikmede' ? '#fef2f2' : '#f8fafc'),
+                    border: `1px solid ${inst.status === 'Ödendi' ? '#bbf7d0' : (inst.status === 'Gecikmede' ? '#fecaca' : '#e2e8f0')}`
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 750, color: '#0f172a', fontSize: '0.92rem' }}>
+                      {inst.installmentNo}. Taksit: {inst.amount.toLocaleString('tr-TR')} ₺
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
+                      Vade Tarihi: {inst.dueDate} {inst.paidDate && `• Ödendiği Tarih: ${inst.paidDate}`}
+                    </div>
+                  </div>
+
+                  <span style={{
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                    fontSize: '0.75rem',
+                    fontWeight: 750,
+                    backgroundColor: inst.status === 'Ödendi' ? '#dcfce7' : (inst.status === 'Gecikmede' ? '#fee2e2' : '#fef3c7'),
+                    color: inst.status === 'Ödendi' ? '#15803d' : (inst.status === 'Gecikmede' ? '#dc2626' : '#b45309')
+                  }}>
+                    {inst.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '0.9rem', fontWeight: 750, color: '#dc2626' }}>
+                Kalan Toplam Borç: {selectedRecord.remainingAmount.toLocaleString('tr-TR')} ₺
+              </div>
+              <button onClick={() => setIsScheduleModalOpen(false)} style={{ padding: '8px 18px', backgroundColor: '#0f172a', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
+                Kapat
+              </button>
             </div>
 
           </div>
