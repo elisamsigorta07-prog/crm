@@ -753,13 +753,23 @@
 }
 
 .marqueeLogo {
-  max-height: 52px;
-  max-width: 155px;
+  max-height: 54px;
+  max-width: 160px;
   width: auto;
   height: auto;
   object-fit: contain;
   filter: none;
   transition: all 0.3s ease;
+}
+
+.logoAksigorta {
+  transform: scale(1.65);
+  transform-origin: center center;
+}
+
+.logoSompo {
+  transform: scale(1.55);
+  transform-origin: center center;
 }
 
 @media (max-width: 768px) {

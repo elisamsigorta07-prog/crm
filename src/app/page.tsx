@@ -147,10 +147,10 @@ export default function Home() {
               <img src="/agencies/ALLİNAZ.png" alt="Allianz Sigorta" className={styles.marqueeLogo} />
             </div>
             <div className={styles.marqueeCard}>
-              <img src="/agencies/ak-sigorta-logo-png_seeklogo-5491.png" alt="Aksigorta" className={styles.marqueeLogo} />
+              <img src="/agencies/ak-sigorta-logo-png_seeklogo-5491.png" alt="Aksigorta" className={`${styles.marqueeLogo} ${styles.logoAksigorta}`} />
             </div>
             <div className={styles.marqueeCard}>
-              <img src="/agencies/sompo-sigorta3099.png" alt="Sompo Sigorta" className={styles.marqueeLogo} />
+              <img src="/agencies/sompo-sigorta3099.png" alt="Sompo Sigorta" className={`${styles.marqueeLogo} ${styles.logoSompo}`} />
             </div>
             <div className={styles.marqueeCard}>
               <img src="/agencies/HDI.png" alt="HDI Sigorta" className={styles.marqueeLogo} />
@@ -167,10 +167,10 @@ export default function Home() {
               <img src="/agencies/ALLİNAZ.png" alt="Allianz Sigorta" className={styles.marqueeLogo} />
             </div>
             <div className={styles.marqueeCard}>
-              <img src="/agencies/ak-sigorta-logo-png_seeklogo-5491.png" alt="Aksigorta" className={styles.marqueeLogo} />
+              <img src="/agencies/ak-sigorta-logo-png_seeklogo-5491.png" alt="Aksigorta" className={`${styles.marqueeLogo} ${styles.logoAksigorta}`} />
             </div>
             <div className={styles.marqueeCard}>
-              <img src="/agencies/sompo-sigorta3099.png" alt="Sompo Sigorta" className={styles.marqueeLogo} />
+              <img src="/agencies/sompo-sigorta3099.png" alt="Sompo Sigorta" className={`${styles.marqueeLogo} ${styles.logoSompo}`} />
             </div>
             <div className={styles.marqueeCard}>
               <img src="/agencies/HDI.png" alt="HDI Sigorta" className={styles.marqueeLogo} />
