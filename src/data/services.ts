@@ -73,7 +73,7 @@ export const servicesData = [
     id: "trafik-sigortasi",
     title: "Trafik Sigortası",
     shortDescription: "Zorunlu trafik sigortası ile yolculuklarınız güvence altında.",
-    image: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=800&q=80",
+    image: "/services/trafik-sigortasi.jpg",
     bannerImage: "/banners/YOLUNUZ GÜVENDE OLSUN.png",
     icon: "Car",
     content: `
@@ -123,7 +123,7 @@ export const servicesData = [
     id: "kasko",
     title: "Kasko Sigortası",
     shortDescription: "Aracınızı her türlü riske karşı tam güvence altına alın.",
-    image: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=800&q=80",
+    image: "/services/kasko.jpg",
     bannerImage: "/banners/YOLUNUZ GÜVENDE OLSUN.png",
     icon: "Shield",
     content: `
