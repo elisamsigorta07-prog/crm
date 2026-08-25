@@ -764,32 +764,32 @@
 }
 
 .logoAllianz {
-  transform: scale(1.3);
+  transform: scale(1.15);
   transform-origin: center center;
 }
 
 .logoAksigorta {
-  transform: scale(1.85);
+  transform: scale(1.75);
   transform-origin: center center;
 }
 
 .logoSompo {
-  transform: scale(1.95);
+  transform: scale(1.8);
   transform-origin: center center;
 }
 
 .logoHdi {
-  transform: scale(1.4);
+  transform: scale(1.05);
   transform-origin: center center;
 }
 
 .logoQuick {
-  transform: scale(2.05);
+  transform: scale(1.45);
   transform-origin: center center;
 }
 
 .logoEmaa {
-  transform: scale(1.95);
+  transform: scale(1.7);
   transform-origin: center center;
 }
 
