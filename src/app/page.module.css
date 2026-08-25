@@ -1,65 +1,27 @@
 /* =========================================================================
-   Aydınlık, Ferah & Gerçekçi Sigorta Hero Section
+   Aydınlık, Ferah & Gerçekçi Sigorta Hero Section (2 Kolonlu Tasarım)
    ========================================================================= */
 .brightHero {
   position: relative;
   width: 100%;
-  min-height: 580px;
-  display: flex;
-  align-items: center;
-  padding: 4.5rem 0;
+  padding: 4.5rem 0 4rem 0;
   overflow: hidden;
-  background-color: #f8fafc;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-bottom: 1px solid #edf2f7;
 }
 
-.brightHeroBgWrap {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 1;
-  overflow: hidden;
-}
-
-.brightHeroBgImg {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center right;
-  transform: scale(1.02);
-}
-
-.brightHeroOverlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    90deg, 
-    rgba(255, 255, 255, 0.96) 0%, 
-    rgba(255, 255, 255, 0.92) 38%, 
-    rgba(255, 255, 255, 0.45) 68%, 
-    rgba(255, 255, 255, 0.12) 100%
-  );
-}
-
-.brightHeroContent {
-  display: flex;
+.brightHeroGrid {
+  display: grid;
+  grid-template-columns: 1.12fr 0.88fr;
+  gap: 3.5rem;
   align-items: center;
 }
 
-.brightHeroCard {
-  max-width: 630px;
-  background: rgba(255, 255, 255, 0.90);
-  backdrop-filter: blur(16px);
-  padding: 2.75rem 2.5rem 2.25rem 2.5rem;
-  border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.95);
-  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.09);
-  position: relative;
-  z-index: 2;
+/* Sol Kolon */
+.brightHeroLeft {
+  display: flex;
+  flex-direction: column;
+  max-width: 620px;
 }
 
 .heroPillBadgeLight {
@@ -67,12 +29,12 @@
   align-items: center;
   gap: 8px;
   padding: 6px 14px;
-  background: #e0f2fe;
-  border: 1px solid #bae6fd;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
   border-radius: 30px;
   font-size: 0.82rem;
   font-weight: 700;
-  color: #0369a1;
+  color: #1d4ed8;
   margin-bottom: 1.25rem;
   width: fit-content;
 }
@@ -93,7 +55,7 @@
 }
 
 .brightHeroTitle {
-  font-size: 2.75rem;
+  font-size: 2.85rem;
   font-weight: 850;
   color: #0f172a;
   line-height: 1.2;
@@ -129,18 +91,18 @@
   gap: 10px;
   background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
   color: #ffffff;
-  padding: 13px 24px;
+  padding: 14px 26px;
   border-radius: 12px;
   font-weight: 700;
-  font-size: 0.96rem;
+  font-size: 0.98rem;
   text-decoration: none;
-  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.28);
+  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.28);
   transition: all 0.25s ease;
 }
 
 .brightHeroPrimaryBtn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 25px rgba(37, 99, 235, 0.38);
+  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.4);
   color: #ffffff;
 }
 
@@ -151,10 +113,10 @@
   background: #ffffff;
   color: #0f172a;
   border: 1px solid #cbd5e1;
-  padding: 13px 20px;
+  padding: 14px 22px;
   border-radius: 12px;
   font-weight: 700;
-  font-size: 0.94rem;
+  font-size: 0.96rem;
   text-decoration: none;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   transition: all 0.25s ease;
@@ -170,14 +132,14 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 1.5rem;
+  margin-bottom: 1.75rem;
 }
 
 .quickPill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 13px;
+  padding: 7px 14px;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 20px;
@@ -185,7 +147,7 @@
   font-weight: 600;
   color: #1e293b;
   text-decoration: none;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
   transition: all 0.2s ease;
 }
 
@@ -205,7 +167,7 @@
   color: #64748b;
   flex-wrap: wrap;
   padding-top: 1.25rem;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid #edf2f7;
 }
 
 .trustDivider {
@@ -213,34 +175,66 @@
   font-weight: 700;
 }
 
+/* Sağ Kolon (Görsel Kartı) */
+.brightHeroRight {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.brightHeroImgWrapper {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.12);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: #ffffff;
+  transition: transform 0.4s ease, box-shadow 0.4s ease;
+}
+
+.brightHeroImgWrapper:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 30px 70px rgba(15, 23, 42, 0.16);
+}
+
+.brightHeroImg {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+}
+
 /* Responsive Hero */
 @media (max-width: 991px) {
   .brightHero {
-    padding: 3rem 0;
-    min-height: auto;
+    padding: 3rem 0 3.5rem 0;
   }
 
-  .brightHeroOverlay {
-    background: linear-gradient(
-      180deg, 
-      rgba(255, 255, 255, 0.95) 0%, 
-      rgba(255, 255, 255, 0.90) 100%
-    );
+  .brightHeroGrid {
+    grid-template-columns: 1fr;
+    gap: 2.5rem;
   }
 
-  .brightHeroCard {
-    max-width: 100%;
-    padding: 2rem 1.5rem;
+  .brightHeroRight {
+    order: -1;
+  }
+
+  .brightHeroImgWrapper {
+    max-width: 480px;
+    margin: 0 auto;
   }
 
   .brightHeroTitle {
-    font-size: 2.2rem;
+    font-size: 2.3rem;
   }
 }
 
 @media (max-width: 768px) {
   .brightHero {
-    padding: 2rem 0;
+    padding: 2rem 0 2.5rem 0;
   }
 
   .brightHeroTitle {

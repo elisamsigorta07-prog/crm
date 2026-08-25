@@ -47,21 +47,11 @@ export default function Home() {
     <>
       {/* Aydınlık & Gerçekçi Sigorta Hero Bölümü */}
       <section className={styles.brightHero}>
-        {/* Arka Planda Aydınlık, Canlı Sigorta Teması (Kaza/Polis, Fanus Evler, Hastane) */}
-        <div className={styles.brightHeroBgWrap}>
-          <img 
-            src="/hero-bg.jpg" 
-            alt="Elisam Sigorta - Trafik, Kasko, Konut ve Sağlık Sigortası" 
-            className={styles.brightHeroBgImg}
-          />
-          <div className={styles.brightHeroOverlay}></div>
-        </div>
-
-        <div className="container" style={{ position: 'relative', zIndex: 3 }}>
-          <div className={styles.brightHeroContent}>
+        <div className="container">
+          <div className={styles.brightHeroGrid}>
             
-            {/* Sol Taraf - Ferah Bilgi Kartı */}
-            <div className={styles.brightHeroCard}>
+            {/* Sol Kolon - Bilgi & Teklif Alma */}
+            <div className={styles.brightHeroLeft}>
               <div className={styles.heroPillBadgeLight}>
                 <span className={styles.heroLiveDot}></span>
                 <span>Elisam Sigorta Aracılık Hizmetleri • Alanya</span>
@@ -121,6 +111,17 @@ export default function Home() {
                 <span>✓ 7/24 Kesintisiz Hasar Desteği</span>
                 <span className={styles.trustDivider}>•</span>
                 <span>✓ Anında Poliçe Kesimi</span>
+              </div>
+            </div>
+
+            {/* Sağ Kolon - Fanus İçinde Tam Koruma Görseli */}
+            <div className={styles.brightHeroRight}>
+              <div className={styles.brightHeroImgWrapper}>
+                <img 
+                  src="/hero-dome.jpg" 
+                  alt="Elisam Sigorta - Fanus İçi Tam Koruma (Kasko, Trafik, Konut, Sağlık)" 
+                  className={styles.brightHeroImg}
+                />
               </div>
             </div>
 
