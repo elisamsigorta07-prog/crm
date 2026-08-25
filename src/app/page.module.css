@@ -687,24 +687,41 @@
   }
 }
 
-/* Agencies Marquee */
+/* Agencies Marquee - Büyük & Net Logolar */
+.marqueeSection {
+  background: #f8fafc;
+  padding: 2.5rem 0 2rem 0;
+  border-bottom: 1px solid #edf2f7;
+  overflow: hidden;
+  width: 100%;
+}
+
+.marqueeHeader {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
 .marqueeWrapper {
-  background-color: #ffffff;
-  padding: 1.5rem 0;
   overflow: hidden;
   position: relative;
-  border-bottom: 1px solid rgba(0,0,0,0.06);
   display: flex;
   white-space: nowrap;
   width: 100%;
+  mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
 }
 
 .marqueeContent {
   display: flex;
   align-items: center;
-  gap: 3.5rem;
-  padding-right: 3.5rem;
-  animation: marquee 25s linear infinite;
+  gap: 2rem;
+  padding-right: 2rem;
+  animation: marquee 24s linear infinite;
   flex-shrink: 0;
   min-width: 100%;
   justify-content: space-around;
@@ -714,60 +731,58 @@
   animation-play-state: paused;
 }
 
+.marqueeCard {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 80px;
+  min-width: 190px;
+  padding: 14px 28px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.marqueeCard:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 25px rgba(37, 99, 235, 0.14);
+  border-color: #93c5fd;
+}
+
 .marqueeLogo {
-  height: 38px;
-  max-width: 140px;
+  max-height: 52px;
+  max-width: 155px;
   width: auto;
+  height: auto;
   object-fit: contain;
-  filter: grayscale(15%);
+  filter: none;
   transition: all 0.3s ease;
-  flex-shrink: 0;
-}
-
-.marqueeLogoMedium {
-  height: 48px;
-  max-width: 150px;
-  width: auto;
-  object-fit: contain;
-  filter: grayscale(15%);
-  transition: all 0.3s ease;
-  flex-shrink: 0;
-}
-
-.marqueeLogoLarge {
-  height: 52px;
-  max-width: 160px;
-  width: auto;
-  object-fit: contain;
-  filter: grayscale(15%);
-  transition: all 0.3s ease;
-  flex-shrink: 0;
-}
-
-.marqueeLogo:hover, .marqueeLogoMedium:hover, .marqueeLogoLarge:hover {
-  filter: grayscale(0%);
-  transform: scale(1.06);
 }
 
 @media (max-width: 768px) {
-  .marqueeWrapper {
-    padding: 1.1rem 0;
+  .marqueeSection {
+    padding: 1.75rem 0 1.5rem 0;
+  }
+  .marqueeHeader {
+    font-size: 0.74rem;
+    margin-bottom: 1rem;
   }
   .marqueeContent {
-    gap: 2rem;
-    padding-right: 2rem;
+    gap: 1.25rem;
+    padding-right: 1.25rem;
+  }
+  .marqueeCard {
+    height: 64px;
+    min-width: 145px;
+    padding: 10px 20px;
+    border-radius: 14px;
   }
   .marqueeLogo {
-    height: 30px;
-    max-width: 95px;
-  }
-  .marqueeLogoMedium {
-    height: 36px;
-    max-width: 105px;
-  }
-  .marqueeLogoLarge {
-    height: 38px;
-    max-width: 115px;
+    max-height: 40px;
+    max-width: 120px;
   }
 }
 

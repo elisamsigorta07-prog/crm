@@ -136,25 +136,52 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Agencies Marquee */}
-      <div className={styles.marqueeWrapper}>
-        <div className={styles.marqueeContent}>
-          <img src="/agencies/ALLİNAZ.png" alt="Allianz" className={styles.marqueeLogo} />
-          <img src="/agencies/ANA.png" alt="Ana Sigorta" className={styles.marqueeLogo} />
-          <img src="/agencies/EMA.png" alt="Emaa Sigorta" className={styles.marqueeLogoLarge} />
-          <img src="/agencies/HDI.png" alt="HDI Sigorta" className={styles.marqueeLogo} />
-          <img src="/agencies/ak-sigorta-logo-png_seeklogo-5491.png" alt="Ak Sigorta" className={styles.marqueeLogoLarge} />
-          <img src="/agencies/quickecs.png" alt="Quick Sigorta" className={styles.marqueeLogoMedium} />
-          <img src="/agencies/sompo-sigorta3099.png" alt="Sompo Sigorta" className={styles.marqueeLogoLarge} />
+      {/* Anlaşmalı Sigorta Şirketleri Kayan Bant (Büyük & Net Logolar) */}
+      <div className={styles.marqueeSection}>
+        <div className={styles.marqueeHeader}>
+          <span>TÜRKİYE&apos;NİN LİDER ANLAŞMALI SİGORTA ŞİRKETLERİ</span>
         </div>
-        <div className={styles.marqueeContent}>
-          <img src="/agencies/ALLİNAZ.png" alt="Allianz" className={styles.marqueeLogo} />
-          <img src="/agencies/ANA.png" alt="Ana Sigorta" className={styles.marqueeLogo} />
-          <img src="/agencies/EMA.png" alt="Emaa Sigorta" className={styles.marqueeLogoLarge} />
-          <img src="/agencies/HDI.png" alt="HDI Sigorta" className={styles.marqueeLogo} />
-          <img src="/agencies/ak-sigorta-logo-png_seeklogo-5491.png" alt="Ak Sigorta" className={styles.marqueeLogoLarge} />
-          <img src="/agencies/quickecs.png" alt="Quick Sigorta" className={styles.marqueeLogoMedium} />
-          <img src="/agencies/sompo-sigorta3099.png" alt="Sompo Sigorta" className={styles.marqueeLogoLarge} />
+        <div className={styles.marqueeWrapper}>
+          <div className={styles.marqueeContent}>
+            <div className={styles.marqueeCard}>
+              <img src="/agencies/ALLİNAZ.png" alt="Allianz Sigorta" className={styles.marqueeLogo} />
+            </div>
+            <div className={styles.marqueeCard}>
+              <img src="/agencies/ak-sigorta-logo-png_seeklogo-5491.png" alt="Aksigorta" className={styles.marqueeLogo} />
+            </div>
+            <div className={styles.marqueeCard}>
+              <img src="/agencies/sompo-sigorta3099.png" alt="Sompo Sigorta" className={styles.marqueeLogo} />
+            </div>
+            <div className={styles.marqueeCard}>
+              <img src="/agencies/HDI.png" alt="HDI Sigorta" className={styles.marqueeLogo} />
+            </div>
+            <div className={styles.marqueeCard}>
+              <img src="/agencies/quickecs.png" alt="Quick Sigorta" className={styles.marqueeLogo} />
+            </div>
+            <div className={styles.marqueeCard}>
+              <img src="/agencies/EMA.png" alt="Emaa Sigorta" className={styles.marqueeLogo} />
+            </div>
+          </div>
+          <div className={styles.marqueeContent} aria-hidden="true">
+            <div className={styles.marqueeCard}>
+              <img src="/agencies/ALLİNAZ.png" alt="Allianz Sigorta" className={styles.marqueeLogo} />
+            </div>
+            <div className={styles.marqueeCard}>
+              <img src="/agencies/ak-sigorta-logo-png_seeklogo-5491.png" alt="Aksigorta" className={styles.marqueeLogo} />
+            </div>
+            <div className={styles.marqueeCard}>
+              <img src="/agencies/sompo-sigorta3099.png" alt="Sompo Sigorta" className={styles.marqueeLogo} />
+            </div>
+            <div className={styles.marqueeCard}>
+              <img src="/agencies/HDI.png" alt="HDI Sigorta" className={styles.marqueeLogo} />
+            </div>
+            <div className={styles.marqueeCard}>
+              <img src="/agencies/quickecs.png" alt="Quick Sigorta" className={styles.marqueeLogo} />
+            </div>
+            <div className={styles.marqueeCard}>
+              <img src="/agencies/EMA.png" alt="Emaa Sigorta" className={styles.marqueeLogo} />
+            </div>
+          </div>
         </div>
       </div>
 
