@@ -39,8 +39,8 @@ export interface Policy {
   customerName: string;
   customerPhone?: string;
   customerTc?: string;
-  type: 'Trafik' | 'Kasko' | 'DASK' | 'Konut' | 'Özel Sağlık' | 'İşyeri';
-  company: 'HDI Sigorta' | 'Ak Sigorta' | 'Sompo Sigorta' | 'Allianz' | 'Anadolu Sigorta' | 'Quick Sigorta' | 'Emaa Sigorta';
+  type: string;
+  company: string;
   startDate: string;
   endDate: string;
   premium: number; // Toplam Brüt Prim (TL)

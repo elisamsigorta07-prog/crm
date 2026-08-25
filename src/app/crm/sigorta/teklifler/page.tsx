@@ -32,12 +32,13 @@ export default function TekliflerPage() {
   const [birthDate, setBirthDate] = useState('');
   const [plate, setPlate] = useState('');
   const [type, setType] = useState('Kasko Sigortası');
+  const [customType, setCustomType] = useState('');
   const [offeredPrice, setOfferedPrice] = useState('');
   const [autoText, setAutoText] = useState('');
 
   const resetForm = () => {
     setCustomer(''); setTc(''); setPhone(''); setBirthDate('');
-    setPlate(''); setType('Kasko Sigortası'); setOfferedPrice('');
+    setPlate(''); setType('Kasko Sigortası'); setCustomType(''); setOfferedPrice('');
     setAutoText(''); setAddMode('Manuel');
   };
 
@@ -78,9 +79,10 @@ export default function TekliflerPage() {
   const handleAddQuote = (e: React.FormEvent) => {
     e.preventDefault();
     if (!customer || !offeredPrice) return;
+    const finalType = type === 'Diğer' ? (customType.trim() || 'Özel Sigorta') : type;
     const newQuote: Quote = {
       id: `TEK-${Math.floor(200 + Math.random() * 800)}`,
-      customer, tc, phone, birthDate, plate, type,
+      customer, tc, phone, birthDate, plate, type: finalType,
       offeredPrice: `${Number(offeredPrice.replace(',', '.')).toLocaleString('tr-TR')} TL`,
       date: new Date().toLocaleDateString('tr-TR'),
       status: 'Beklemede',
@@ -263,7 +265,7 @@ export default function TekliflerPage() {
                 </div>
               </div>
               <div style={{ marginBottom: '15px' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Sigorta Ürünü</label>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Sigorta Ürünü / Türü</label>
                 <select value={type} onChange={(e) => setType(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }}>
                   <option>Kasko Sigortası</option>
                   <option>Trafik Sigortası</option>
@@ -272,8 +274,25 @@ export default function TekliflerPage() {
                   <option>Tamamlayıcı Sağlık</option>
                   <option>İşyeri Paket</option>
                   <option>Bireysel Sağlık</option>
-                  <option>Diğer</option>
+                  <option>Yabancı Sağlık</option>
+                  <option>Seyahat Sağlık</option>
+                  <option>Ferdi Kaza</option>
+                  <option>Nakliyat</option>
+                  <option>Mesleki Sorumluluk</option>
+                  <option>TARSİM Tarım</option>
+                  <option>Tekne / Yat</option>
+                  <option value="Diğer">➕ Diğer (Manuel Tür Yaz...)</option>
                 </select>
+                {type === 'Diğer' && (
+                  <input 
+                    type="text" 
+                    required 
+                    value={customType} 
+                    onChange={(e) => setCustomType(e.target.value)} 
+                    placeholder="Sigorta ürününü/türünü yazın..." 
+                    style={{ width: '100%', marginTop: '8px', padding: '9px', borderRadius: '8px', border: '2px solid #3b82f6', outline: 'none', fontWeight: 600, backgroundColor: '#eff6ff' }} 
+                  />
+                )}
               </div>
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Sunulan Teklif Fiyatı (TL) *</label>

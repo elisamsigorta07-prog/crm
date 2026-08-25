@@ -16,8 +16,10 @@ export default function PolicelerPage() {
   // Form state
   const [policyNo, setPolicyNo] = useState('');
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
-  const [type, setType] = useState<Policy['type']>('Trafik');
-  const [company, setCompany] = useState<Policy['company']>('HDI Sigorta');
+  const [type, setType] = useState('Trafik');
+  const [customType, setCustomType] = useState('');
+  const [company, setCompany] = useState('HDI Sigorta');
+  const [customCompany, setCustomCompany] = useState('');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0]);
   const [premium, setPremium] = useState('');
@@ -31,6 +33,9 @@ export default function PolicelerPage() {
   const handleAddPolicy = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCustomerId || !premium) return;
+
+    const finalType = type === 'DIGER' ? (customType.trim() || 'Özel Sigorta') : type;
+    const finalCompany = company === 'DIGER' ? (customCompany.trim() || 'Diğer Sigorta') : company;
 
     const matchedCustomer = customers.find(c => c.id === selectedCustomerId);
     const prem = Number(premium);
@@ -46,8 +51,8 @@ export default function PolicelerPage() {
       customerName: matchedCustomer ? matchedCustomer.name : 'Bilinmeyen Müşteri',
       customerPhone: matchedCustomer ? matchedCustomer.phone : '',
       customerTc: matchedCustomer ? matchedCustomer.identityNo : '',
-      type,
-      company,
+      type: finalType,
+      company: finalCompany,
       startDate: startDate ? new Date(startDate).toLocaleDateString('tr-TR') : '01.01.2024',
       endDate: endDate ? new Date(endDate).toLocaleDateString('tr-TR') : '01.01.2025',
       premium: prem,
@@ -66,6 +71,8 @@ export default function PolicelerPage() {
 
     // Reset Form
     setPolicyNo('');
+    setCustomType('');
+    setCustomCompany('');
     setPremium('');
     setPaidAmount('');
     setNotes('');
@@ -382,19 +389,38 @@ export default function PolicelerPage() {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Poliçe Türü</label>
-                  <select value={type} onChange={(e) => setType(e.target.value as Policy['type'])} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }}>
+                  <select value={type} onChange={(e) => setType(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }}>
                     <option value="Trafik">Trafik Sigortası</option>
                     <option value="Kasko">Kasko Sigortası</option>
                     <option value="DASK">DASK Deprem</option>
                     <option value="Konut">Konut Sigortası</option>
-                    <option value="Özel Sağlık">Özel Sağlık</option>
                     <option value="İşyeri">İşyeri Sigortası</option>
+                    <option value="Özel Sağlık">Özel Sağlık</option>
+                    <option value="Tamamlayıcı Sağlık (TSS)">Tamamlayıcı Sağlık (TSS)</option>
+                    <option value="Yabancı Sağlık">Yabancı Sağlık Sigortası</option>
+                    <option value="Seyahat Sağlık">Seyahat Sağlık Sigortası</option>
+                    <option value="Ferdi Kaza">Ferdi Kaza Sigortası</option>
+                    <option value="Nakliyat">Nakliyat Sigortası</option>
+                    <option value="Mesleki Sorumluluk">Mesleki Sorumluluk</option>
+                    <option value="TARSİM Tarım">TARSİM Tarım Sigortası</option>
+                    <option value="Tekne / Yat">Tekne / Yat Sigortası</option>
+                    <option value="DIGER">➕ Diğer (Manuel Tür Yaz...)</option>
                   </select>
+                  {type === 'DIGER' && (
+                    <input 
+                      type="text" 
+                      required 
+                      value={customType} 
+                      onChange={(e) => setCustomType(e.target.value)} 
+                      placeholder="Sigorta türünü yazın..." 
+                      style={{ width: '100%', marginTop: '8px', padding: '9px', borderRadius: '8px', border: '2px solid #3b82f6', outline: 'none', fontWeight: 600, backgroundColor: '#eff6ff' }} 
+                    />
+                  )}
                 </div>
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Sigorta Şirketi</label>
-                  <select value={company} onChange={(e) => setCompany(e.target.value as Policy['company'])} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }}>
+                  <select value={company} onChange={(e) => setCompany(e.target.value)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }}>
                     <option value="HDI Sigorta">HDI Sigorta</option>
                     <option value="Ak Sigorta">Ak Sigorta</option>
                     <option value="Sompo Sigorta">Sompo Sigorta</option>
@@ -402,7 +428,32 @@ export default function PolicelerPage() {
                     <option value="Anadolu Sigorta">Anadolu Sigorta</option>
                     <option value="Quick Sigorta">Quick Sigorta</option>
                     <option value="Emaa Sigorta">Emaa Sigorta</option>
+                    <option value="Türkiye Sigorta">Türkiye Sigorta</option>
+                    <option value="Axa Sigorta">Axa Sigorta</option>
+                    <option value="Ray Sigorta">Ray Sigorta</option>
+                    <option value="Neova Sigorta">Neova Sigorta</option>
+                    <option value="Hepiyi Sigorta">Hepiyi Sigorta</option>
+                    <option value="Generali Sigorta">Generali Sigorta</option>
+                    <option value="Unico Sigorta">Unico Sigorta</option>
+                    <option value="Corpus Sigorta">Corpus Sigorta</option>
+                    <option value="Koru Sigorta">Koru Sigorta</option>
+                    <option value="Bereket Sigorta">Bereket Sigorta</option>
+                    <option value="Mapfre Sigorta">Mapfre Sigorta</option>
+                    <option value="Orient Sigorta">Orient Sigorta</option>
+                    <option value="Ankara Sigorta">Ankara Sigorta</option>
+                    <option value="Zurich Sigorta">Zurich Sigorta</option>
+                    <option value="DIGER">➕ Diğer (Manuel Şirket Yaz...)</option>
                   </select>
+                  {company === 'DIGER' && (
+                    <input 
+                      type="text" 
+                      required 
+                      value={customCompany} 
+                      onChange={(e) => setCustomCompany(e.target.value)} 
+                      placeholder="Sigorta şirketini yazın..." 
+                      style={{ width: '100%', marginTop: '8px', padding: '9px', borderRadius: '8px', border: '2px solid #3b82f6', outline: 'none', fontWeight: 600, backgroundColor: '#eff6ff' }} 
+                    />
+                  )}
                 </div>
               </div>
 
