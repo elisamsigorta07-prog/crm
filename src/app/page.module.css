@@ -1,33 +1,78 @@
 /* =========================================================================
-   Büyük Görsel Odaklı & Ferah Hero Section (Grand Showcase)
+   Tam Ekran Arka Plan Cam Fanus Hero Section
    ========================================================================= */
-.grandHero {
+.fullBgHero {
   position: relative;
   width: 100%;
-  padding: 4.5rem 0 3.5rem 0;
+  min-height: 660px;
+  display: flex;
+  align-items: center;
+  padding: 4.5rem 0;
   overflow: hidden;
-  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-  border-bottom: 1px solid #edf2f7;
+  background-color: #f8fafc;
 }
 
-.grandHeroHeader {
-  text-align: center;
-  max-width: 840px;
-  margin: 0 auto 2.5rem auto;
+.fullBgHeroImgWrap {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  overflow: hidden;
+}
+
+.fullBgHeroImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center right;
+  transform: scale(1.02);
+}
+
+.fullBgHeroOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg, 
+    rgba(255, 255, 255, 0.96) 0%, 
+    rgba(255, 255, 255, 0.90) 38%, 
+    rgba(255, 255, 255, 0.35) 68%, 
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  pointer-events: none;
+}
+
+.fullBgHeroContent {
   display: flex;
-  flex-direction: column;
   align-items: center;
+}
+
+.fullBgHeroCard {
+  max-width: 630px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  padding: 2.75rem 2.5rem 2.25rem 2.5rem;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+  position: relative;
+  z-index: 2;
 }
 
 .heroPillBadgeLight {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 16px;
+  padding: 6px 14px;
   background: #eff6ff;
   border: 1px solid #bfdbfe;
   border-radius: 30px;
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   font-weight: 700;
   color: #1d4ed8;
   margin-bottom: 1.25rem;
@@ -49,13 +94,13 @@
   50% { opacity: 0.4; transform: scale(0.85); }
 }
 
-.grandHeroTitle {
-  font-size: 3.2rem;
+.fullBgHeroTitle {
+  font-size: 2.85rem;
   font-weight: 850;
   color: #0f172a;
   line-height: 1.18;
-  letter-spacing: -0.03em;
-  margin-bottom: 1.25rem;
+  letter-spacing: -0.025em;
+  margin-bottom: 1.15rem;
 }
 
 .brightHeroHighlight {
@@ -64,21 +109,20 @@
   -webkit-text-fill-color: transparent;
 }
 
-.grandHeroSubtitle {
-  font-size: 1.12rem;
+.fullBgHeroSubtitle {
+  font-size: 1.05rem;
   color: #475569;
-  line-height: 1.65;
-  max-width: 680px;
-  margin-bottom: 2rem;
+  line-height: 1.6;
+  margin-bottom: 1.75rem;
   font-weight: 450;
 }
 
-.grandHeroBtnGroup {
+.fullBgHeroBtnGroup {
   display: flex;
-  gap: 14px;
+  gap: 12px;
   align-items: center;
-  justify-content: center;
   flex-wrap: wrap;
+  margin-bottom: 1.75rem;
 }
 
 .brightHeroPrimaryBtn {
@@ -87,18 +131,18 @@
   gap: 10px;
   background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
   color: #ffffff;
-  padding: 15px 28px;
+  padding: 14px 26px;
   border-radius: 12px;
   font-weight: 700;
   font-size: 0.98rem;
   text-decoration: none;
-  box-shadow: 0 8px 25px rgba(37, 99, 235, 0.28);
+  box-shadow: 0 8px 22px rgba(37, 99, 235, 0.28);
   transition: all 0.25s ease;
 }
 
 .brightHeroPrimaryBtn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 14px 30px rgba(37, 99, 235, 0.42);
+  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.4);
   color: #ffffff;
 }
 
@@ -109,7 +153,7 @@
   background: #ffffff;
   color: #0f172a;
   border: 1px solid #cbd5e1;
-  padding: 15px 24px;
+  padding: 14px 22px;
   border-radius: 12px;
   font-weight: 700;
   font-size: 0.96rem;
@@ -124,181 +168,94 @@
   transform: translateY(-2px);
 }
 
-/* Merkezde BÜYÜK Fanus Görseli */
-.grandHeroVisualWrap {
-  max-width: 1100px;
-  margin: 0 auto 2.5rem auto;
-  position: relative;
-  width: 100%;
-}
-
-.grandHeroImgCard {
-  position: relative;
-  width: 100%;
-  border-radius: 28px;
-  overflow: hidden;
-  box-shadow: 0 30px 80px rgba(15, 23, 42, 0.12), 0 10px 25px rgba(15, 23, 42, 0.06);
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  background: #ffffff;
-  transition: transform 0.4s ease, box-shadow 0.4s ease;
-}
-
-.grandHeroImgCard:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 35px 90px rgba(15, 23, 42, 0.16), 0 12px 30px rgba(15, 23, 42, 0.08);
-}
-
-.grandHeroImg {
-  width: 100%;
-  height: auto;
-  display: block;
-  object-fit: cover;
-}
-
-/* 4 Hizmet Kartı */
-.grandHeroServicesGrid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-  max-width: 1100px;
-  margin: 0 auto 2.5rem auto;
-}
-
-.servicePillCard {
+.fullBgHeroQuickPills {
   display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.quickPill {
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
-  padding: 16px 18px;
+  gap: 6px;
+  padding: 7px 14px;
   background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 16px;
+  border-radius: 20px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #1e293b;
   text-decoration: none;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
-  transition: all 0.25s ease;
-}
-
-.servicePillCard:hover {
-  border-color: #3b82f6;
-  transform: translateY(-3px);
-  box-shadow: 0 12px 25px rgba(37, 99, 235, 0.12);
-}
-
-.servicePillIcon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.servicePillText {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-}
-
-.servicePillText strong {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #0f172a;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.servicePillText span {
-  font-size: 0.78rem;
-  color: #64748b;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.servicePillArrow {
-  color: #cbd5e1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
   transition: all 0.2s ease;
-  flex-shrink: 0;
 }
 
-.servicePillCard:hover .servicePillArrow {
+.quickPill:hover {
+  border-color: #3b82f6;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(37, 99, 235, 0.12);
   color: #2563eb;
-  transform: translateX(3px);
 }
 
-/* Güven Rozetleri */
-.grandHeroTrustBar {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 28px;
-  flex-wrap: wrap;
-  padding-top: 1.5rem;
-  border-top: 1px solid #edf2f7;
-  max-width: 1000px;
-  margin: 0 auto;
-}
-
-.trustBarItem {
+.fullBgHeroTrust {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.88rem;
-  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #64748b;
+  flex-wrap: wrap;
+  padding-top: 1.25rem;
+  border-top: 1px solid #edf2f7;
 }
 
-.trustCheck {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #dcfce7;
-  color: #16a34a;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.72rem;
-  font-weight: 800;
+.trustDivider {
+  color: #cbd5e1;
+  font-weight: 700;
 }
 
 /* Responsive Hero */
 @media (max-width: 991px) {
-  .grandHero {
-    padding: 3.5rem 0 2.5rem 0;
+  .fullBgHero {
+    padding: 3rem 0;
+    min-height: auto;
   }
 
-  .grandHeroTitle {
-    font-size: 2.5rem;
+  .fullBgHeroOverlay {
+    background: linear-gradient(
+      180deg, 
+      rgba(255, 255, 255, 0.95) 0%, 
+      rgba(255, 255, 255, 0.90) 100%
+    );
   }
 
-  .grandHeroServicesGrid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+  .fullBgHeroCard {
+    max-width: 100%;
+    padding: 2rem 1.5rem;
+  }
+
+  .fullBgHeroTitle {
+    font-size: 2.2rem;
   }
 }
 
 @media (max-width: 768px) {
-  .grandHero {
-    padding: 2.5rem 0 2rem 0;
+  .fullBgHero {
+    padding: 2rem 0;
   }
 
-  .grandHeroTitle {
-    font-size: 1.95rem;
+  .fullBgHeroTitle {
+    font-size: 1.85rem;
     line-height: 1.25;
   }
 
-  .titleBreak {
-    display: none;
-  }
-
-  .grandHeroSubtitle {
+  .fullBgHeroSubtitle {
     font-size: 0.95rem;
     margin-bottom: 1.5rem;
   }
 
-  .grandHeroBtnGroup {
+  .fullBgHeroBtnGroup {
     flex-direction: column;
     width: 100%;
     gap: 10px;
@@ -310,24 +267,26 @@
     justify-content: center;
   }
 
-  .grandHeroVisualWrap {
-    margin-bottom: 1.75rem;
+  .fullBgHeroQuickPills {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
   }
 
-  .grandHeroImgCard {
-    border-radius: 18px;
+  .quickPill {
+    justify-content: center;
+    padding: 8px 10px;
+    font-size: 0.8rem;
   }
 
-  .grandHeroServicesGrid {
-    grid-template-columns: 1fr;
-    gap: 10px;
-    margin-bottom: 1.75rem;
-  }
-
-  .grandHeroTrustBar {
+  .fullBgHeroTrust {
     flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
+    gap: 6px;
+  }
+
+  .trustDivider {
+    display: none;
   }
 }
 

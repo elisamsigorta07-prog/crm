@@ -45,123 +45,86 @@ export default function Home() {
 
   return (
     <>
-      {/* Büyük Görsel Odaklı & Ferah Hero Bölümü */}
-      <section className={styles.grandHero}>
-        <div className="container">
-          
-          {/* Üst Kısım: Başlık & Aksiyon */}
-          <div className={styles.grandHeroHeader}>
-            <div className={styles.heroPillBadgeLight}>
-              <span className={styles.heroLiveDot}></span>
-              <span>Elisam Sigorta Aracılık Hizmetleri • Alanya</span>
+      {/* Tam Ekran Arka Plan Cam Fanus Hero Bölümü */}
+      <section className={styles.fullBgHero}>
+        {/* Arka Plan Görseli - Tam Ekran */}
+        <div className={styles.fullBgHeroImgWrap}>
+          <img 
+            src="/hero-dome.jpg" 
+            alt="Elisam Sigorta - Fanus İçi Tam Koruma (Kasko, Trafik, Konut, Sağlık)" 
+            className={styles.fullBgHeroImg}
+          />
+          <div className={styles.fullBgHeroOverlay}></div>
+        </div>
+
+        <div className="container" style={{ position: 'relative', zIndex: 3 }}>
+          <div className={styles.fullBgHeroContent}>
+            
+            {/* Sol Taraf - Ferah Bilgi & Teklif Kartı */}
+            <div className={styles.fullBgHeroCard}>
+              <div className={styles.heroPillBadgeLight}>
+                <span className={styles.heroLiveDot}></span>
+                <span>Elisam Sigorta Aracılık Hizmetleri • Alanya</span>
+              </div>
+
+              <h1 className={styles.fullBgHeroTitle}>
+                Hayatın Her Anında <br />
+                <span className={styles.brightHeroHighlight}>Tam Güvence Yanınızda.</span>
+              </h1>
+
+              <p className={styles.fullBgHeroSubtitle}>
+                Kaza ve trafikten sağlığınıza, evinizden işyerinize kadar tüm risklere karşı 15+ lider sigorta şirketinden en avantajlı fiyat tekliflerini anında karşılaştırın.
+              </p>
+
+              {/* Aksiyon Butonları */}
+              <div className={styles.fullBgHeroBtnGroup}>
+                <a 
+                  href="https://wa.me/905514387771?text=Merhaba,%20sigorta%20teklifi%20almak%20istiyorum." 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className={styles.brightHeroPrimaryBtn}
+                >
+                  <span>💬 WhatsApp&apos;tan Hızlı Teklif Al</span>
+                  <ArrowRight size={18} />
+                </a>
+
+                <a href="tel:05514387771" className={styles.brightHeroPhoneBtn}>
+                  <PhoneCall size={18} />
+                  <span>0551 438 77 71</span>
+                </a>
+              </div>
+
+              {/* 4 Hızlı Hizmet Butonu */}
+              <div className={styles.fullBgHeroQuickPills}>
+                <Link href="/hizmetler/kasko" className={styles.quickPill}>
+                  <Car size={16} color="#2563eb" />
+                  <span>Kasko & Trafik</span>
+                </Link>
+                <Link href="/hizmetler/konut-sigortasi" className={styles.quickPill}>
+                  <HomeIcon size={16} color="#059669" />
+                  <span>Konut & DASK</span>
+                </Link>
+                <Link href="/hizmetler/saglik-sigortasi" className={styles.quickPill}>
+                  <HeartPulse size={16} color="#dc2626" />
+                  <span>Sağlık Sigortası</span>
+                </Link>
+                <Link href="/hizmetler/isyeri-sigortasi" className={styles.quickPill}>
+                  <Briefcase size={16} color="#d97706" />
+                  <span>İşyeri & KOBİ</span>
+                </Link>
+              </div>
+
+              {/* Güven Rozetleri */}
+              <div className={styles.fullBgHeroTrust}>
+                <span>✓ 15+ Sigorta Şirketi</span>
+                <span className={styles.trustDivider}>•</span>
+                <span>✓ 7/24 Kesintisiz Hasar Desteği</span>
+                <span className={styles.trustDivider}>•</span>
+                <span>✓ Anında Poliçe Kesimi</span>
+              </div>
             </div>
 
-            <h1 className={styles.grandHeroTitle}>
-              Hayatın Her Anında <br className={styles.titleBreak} />
-              <span className={styles.brightHeroHighlight}>Tam Güvence Yanınızda.</span>
-            </h1>
-
-            <p className={styles.grandHeroSubtitle}>
-              Kaza ve trafikten sağlığınıza, evinizden işyerinize kadar tüm risklere karşı Türkiye&apos;nin 15+ lider sigorta şirketinden en avantajlı fiyat tekliflerini anında karşılaştırın.
-            </p>
-
-            {/* Aksiyon Butonları */}
-            <div className={styles.grandHeroBtnGroup}>
-              <a 
-                href="https://wa.me/905514387771?text=Merhaba,%20sigorta%20teklifi%20almak%20istiyorum." 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className={styles.brightHeroPrimaryBtn}
-              >
-                <span>💬 WhatsApp&apos;tan Hızlı Teklif Al</span>
-                <ArrowRight size={18} />
-              </a>
-
-              <a href="tel:05514387771" className={styles.brightHeroPhoneBtn}>
-                <PhoneCall size={18} />
-                <span>0551 438 77 71</span>
-              </a>
-            </div>
           </div>
-
-          {/* Merkezde BÜYÜK Fanus Görseli */}
-          <div className={styles.grandHeroVisualWrap}>
-            <div className={styles.grandHeroImgCard}>
-              <img 
-                src="/hero-dome.jpg" 
-                alt="Elisam Sigorta - Fanus İçi Tam Koruma (Kasko, Trafik, Konut, Sağlık)" 
-                className={styles.grandHeroImg}
-              />
-            </div>
-          </div>
-
-          {/* Görselin Altında 4 Hızlı Hizmet Kartı */}
-          <div className={styles.grandHeroServicesGrid}>
-            <Link href="/hizmetler/kasko" className={styles.servicePillCard}>
-              <div className={styles.servicePillIcon} style={{ background: '#eff6ff', color: '#2563eb' }}>
-                <Car size={22} strokeWidth={2} />
-              </div>
-              <div className={styles.servicePillText}>
-                <strong>Kasko & Trafik</strong>
-                <span>7/24 yol yardım & kaza desteği</span>
-              </div>
-              <ArrowRight size={16} className={styles.servicePillArrow} />
-            </Link>
-
-            <Link href="/hizmetler/konut-sigortasi" className={styles.servicePillCard}>
-              <div className={styles.servicePillIcon} style={{ background: '#ecfdf5', color: '#059669' }}>
-                <HomeIcon size={22} strokeWidth={2} />
-              </div>
-              <div className={styles.servicePillText}>
-                <strong>Konut & DASK</strong>
-                <span>Eviniz ve eşyalarınız için tam koruma</span>
-              </div>
-              <ArrowRight size={16} className={styles.servicePillArrow} />
-            </Link>
-
-            <Link href="/hizmetler/saglik-sigortasi" className={styles.servicePillCard}>
-              <div className={styles.servicePillIcon} style={{ background: '#fef2f2', color: '#dc2626' }}>
-                <HeartPulse size={22} strokeWidth={2} />
-              </div>
-              <div className={styles.servicePillText}>
-                <strong>Sağlık Sigortası</strong>
-                <span>Özel hastanelerde ayrıcalıklı tedavi</span>
-              </div>
-              <ArrowRight size={16} className={styles.servicePillArrow} />
-            </Link>
-
-            <Link href="/hizmetler/isyeri-sigortasi" className={styles.servicePillCard}>
-              <div className={styles.servicePillIcon} style={{ background: '#fffbeb', color: '#d97706' }}>
-                <Briefcase size={22} strokeWidth={2} />
-              </div>
-              <div className={styles.servicePillText}>
-                <strong>İşyeri & KOBİ</strong>
-                <span>İşletmeniz ve ticari varlıklarınız</span>
-              </div>
-              <ArrowRight size={16} className={styles.servicePillArrow} />
-            </Link>
-          </div>
-
-          {/* Güven Rozetleri */}
-          <div className={styles.grandHeroTrustBar}>
-            <div className={styles.trustBarItem}>
-              <span className={styles.trustCheck}>✓</span>
-              <span><strong>15+ Lider</strong> Sigorta Şirketi</span>
-            </div>
-            <div className={styles.trustBarItem}>
-              <span className={styles.trustCheck}>✓</span>
-              <span><strong>7/24 Kesintisiz</strong> Hasar Destek</span>
-            </div>
-            <div className={styles.trustBarItem}>
-              <span className={styles.trustCheck}>✓</span>
-              <span><strong>Anında Online</strong> Poliçe Kesimi</span>
-            </div>
-            <div className={styles.trustBarItem}>
-              <span className={styles.trustCheck}>✓</span>
-              <span><strong>En İyi Fiyat</strong> Garantisi</span>
-            </div>
-          </div>
-
         </div>
       </section>
 
