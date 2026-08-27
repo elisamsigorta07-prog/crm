@@ -11,12 +11,13 @@ export default function WhatsAppButton() {
     return null;
   }
 
-  // Use the agency's actual WhatsApp number
+  // Use the agency's actual WhatsApp number with prefilled message
   const phoneNumber = '905514387771';
+  const defaultMessage = encodeURIComponent('Merhaba, sigortalar hakkında bilgi almak istiyorum.');
 
   return (
     <a
-      href={`https://wa.me/${phoneNumber}`}
+      href={`https://wa.me/${phoneNumber}?text=${defaultMessage}`}
       target="_blank"
       rel="noopener noreferrer"
       className={styles.wpButton}
