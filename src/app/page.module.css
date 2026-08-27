@@ -239,12 +239,12 @@
 /* Responsive */
 @media (max-width: 991px) {
   .archHero {
-    padding: 3.5rem 0 3rem 0;
+    padding: 3rem 0 2.5rem 0;
   }
 
   .archHeroGrid {
     grid-template-columns: 1fr;
-    gap: 3rem;
+    gap: 2.5rem;
   }
 
   .archHeroLeft {
@@ -252,33 +252,67 @@
   }
 
   .archHeroTitle {
-    font-size: 2.6rem;
+    font-size: 2.5rem;
+  }
+
+  .archHeroRight {
+    max-width: 440px;
+    margin: 0 auto;
   }
 
   .archFrame {
-    height: 380px;
-    max-width: 480px;
+    height: 360px;
+    max-width: 420px;
+  }
+
+  .archFloatingBadge {
+    right: 2%;
+    bottom: -10px;
   }
 }
 
 @media (max-width: 768px) {
   .archHero {
-    padding: 2.5rem 0 2rem 0;
+    padding: 1.75rem 0 2rem 0;
+  }
+
+  .archHeroGrid {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .archHeroLeft {
+    text-align: center;
+    align-items: center;
+    max-width: 100%;
+  }
+
+  .archHeroEyebrow {
+    font-size: 0.72rem;
+    letter-spacing: 2px;
+    margin-bottom: 0.6rem;
+    display: inline-block;
   }
 
   .archHeroTitle {
-    font-size: 2.1rem;
-    line-height: 1.2;
+    font-size: 1.95rem;
+    line-height: 1.22;
+    margin-bottom: 0.85rem;
+    letter-spacing: -0.03em;
   }
 
   .archHeroSubtitle {
-    font-size: 0.95rem;
-    margin-bottom: 1.5rem;
+    font-size: 0.92rem;
+    line-height: 1.55;
+    margin-bottom: 1.25rem;
+    max-width: 460px;
   }
 
   .archHeroBtnGroup {
     flex-direction: column;
     width: 100%;
+    max-width: 360px;
+    margin: 0 auto 1.25rem auto;
     gap: 10px;
   }
 
@@ -286,34 +320,155 @@
   .archPhoneBtn {
     width: 100%;
     justify-content: center;
+    padding: 13px 20px;
+    font-size: 0.92rem;
   }
 
   .archQuickPills {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
+    width: 100%;
+    max-width: 360px;
+    margin: 0 auto;
   }
 
   .archPill {
     justify-content: center;
     padding: 8px 10px;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
+    border-radius: 10px;
+  }
+
+  .archHeroRight {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 340px;
+    margin: 0 auto;
+    padding-bottom: 1.5rem;
+    position: relative;
+  }
+
+  .archBackdropGlow {
+    width: 90%;
+    height: 90%;
+    left: 5%;
+    top: 5%;
+    right: auto;
+    transform: none;
+    filter: blur(14px);
+    opacity: 0.45;
   }
 
   .archFrame {
-    height: 280px;
+    width: 100%;
+    max-width: 290px;
+    height: 290px;
     border-radius: 180px 180px 24px 24px;
+    border: 3px solid #ffffff;
+    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.1);
   }
 
   .archFloatingBadge {
-    position: static;
-    margin-top: 1rem;
-    width: 100%;
+    position: absolute;
+    bottom: 0px;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: calc(100% - 20px);
+    max-width: 310px;
+    padding: 9px 12px;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14), 0 2px 6px rgba(15, 23, 42, 0.04);
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    z-index: 10;
+    margin-top: 0;
+    animation: none;
   }
 
-  .archBadgeText strong,
-  .archBadgeText span {
+  .archBadgeIconWrap {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: #eff6ff;
+    flex-shrink: 0;
+  }
+
+  .archBadgeIconWrap svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .archBadgeText {
+    text-align: left;
+  }
+
+  .archBadgeText strong {
+    font-size: 0.82rem;
+    font-weight: 750;
+    color: #0f172a;
+    display: block;
+    line-height: 1.2;
     white-space: normal;
+  }
+
+  .archBadgeText span {
+    font-size: 0.72rem;
+    color: #64748b;
+    display: block;
+    line-height: 1.3;
+    margin-top: 1px;
+    white-space: normal;
+  }
+}
+
+@media (max-width: 480px) {
+  .archHeroTitle {
+    font-size: 1.75rem;
+  }
+
+  .archHeroSubtitle {
+    font-size: 0.88rem;
+  }
+
+  .archFrame {
+    max-width: 260px;
+    height: 260px;
+    border-radius: 160px 160px 20px 20px;
+  }
+
+  .archFloatingBadge {
+    max-width: 275px;
+    padding: 8px 10px;
+    gap: 8px;
+    bottom: -6px;
+  }
+
+  .archBadgeIconWrap {
+    width: 34px;
+    height: 34px;
+  }
+
+  .archBadgeIconWrap svg {
+    width: 19px;
+    height: 19px;
+  }
+
+  .archBadgeText strong {
+    font-size: 0.78rem;
+  }
+
+  .archBadgeText span {
+    font-size: 0.68rem;
   }
 }
 
