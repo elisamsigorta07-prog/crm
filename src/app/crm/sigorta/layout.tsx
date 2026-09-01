@@ -39,7 +39,6 @@ export default function SigortaCrmLayout({
 
   const navItems = [
     { name: 'Dashboard', href: '/crm/sigorta/dashboard', icon: LayoutDashboard },
-    { name: 'Müşteriler', href: '/crm/sigorta/musteriler', icon: Users },
     { name: 'Poliçeler', href: '/crm/sigorta/policeler', icon: ShieldAlert },
     { name: 'Teklifler', href: '/crm/sigorta/teklifler', icon: FileText },
     { name: 'Finans', href: '/crm/sigorta/finans', icon: Wallet },

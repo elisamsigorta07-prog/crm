@@ -97,7 +97,7 @@ export default function TekliflerPage() {
   };
 
   const handleConvertToPolicy = (q: Quote) => {
-    alert('Teklif ' + q.id + ' onaylandi! Musteri: ' + q.customer + (q.tc ? ' | TC: ' + q.tc : '') + (q.plate ? ' | Plaka: ' + q.plate : '') + '\nTutar: ' + q.offeredPrice + '\n\nMusteriler sayfasindan yeni musteri kaydi olusturup policeye donusturebilirsiniz.');
+    alert('Teklif ' + q.id + ' onaylandı! Müşteri: ' + q.customer + (q.tc ? ' | TC: ' + q.tc : '') + (q.plate ? ' | Plaka: ' + q.plate : '') + '\nTutar: ' + q.offeredPrice + '\n\nPoliçeler sayfasına yönlendirilerek tek adımda poliçesini kesebilir ve müşteriyi kaydedebilirsiniz.');
   };
 
   const filteredQuotes = quotes.filter((q) => {
