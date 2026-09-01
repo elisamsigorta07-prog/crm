@@ -22,69 +22,189 @@ import {
   Send,
   MessageCircle,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Building2,
+  Trash2,
+  Edit2,
+  Receipt
 } from 'lucide-react';
 import { 
   Customer, 
   initialCustomersData, 
   Policy, 
-  initialPoliciesData,
-  Installment
+  initialPoliciesData 
 } from '@/data/crmData';
+import { generateModernPDF } from '@/lib/pdfReportGenerator';
 import styles from '../layout.module.css';
 
-// Müşteri Borç / Taksit Kaydı
-export interface CustomerDebtRecord {
+// Cari Hesap Hareketi Modeli (Görsellerdeki Birebir Yapı)
+export interface CariMovement {
   id: string;
-  customerId: string;
-  customerName: string;
-  customerPhone: string;
-  customerTc?: string;
-  policyNo: string;
-  insuranceType: string;
-  company: string;
-  totalAmount: number;      // Toplam Prim / Borç Tutarı
-  paidAmount: number;       // Ödenen Tutar
-  remainingAmount: number;  // Kalan Bakiye
-  paymentType: 'Peşin / Tek Çekim' | 'Taksitli';
-  installmentCount: number;
-  installments: Installment[];
-  status: 'Ödendi' | 'Kısmi Ödendi' | 'Gecikmede' | 'Bekliyor';
-  startDate: string;
+  date: string;               // Tarih (DD.MM.YYYY)
+  dueDate?: string;           // Vade Tarihi (opsiyonel)
+  receiptNo?: string;         // Fiş / Dekont / Belge No (örn: 7339, 27)
+  customerId: string;         // Müşteri ID
+  customerName: string;       // Müşteri Adı / Ünvanı
+  description: string;        // Açıklama (Poliçe No, Şirket, Plaka, Banka Bilgisi vb.)
+  movementType: 
+    | 'Poliçe Tahakkuku' 
+    | 'Banka Giden Havale' 
+    | 'Banka Gelen Havale' 
+    | 'Kredi Kartı Tahsilat' 
+    | 'Hizmet Alım Faturası' 
+    | 'Cari Mahsup Çıkışı' 
+    | 'Cari Hareket Girişi' 
+    | 'Poliçe İptal / İade' 
+    | 'Tarih Öncesi Devir Bakiye';
+  debitAmount: number;        // Borç (Poliçe Bedeli / Fatura vb.)
+  creditAmount: number;       // Alacak / Alınan (Ödeme / Havale / İade)
   notes?: string;
 }
 
-// Kasa İşlem Kaydı
-export interface CashLog {
-  id: string;
-  date: string;
-  customerName: string;
-  policyNo: string;
-  amount: number;
-  paymentMethod: 'Kredi Kartı' | 'Banka Havalesi / EFT' | 'Nakit' | 'Çek / Senet';
-  type: 'Tahsilat' | 'Gider / İade';
-  description: string;
-}
+// Örnek Başlangıç Cari Hareket Verileri (Kullanıcının görsellerindeki gerçekçi veriler)
+const initialCariMovements: CariMovement[] = [
+  {
+    id: 'CAR-001',
+    date: '31.12.2025',
+    receiptNo: '-',
+    customerId: 'CUST-001',
+    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
+    description: 'TARİH ÖNCESİ BAKİYE TL (DEVİR)',
+    movementType: 'Tarih Öncesi Devir Bakiye',
+    debitAmount: 1415883.27,
+    creditAmount: 1396366.99,
+    notes: 'Geçmiş dönem devir bakiyesi'
+  },
+  {
+    id: 'CAR-002',
+    date: '09.01.2026',
+    receiptNo: '101',
+    customerId: 'CUST-001',
+    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
+    description: 'İŞ BNK ELİSAM SİG',
+    movementType: 'Banka Gelen Havale',
+    debitAmount: 0,
+    creditAmount: 10000.00
+  },
+  {
+    id: 'CAR-003',
+    date: '14.01.2026',
+    dueDate: '14.01.2026',
+    receiptNo: '7339',
+    customerId: 'CUST-001',
+    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
+    description: '2000270031266 / 0 HDI KASKO 34MNP977 KAYSERİ ÇOK YAŞAR',
+    movementType: 'Poliçe Tahakkuku',
+    debitAmount: 32838.57,
+    creditAmount: 0
+  },
+  {
+    id: 'CAR-004',
+    date: '31.01.2026',
+    dueDate: '31.01.2026',
+    receiptNo: '7335',
+    customerId: 'CUST-001',
+    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
+    description: '20002700411661 / 0 HDI KASKO 38SZ184 KAYSERİ ÇOK YAŞAR',
+    movementType: 'Poliçe Tahakkuku',
+    debitAmount: 31662.62,
+    creditAmount: 0
+  },
+  {
+    id: 'CAR-005',
+    date: '31.01.2026',
+    dueDate: '31.01.2026',
+    receiptNo: '7336',
+    customerId: 'CUST-001',
+    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
+    description: '2000270044808 / 0 HDI KASKO 38YD923 KAYSERİ ÇOK YAŞAR',
+    movementType: 'Poliçe Tahakkuku',
+    debitAmount: 38399.36,
+    creditAmount: 0
+  },
+  {
+    id: 'CAR-006',
+    date: '31.01.2026',
+    dueDate: '31.01.2026',
+    receiptNo: '7337',
+    customerId: 'CUST-001',
+    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
+    description: '2000270049308 / 0 HDI KASKO 38EB739 KAYSERİ ÇOK YAŞAR',
+    movementType: 'Poliçe Tahakkuku',
+    debitAmount: 37672.98,
+    creditAmount: 0
+  },
+  {
+    id: 'CAR-007',
+    date: '31.01.2026',
+    dueDate: '31.01.2026',
+    receiptNo: '7338',
+    customerId: 'CUST-001',
+    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
+    description: '2000270051912 / 0 HDI KASKO 38JD384 KAYSERİ ÇOK YAŞAR',
+    movementType: 'Poliçe Tahakkuku',
+    debitAmount: 43088.07,
+    creditAmount: 0
+  },
+  {
+    id: 'CAR-008',
+    date: '23.02.2026',
+    dueDate: '23.02.2026',
+    receiptNo: '7772',
+    customerId: 'CUST-001',
+    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
+    description: '2000284839432 / 0 HDI KASKO 38NT923 KAYSERİ ÇOK YAŞAR',
+    movementType: 'Poliçe Tahakkuku',
+    debitAmount: 41128.80,
+    creditAmount: 0
+  },
+  {
+    id: 'CAR-009',
+    date: '23.02.2026',
+    dueDate: '23.02.2026',
+    receiptNo: '7774',
+    customerId: 'CUST-001',
+    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
+    description: '2000284842165 / 0 HDI KASKO 38DC673 KAYSERİ ÇOK YAŞAR',
+    movementType: 'Poliçe Tahakkuku',
+    debitAmount: 43157.56,
+    creditAmount: 0
+  },
+  {
+    id: 'CAR-010',
+    date: '24.02.2026',
+    dueDate: '24.02.2026',
+    receiptNo: '7773',
+    customerId: 'CUST-001',
+    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
+    description: '2000284836488 / 0 HDI KASKO 38LJ521 KAYSERİ ÇOK YAŞAR',
+    movementType: 'Poliçe Tahakkuku',
+    debitAmount: 42495.66,
+    creditAmount: 0
+  },
+  {
+    id: 'CAR-011',
+    date: '16.04.2026',
+    receiptNo: '8324',
+    customerId: 'CUST-001',
+    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
+    description: 'İptal 2000255346766 / 1 HDI KASKO 34CYT106 KAYSERİ ÇOK YAŞAR',
+    movementType: 'Poliçe İptal / İade',
+    debitAmount: 0,
+    creditAmount: 18506.57,
+    notes: 'Poliçe zeyil / iptal iade hareketi'
+  }
+];
 
 export default function SigortaFinansPage() {
-  // Local storage state for persistent records
-  const loadDebtRecords = (): CustomerDebtRecord[] => {
-    if (typeof window === 'undefined') return [];
+  // Load persisted movements & customers
+  const loadStoredMovements = (): CariMovement[] => {
+    if (typeof window === 'undefined') return initialCariMovements;
     try {
-      const saved = localStorage.getItem('elisam_debt_records');
-      return saved ? JSON.parse(saved) : [];
+      const saved = localStorage.getItem('elisam_cari_movements');
+      return saved ? JSON.parse(saved) : initialCariMovements;
     } catch {
-      return [];
-    }
-  };
-
-  const loadCashLogs = (): CashLog[] => {
-    if (typeof window === 'undefined') return [];
-    try {
-      const saved = localStorage.getItem('elisam_cash_logs');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
+      return initialCariMovements;
     }
   };
 
@@ -98,1153 +218,824 @@ export default function SigortaFinansPage() {
     }
   };
 
-  const [records, setRecords] = useState<CustomerDebtRecord[]>(loadDebtRecords);
-  const [cashLogs, setCashLogs] = useState<CashLog[]>(loadCashLogs);
-  const [customers] = useState<Customer[]>(loadStoredCustomers);
-
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<'tumu' | 'kalan' | 'geciken' | 'odendi' | 'kasa'>('tumu');
+  const [movements, setMovements] = useState<CariMovement[]>(loadStoredMovements);
+  const [customers, setCustomers] = useState<Customer[]>(loadStoredCustomers);
   
-  // Modals
+  // Selected Customer Filter (Default: ALL or specific customer)
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('ALL');
+  const [customerSearchTerm, setCustomerSearchTerm] = useState<string>('');
+  const [tableSearchTerm, setTableSearchTerm] = useState<string>('');
+  const [activeMovementTypeFilter, setActiveMovementTypeFilter] = useState<string>('Tümü');
+
+  // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isCollectModalOpen, setIsCollectModalOpen] = useState(false);
-  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<CustomerDebtRecord | null>(null);
+  const [modalActionType, setModalActionType] = useState<'BORC' | 'TAHSILAT' | 'IADE' | 'DEVIR'>('BORC');
+  const [editingMovement, setEditingMovement] = useState<CariMovement | null>(null);
 
-  // New Record Form State
-  const [selectedCustomerId, setSelectedCustomerId] = useState('');
-  const [finansCustomerSearch, setFinansCustomerSearch] = useState('');
-  const [customCustomerName, setCustomCustomerName] = useState('');
-  const [customCustomerPhone, setCustomCustomerPhone] = useState('');
-  const [customCustomerTc, setCustomCustomerTc] = useState('');
-  const [policyNo, setPolicyNo] = useState('');
-  const [insuranceType, setInsuranceType] = useState('Kasko');
-  const [customInsuranceType, setCustomInsuranceType] = useState('');
-  const [company, setCompany] = useState('HDI Sigorta');
-  const [customCompany, setCustomCompany] = useState('');
-  const [totalAmount, setTotalAmount] = useState('');
-  const [initialPaidAmount, setInitialPaidAmount] = useState('');
-  const [paymentType, setPaymentType] = useState<'Peşin / Tek Çekim' | 'Taksitli'>('Peşin / Tek Çekim');
-  const [installmentCount, setInstallmentCount] = useState<number>(3);
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [notes, setNotes] = useState('');
+  // Form States
+  const [formDate, setFormDate] = useState(new Date().toISOString().split('T')[0]);
+  const [formDueDate, setFormDueDate] = useState('');
+  const [formReceiptNo, setFormReceiptNo] = useState('');
+  const [formCustomerId, setFormCustomerId] = useState('');
+  const [formCustomerName, setFormCustomerName] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formMovementType, setFormMovementType] = useState<CariMovement['movementType']>('Poliçe Tahakkuku');
+  const [formDebitAmount, setFormDebitAmount] = useState('');
+  const [formCreditAmount, setFormCreditAmount] = useState('');
+  const [formNotes, setFormNotes] = useState('');
 
-  // Collect Payment Modal State
-  const [collectAmount, setCollectAmount] = useState('');
-  const [collectMethod, setCollectMethod] = useState<'Kredi Kartı' | 'Banka Havalesi / EFT' | 'Nakit'>('Kredi Kartı');
-  const [collectNote, setCollectNote] = useState('');
-
-  // Save to localStorage when state updates
+  // Persist movements to localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('elisam_debt_records', JSON.stringify(records));
+      localStorage.setItem('elisam_cari_movements', JSON.stringify(movements));
     }
-  }, [records]);
+  }, [movements]);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('elisam_cash_logs', JSON.stringify(cashLogs));
+  // Open Add Movement Modal
+  const handleOpenAddModal = (type: 'BORC' | 'TAHSILAT' | 'IADE' | 'DEVIR') => {
+    setEditingMovement(null);
+    setModalActionType(type);
+    setFormDate(new Date().toISOString().split('T')[0]);
+    setFormDueDate('');
+    setFormReceiptNo(String(Math.floor(1000 + Math.random() * 9000)));
+    
+    // Set default customer
+    if (selectedCustomerId !== 'ALL') {
+      const matched = customers.find(c => c.id === selectedCustomerId);
+      setFormCustomerId(selectedCustomerId);
+      setFormCustomerName(matched?.name || 'KAYSERİ ÇOK YAŞAR POSTALLI');
+    } else {
+      setFormCustomerId(customers[0]?.id || 'CUST-001');
+      setFormCustomerName(customers[0]?.name || 'KAYSERİ ÇOK YAŞAR POSTALLI');
     }
-  }, [cashLogs]);
 
-  // Handle Customer Selection in New Record Modal
-  const handleCustomerSelect = (cId: string) => {
-    setSelectedCustomerId(cId);
-    if (cId === 'custom') {
-      setCustomCustomerName('');
-      setCustomCustomerPhone('');
-      setCustomCustomerTc('');
+    if (type === 'BORC') {
+      setFormMovementType('Poliçe Tahakkuku');
+      setFormDescription('');
+      setFormDebitAmount('');
+      setFormCreditAmount('0');
+    } else if (type === 'TAHSILAT') {
+      setFormMovementType('Banka Gelen Havale');
+      setFormDescription('İŞ BANKASI HAVALE / TAHSİLAT');
+      setFormDebitAmount('0');
+      setFormCreditAmount('');
+    } else if (type === 'IADE') {
+      setFormMovementType('Poliçe İptal / İade');
+      setFormDescription('İPTAL / ZEYİL İADE BEDELİ');
+      setFormDebitAmount('0');
+      setFormCreditAmount('');
+    } else if (type === 'DEVIR') {
+      setFormMovementType('Tarih Öncesi Devir Bakiye');
+      setFormDescription('TARİH ÖNCESİ BAKİYE TL (DEVİR)');
+      setFormDebitAmount('');
+      setFormCreditAmount('0');
+    }
+
+    setFormNotes('');
+    setIsAddModalOpen(true);
+  };
+
+  // Open Edit Modal
+  const handleOpenEditModal = (mov: CariMovement) => {
+    setEditingMovement(mov);
+    setFormDate(mov.date);
+    setFormDueDate(mov.dueDate || '');
+    setFormReceiptNo(mov.receiptNo || '');
+    setFormCustomerId(mov.customerId);
+    setFormCustomerName(mov.customerName);
+    setFormDescription(mov.description);
+    setFormMovementType(mov.movementType);
+    setFormDebitAmount(String(mov.debitAmount));
+    setFormCreditAmount(String(mov.creditAmount));
+    setFormNotes(mov.notes || '');
+    setIsAddModalOpen(true);
+  };
+
+  // Save Movement
+  const handleSaveMovement = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formCustomerName || (!formDebitAmount && !formCreditAmount)) {
+      alert('Lütfen müşteri adı ve tutar bilgilerini girin.');
       return;
     }
-    const found = customers.find(c => c.id === cId);
-    if (found) {
-      setCustomCustomerName(found.name);
-      setCustomCustomerPhone(found.phone);
-      setCustomCustomerTc(found.identityNo || '');
-      if (found.policyNo) setPolicyNo(found.policyNo);
-      if (found.insuranceType) setInsuranceType(found.insuranceType);
-    }
-  };
 
-  // Create Installments Helper
-  const generateInstallments = (total: number, count: number, start: string, initialPaid: number): Installment[] => {
-    const installments: Installment[] = [];
-    const monthlyAmt = Math.round(total / count);
-    const sDate = start ? new Date(start) : new Date();
+    const dAmount = Number(formDebitAmount) || 0;
+    const cAmount = Number(formCreditAmount) || 0;
 
-    let paidRemaining = initialPaid;
-
-    for (let i = 1; i <= count; i++) {
-      const dueDate = new Date(sDate);
-      dueDate.setMonth(dueDate.getMonth() + (i - 1));
-      const formattedDue = dueDate.toLocaleDateString('tr-TR');
-
-      const isOverdue = dueDate < new Date() && paidRemaining < monthlyAmt;
-      const isPaid = paidRemaining >= monthlyAmt;
-      
-      if (isPaid) {
-        paidRemaining -= monthlyAmt;
-      }
-
-      installments.push({
-        installmentNo: i,
-        amount: i === count ? (total - monthlyAmt * (count - 1)) : monthlyAmt,
-        dueDate: formattedDue,
-        status: isPaid ? 'Ödendi' : (isOverdue ? 'Gecikmede' : 'Bekliyor'),
-        paidDate: isPaid ? new Date().toLocaleDateString('tr-TR') : undefined
-      });
+    // Convert date string if from datepicker
+    let formattedDate = formDate;
+    if (formDate.includes('-')) {
+      const p = formDate.split('-');
+      if (p.length === 3) formattedDate = `${p[2]}.${p[1]}.${p[0]}`;
     }
 
-    return installments;
-  };
+    let formattedDueDate = formDueDate;
+    if (formDueDate.includes('-')) {
+      const p = formDueDate.split('-');
+      if (p.length === 3) formattedDueDate = `${p[2]}.${p[1]}.${p[0]}`;
+    }
 
-  // Add New Debt / Policy Record
-  const handleAddRecord = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!customCustomerName || !totalAmount) return;
-
-    const finalType = insuranceType === 'DIGER' ? (customInsuranceType.trim() || 'Özel Sigorta') : insuranceType;
-    const finalCompany = company === 'DIGER' ? (customCompany.trim() || 'Diğer Sigorta') : company;
-
-    const total = Number(totalAmount);
-    const paid = Number(initialPaidAmount) || (paymentType === 'Peşin / Tek Çekim' ? total : 0);
-    const remaining = Math.max(0, total - paid);
-
-    const instCount = paymentType === 'Taksitli' ? installmentCount : 1;
-    const installments = generateInstallments(total, instCount, startDate, paid);
-
-    const generatedPolicyNo = policyNo.trim() || `POL-${Math.floor(100000 + Math.random() * 900000)}`;
-
-    const newRecord: CustomerDebtRecord = {
-      id: `REC-${Math.floor(1000 + Math.random() * 9000)}`,
-      customerId: selectedCustomerId || 'CUSTOM',
-      customerName: customCustomerName,
-      customerPhone: customCustomerPhone || '-',
-      customerTc: customCustomerTc || '-',
-      policyNo: generatedPolicyNo,
-      insuranceType: finalType,
-      company: finalCompany,
-      totalAmount: total,
-      paidAmount: paid,
-      remainingAmount: remaining,
-      paymentType,
-      installmentCount: instCount,
-      installments,
-      status: remaining === 0 ? 'Ödendi' : (paid > 0 ? 'Kısmi Ödendi' : 'Bekliyor'),
-      startDate: startDate ? new Date(startDate).toLocaleDateString('tr-TR') : new Date().toLocaleDateString('tr-TR'),
-      notes: notes || 'Poliçe ödeme kaydı.'
+    const newMov: CariMovement = {
+      id: editingMovement ? editingMovement.id : `CAR-${Math.floor(1000 + Math.random() * 9000)}`,
+      date: formattedDate,
+      dueDate: formattedDueDate || undefined,
+      receiptNo: formReceiptNo || '-',
+      customerId: formCustomerId || 'CUSTOM',
+      customerName: formCustomerName,
+      description: formDescription,
+      movementType: formMovementType,
+      debitAmount: dAmount,
+      creditAmount: cAmount,
+      notes: formNotes || undefined
     };
 
-    setRecords([newRecord, ...records]);
-
-    // If initial payment was made, add to cash log
-    if (paid > 0) {
-      const newCashLog: CashLog = {
-        id: `LOG-${Math.floor(1000 + Math.random() * 9000)}`,
-        date: new Date().toLocaleDateString('tr-TR'),
-        customerName: customCustomerName,
-        policyNo: generatedPolicyNo,
-        amount: paid,
-        paymentMethod: 'Kredi Kartı',
-        type: 'Tahsilat',
-        description: `${generatedPolicyNo} nolu ${insuranceType} poliçesi peşinat/ilk tahsilatı.`
-      };
-      setCashLogs([newCashLog, ...cashLogs]);
+    if (editingMovement) {
+      setMovements(movements.map(m => m.id === editingMovement.id ? newMov : m));
+    } else {
+      setMovements([...movements, newMov]);
     }
 
     setIsAddModalOpen(false);
-
-    // Reset Form
-    setCustomCustomerName('');
-    setCustomCustomerPhone('');
-    setCustomCustomerTc('');
-    setPolicyNo('');
-    setTotalAmount('');
-    setInitialPaidAmount('');
-    setNotes('');
   };
 
-  // Handle Collecting Partial or Installment Payment
-  const handleCollectPayment = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedRecord || !collectAmount) return;
-
-    const amt = Number(collectAmount);
-    if (amt <= 0) return;
-
-    const newPaid = selectedRecord.paidAmount + amt;
-    const newRemaining = Math.max(0, selectedRecord.totalAmount - newPaid);
-
-    // Update installments status
-    let remainingPaidPool = newPaid;
-    const updatedInstallments = selectedRecord.installments.map(inst => {
-      if (remainingPaidPool >= inst.amount) {
-        remainingPaidPool -= inst.amount;
-        return { ...inst, status: 'Ödendi' as const, paidDate: inst.paidDate || new Date().toLocaleDateString('tr-TR') };
-      } else {
-        return { ...inst, status: (inst.status === 'Ödendi' ? 'Bekliyor' : inst.status) as any };
-      }
-    });
-
-    const updatedRecord: CustomerDebtRecord = {
-      ...selectedRecord,
-      paidAmount: newPaid,
-      remainingAmount: newRemaining,
-      status: newRemaining === 0 ? 'Ödendi' : 'Kısmi Ödendi',
-      installments: updatedInstallments
-    };
-
-    setRecords(records.map(r => r.id === selectedRecord.id ? updatedRecord : r));
-
-    // Log to Cash Book
-    const newLog: CashLog = {
-      id: `LOG-${Math.floor(1000 + Math.random() * 9000)}`,
-      date: new Date().toLocaleDateString('tr-TR'),
-      customerName: selectedRecord.customerName,
-      policyNo: selectedRecord.policyNo,
-      amount: amt,
-      paymentMethod: collectMethod,
-      type: 'Tahsilat',
-      description: collectNote || `${selectedRecord.policyNo} nolu poliçeye ait ${amt.toLocaleString('tr-TR')} ₺ tahsilat.`
-    };
-    setCashLogs([newLog, ...cashLogs]);
-
-    setIsCollectModalOpen(false);
-    setSelectedRecord(null);
-    setCollectAmount('');
-    setCollectNote('');
-  };
-
-  // WhatsApp Reminder Generator
-  const sendWhatsAppReminder = (rec: CustomerDebtRecord) => {
-    const cleanPhone = rec.customerPhone.replace(/\s+/g, '').replace(/^0/, '90');
-    const msg = `Sayın ${rec.customerName},\n\nElisam Sigorta acentemizden bildirilmektedir.\n${rec.policyNo} numaralı ${rec.insuranceType} poliçenize ait kalan borç / taksit tutarınız: *${rec.remainingAmount.toLocaleString('tr-TR')} ₺*'dir.\n\nÖdemenizi güvenle gerçekleştirmek için bizimle iletişime geçebilirsiniz:\n📞 0551 438 77 71\nElisam Sigorta • Alanya`;
-    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
-  };
-
-  // Telegram Reminder Generator (uses config from Ayarlar)
-  const sendTelegramReminder = async (rec: CustomerDebtRecord) => {
-    try {
-      const config = JSON.parse(localStorage.getItem('elisam_telegram_config') || '{}');
-      if (!config.botToken || !config.chatId) {
-        alert('Lütfen önce Ayarlar -> Hatırlatmalar & Telegram bölümünden Bot Token ve Chat ID bilgilerinizi kaydedin.');
-        return;
-      }
-
-      const text = `💳 *Ödeme / Taksit Hatırlatması*\n\n👤 *Müşteri:* ${rec.customerName}\n📱 *Telefon:* ${rec.customerPhone}\n📄 *Poliçe No:* \`${rec.policyNo}\` (${rec.insuranceType} - ${rec.company})\n💰 *Toplam Prim:* ${rec.totalAmount.toLocaleString('tr-TR')} ₺\n🟢 *Ödenen:* ${rec.paidAmount.toLocaleString('tr-TR')} ₺\n🔴 *Kalan Borç:* ${rec.remainingAmount.toLocaleString('tr-TR')} ₺\n📅 *Ödeme Tipi:* ${rec.paymentType} (${rec.installmentCount} Taksit)\n\n⏰ *Hatırlatma Zamanı:* ${new Date().toLocaleString('tr-TR')}`;
-
-      const res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: config.chatId, text, parse_mode: 'Markdown' })
-      });
-      const data = await res.json();
-      if (data.ok) {
-        alert(`✓ ${rec.customerName} müşterisine ait borç özeti Telegram kanalınıza başarıyla iletildi!`);
-      } else {
-        alert(`Telegram Hatası: ${data.description}`);
-      }
-    } catch (err: any) {
-      alert('Telegram mesajı gönderilemedi: ' + err.message);
+  // Delete Movement
+  const handleDeleteMovement = (id: string, desc: string) => {
+    if (confirm(`"${desc}" hareketini silmek istediğinize emin misiniz?`)) {
+      setMovements(movements.filter(m => m.id !== id));
     }
   };
 
-  // Calculations
-  const totalTahakkuk = records.reduce((s, r) => s + r.totalAmount, 0);
-  const totalTahsilEdilen = records.reduce((s, r) => s + r.paidAmount, 0);
-  const totalKalanAlacak = records.reduce((s, r) => s + r.remainingAmount, 0);
-  const totalGeciken = records
-    .filter(r => r.status === 'Gecikmede' || (r.remainingAmount > 0 && r.installments.some(i => i.status === 'Gecikmede')))
-    .reduce((s, r) => s + r.remainingAmount, 0);
-
-  // Filtered List
-  const filteredRecords = records.filter(r => {
-    const matchesSearch = r.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          r.policyNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          r.customerPhone.includes(searchTerm) ||
-                          (r.customerTc && r.customerTc.includes(searchTerm));
-
-    if (activeTab === 'kalan') return matchesSearch && r.remainingAmount > 0;
-    if (activeTab === 'geciken') return matchesSearch && (r.status === 'Gecikmede' || r.installments.some(i => i.status === 'Gecikmede'));
-    if (activeTab === 'odendi') return matchesSearch && r.remainingAmount === 0;
-    return matchesSearch;
+  // Filtered movements based on selected customer & search
+  const filteredMovements = movements.filter(m => {
+    const matchesCustomer = selectedCustomerId === 'ALL' || m.customerId === selectedCustomerId || m.customerName.toLowerCase() === selectedCustomerId.toLowerCase();
+    const matchesSearch = 
+      m.description.toLowerCase().includes(tableSearchTerm.toLowerCase()) ||
+      (m.receiptNo && m.receiptNo.toLowerCase().includes(tableSearchTerm.toLowerCase())) ||
+      m.movementType.toLowerCase().includes(tableSearchTerm.toLowerCase()) ||
+      m.customerName.toLowerCase().includes(tableSearchTerm.toLowerCase());
+    
+    const matchesType = activeMovementTypeFilter === 'Tümü' || m.movementType === activeMovementTypeFilter;
+    return matchesCustomer && matchesSearch && matchesType;
   });
+
+  // Calculate Cumulative Running Balances for each row
+  let runningBalance = 0;
+  const movementsWithBalance = filteredMovements.map(m => {
+    // In Turkish Cari: Borç increases customer debt (+), Alacak / Tahsilat decreases customer debt (-)
+    runningBalance += (m.debitAmount - m.creditAmount);
+    return {
+      ...m,
+      currentBalance: runningBalance
+    };
+  });
+
+  // Totals
+  const totalDebit = filteredMovements.reduce((sum, m) => sum + m.debitAmount, 0);
+  const totalCredit = filteredMovements.reduce((sum, m) => sum + m.creditAmount, 0);
+  const netRemainingBalance = totalDebit - totalCredit;
+
+  // Selected customer name for title
+  const currentCustomerObj = customers.find(c => c.id === selectedCustomerId);
+  const headerCustomerTitle = selectedCustomerId === 'ALL' 
+    ? 'GENEL CARİ HESAP EKSTRESİ (TÜM MÜŞTERİLER)' 
+    : (currentCustomerObj ? `${currentCustomerObj.name.toUpperCase()} - HESAP ÖZETİ` : `${selectedCustomerId.toUpperCase()} - HESAP ÖZETİ`);
+
+  // Export to Branded PDF (Görsellerdeki Birebir Format)
+  const handleExportPDF = () => {
+    generateModernPDF({
+      title: headerCustomerTitle,
+      subtitle: 'Elisam Sigorta • Müşteri Borç / Alacak ve Cari Hareket Ekstresi',
+      category: 'SİGORTA ACENTELİĞİ',
+      dateRange: `Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}`,
+      kpis: [
+        { label: 'TOPLAM BORÇ (POLİÇELER)', value: `${totalDebit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`, color: '#1e3a8a' },
+        { label: 'TOPLAM ALINAN (TAHSİLAT)', value: `${totalCredit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`, color: '#16a34a' },
+        { label: 'KALAN BAKİYE (BORÇ)', value: `${netRemainingBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`, color: netRemainingBalance > 0 ? '#dc2626' : '#16a34a' }
+      ],
+      headers: ['Tarih', 'Vade T.', 'Fiş No', 'Açıklama', 'Hareket Türü', 'Borç (₺)', 'Alacak (₺)', 'Kalan Bakiye (₺)'],
+      rows: movementsWithBalance.map(m => [
+        m.date,
+        m.dueDate || '-',
+        m.receiptNo || '-',
+        m.description,
+        m.movementType,
+        m.debitAmount > 0 ? m.debitAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) : '-',
+        m.creditAmount > 0 ? m.creditAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) : '-',
+        m.currentBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })
+      ]),
+      summaryNotes: [
+        `DİP TOPLAMLAR: Toplam Borç: ${totalDebit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺ | Toplam Alacak/Tahsilat: ${totalCredit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺ | Net Bakiye: ${netRemainingBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`,
+        'İşbu cari hesap ekstresi Elisam Sigorta acente otomasyonu tarafından üretilmiş resmi hesap özetidir.'
+      ]
+    });
+  };
+
+  // Export to CSV / Excel
+  const handleExportCSV = () => {
+    const headers = ['Tarih', 'Vade Tarihi', 'Fiş No', 'Müşteri', 'Açıklama', 'Hareket Türü', 'Borç (TL)', 'Alacak / Alınan (TL)', 'Kalan Bakiye (TL)'];
+    const rows = movementsWithBalance.map(m => [
+      `"${m.date}"`,
+      `"${m.dueDate || '-'}"`,
+      `"${m.receiptNo || '-'}"`,
+      `"${m.customerName}"`,
+      `"${m.description.replace(/"/g, '""')}"`,
+      `"${m.movementType}"`,
+      `"${m.debitAmount.toFixed(2)}"`,
+      `"${m.creditAmount.toFixed(2)}"`,
+      `"${m.currentBalance.toFixed(2)}"`
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Elisam_Cari_Hesap_Ekstresi_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
 
   return (
     <div>
-      {/* Page Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', flexWrap: 'wrap', gap: '15px' }}>
+      {/* Top Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '22px', flexWrap: 'wrap', gap: '15px' }}>
         <div>
-          <h1 style={{ fontSize: '1.65rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-            Müşteri Ödeme, Taksit & Borç Takibi
+          <h1 style={{ fontSize: '1.65rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Receipt size={28} color="#2563eb" /> Cari Hesap Ekstresi & Borç-Alacak Defteri
           </h1>
           <p style={{ color: '#64748b', fontSize: '0.92rem', marginTop: '4px', margin: 0 }}>
-            Kimin ne kadar ödemesi var, kimin kaç taksiti kalmış tek ekrandan anlık takip edin ve tahsilat yapın.
+            Müşterilerinizin tüm poliçe borçlandırmaları, havale/tahsilatları, iadeleri ve anlık yürüyen bakiyeleri.
           </p>
         </div>
 
-        <button 
-          onClick={() => setIsAddModalOpen(true)}
-          className={styles.btnCrm}
-          style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 22px', fontSize: '0.95rem' }}
-        >
-          <Plus size={18} /> Yeni Poliçe Ödeme / Taksit Kaydı Ekle
-        </button>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button 
+            onClick={handleExportPDF}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '10px 18px',
+              backgroundColor: '#1e3a8a',
+              color: '#ffffff',
+              borderRadius: '10px',
+              border: 'none',
+              fontWeight: 700,
+              fontSize: '0.88rem',
+              cursor: 'pointer'
+            }}
+          >
+            <Printer size={16} /> PDF Ekstre Al / Yazdır
+          </button>
+
+          <button 
+            onClick={handleExportCSV}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '10px 18px',
+              backgroundColor: '#059669',
+              color: '#ffffff',
+              borderRadius: '10px',
+              border: 'none',
+              fontWeight: 700,
+              fontSize: '0.88rem',
+              cursor: 'pointer'
+            }}
+          >
+            <Download size={16} /> Excel (CSV)
+          </button>
+        </div>
       </div>
 
-      {/* KPI Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '25px' }}>
-        
-        {/* Toplam Satış Hacmi */}
-        <div className={styles.card} style={{ borderLeft: '4px solid #3b82f6', padding: '18px 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Toplam Satış Hacmi</span>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#eff6ff', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <TrendingUp size={20} />
+      {/* MÜŞTERİ SEÇİM & FİLTRELEME ÇUBUĞU */}
+      <div className={styles.card} style={{ marginBottom: '20px', padding: '16px 20px', backgroundColor: '#f8fafc', border: '1px solid #cbd5e1' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '15px' }}>
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '300px' }}>
+            <Building2 size={22} color="#2563eb" />
+            <div style={{ flex: 1 }}>
+              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800, color: '#334155', marginBottom: '4px' }}>
+                HESAP ÖZETİ GÖRÜNTÜLENECEK MÜŞTERİ:
+              </label>
+              <select
+                value={selectedCustomerId}
+                onChange={(e) => setSelectedCustomerId(e.target.value)}
+                style={{
+                  width: '100%',
+                  maxWidth: '480px',
+                  padding: '9px 14px',
+                  borderRadius: '8px',
+                  border: '2px solid #2563eb',
+                  backgroundColor: '#ffffff',
+                  fontSize: '0.95rem',
+                  fontWeight: 800,
+                  color: '#0f172a',
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="ALL">📋 TÜM MÜŞTERİLERİN GENEL CARİ HESAP EKSTRESİ</option>
+                <option value="KAYSERİ ÇOK YAŞAR POSTALLI">🏢 KAYSERİ ÇOK YAŞAR POSTALLI</option>
+                {customers.map(c => (
+                  <option key={c.id} value={c.id}>👤 {c.name} ({c.type} - {c.phone})</option>
+                ))}
+              </select>
             </div>
           </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 850, color: '#0f172a' }}>
-            {totalTahakkuk.toLocaleString('tr-TR')} ₺
-          </div>
-          <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>
-            {records.length} adet kayıtlı poliçe
-          </div>
-        </div>
 
-        {/* Toplam Tahsil Edilen */}
-        <div className={styles.card} style={{ borderLeft: '4px solid #10b981', padding: '18px 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Tahsil Edilen (Kasada)</span>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#ecfdf5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <CheckCircle2 size={20} />
-            </div>
-          </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 850, color: '#059669' }}>
-            {totalTahsilEdilen.toLocaleString('tr-TR')} ₺
-          </div>
-          <div style={{ fontSize: '0.78rem', color: '#059669', marginTop: '4px', fontWeight: 600 }}>
-            ✓ Kasaya giren net tutar
-          </div>
-        </div>
-
-        {/* Kalan Müşteri Alacakları */}
-        <div className={styles.card} style={{ borderLeft: '4px solid #ef4444', padding: '18px 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Kalan Müşteri Borçları</span>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#fef2f2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Wallet size={20} />
-            </div>
-          </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 850, color: '#dc2626' }}>
-            {totalKalanAlacak.toLocaleString('tr-TR')} ₺
-          </div>
-          <div style={{ fontSize: '0.78rem', color: '#dc2626', marginTop: '4px', fontWeight: 600 }}>
-            {records.filter(r => r.remainingAmount > 0).length} müşteride açık bakiye
-          </div>
-        </div>
-
-        {/* Geciken / Vadesi Dolan Taksitler */}
-        <div className={styles.card} style={{ borderLeft: '4px solid #f59e0b', padding: '18px 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Geciken Taksitler</span>
-            <div style={{ width: '36px', height: '36px', borderRadius: '10px', backgroundColor: '#fffbeb', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <AlertCircle size={20} />
-            </div>
-          </div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 850, color: '#d97706' }}>
-            {totalGeciken.toLocaleString('tr-TR')} ₺
-          </div>
-          <div style={{ fontSize: '0.78rem', color: '#d97706', marginTop: '4px' }}>
-            Vadesi geçmiş ödemeler
-          </div>
-        </div>
-
-      </div>
-
-      {/* Main Content Card */}
-      <div className={styles.card}>
-        
-        {/* Navigation Tabs */}
-        <div style={{ display: 'flex', gap: '16px', borderBottom: '1px solid #edf2f7', marginBottom: '20px', overflowX: 'auto' }}>
-          {[
-            { key: 'tumu', label: `Tüm Müşteri Kayıtları (${records.length})` },
-            { key: 'kalan', label: `Borcu Kalanlar / Taksitli (${records.filter(r => r.remainingAmount > 0).length})` },
-            { key: 'geciken', label: `Vadesi Geçenler (${records.filter(r => r.status === 'Gecikmede' || r.installments.some(i => i.status === 'Gecikmede')).length})` },
-            { key: 'odendi', label: `Tamamı Ödenenler (${records.filter(r => r.remainingAmount === 0).length})` },
-            { key: 'kasa', label: `Kasa Defteri / Tahsilat Geçmişi (${cashLogs.length})` }
-          ].map(tab => (
+          {/* Hızlı Hareket Ekleme Butonları */}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key as any)}
+              onClick={() => handleOpenAddModal('BORC')}
               style={{
-                padding: '12px 6px',
-                background: 'none',
-                border: 'none',
-                borderBottom: activeTab === tab.key ? '3px solid #2563eb' : '3px solid transparent',
-                color: activeTab === tab.key ? '#2563eb' : '#64748b',
-                fontWeight: activeTab === tab.key ? 750 : 600,
-                fontSize: '0.92rem',
-                cursor: 'pointer',
-                whiteSpace: 'nowrap'
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '9px 14px',
+                backgroundColor: '#eff6ff',
+                color: '#1d4ed8',
+                border: '1px solid #bfdbfe',
+                borderRadius: '8px',
+                fontWeight: 750,
+                fontSize: '0.85rem',
+                cursor: 'pointer'
               }}
             >
-              {tab.label}
+              <Plus size={16} /> ➕ Poliçe / Borç Kaydı
             </button>
-          ))}
+
+            <button
+              onClick={() => handleOpenAddModal('TAHSILAT')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '9px 14px',
+                backgroundColor: '#ecfdf5',
+                color: '#047857',
+                border: '1px solid #a7f3d0',
+                borderRadius: '8px',
+                fontWeight: 750,
+                fontSize: '0.85rem',
+                cursor: 'pointer'
+              }}
+            >
+              <Plus size={16} /> 💳 Tahsilat / Havale Ekle
+            </button>
+
+            <button
+              onClick={() => handleOpenAddModal('IADE')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '9px 14px',
+                backgroundColor: '#fffbeb',
+                color: '#b45309',
+                border: '1px solid #fde68a',
+                borderRadius: '8px',
+                fontWeight: 750,
+                fontSize: '0.85rem',
+                cursor: 'pointer'
+              }}
+            >
+              <Plus size={16} /> ↩️ İptal / İade Girişi
+            </button>
+
+            <button
+              onClick={() => handleOpenAddModal('DEVIR')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '9px 14px',
+                backgroundColor: '#f8fafc',
+                color: '#475569',
+                border: '1px solid #cbd5e1',
+                borderRadius: '8px',
+                fontWeight: 750,
+                fontSize: '0.85rem',
+                cursor: 'pointer'
+              }}
+            >
+              <Plus size={16} /> 📜 Devir Bakiye
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      {/* KPI ÖZET KUTULARI (Görsel 2'deki Birebir Özet) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '22px' }}>
+        
+        <div className={styles.card} style={{ borderLeft: '5px solid #1e3a8a', padding: '18px 22px' }}>
+          <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Toplam Borç (Poliçeler)
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 850, color: '#1e3a8a', marginTop: '6px' }}>
+            {totalDebit.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+          </div>
+          <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>
+            Kesilen poliçelerin ve hizmetlerin toplamı
+          </div>
         </div>
 
-        {/* Search & Actions */}
-        {activeTab !== 'kasa' && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '14px', flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative', flex: 1, minWidth: '280px' }}>
-              <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-              <input 
-                type="text"
-                placeholder="Müşteri adı, TC kimlik, telefon veya poliçe no ara..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ width: '100%', padding: '11px 12px 11px 42px', borderRadius: '10px', border: '1px solid #e2e8f0', outline: 'none', fontSize: '0.95rem' }}
-              />
-            </div>
+        <div className={styles.card} style={{ borderLeft: '5px solid #16a34a', padding: '18px 22px' }}>
+          <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Toplam Alınan (Tahsilat / Havale)
           </div>
-        )}
-
-        {/* TAB 1: MÜŞTERİ BORÇ & TAKSİT TABLOSU */}
-        {activeTab !== 'kasa' && (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ backgroundColor: '#f8fafc' }}>
-                  <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Müşteri Bilgisi</th>
-                  <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Poliçe No / Tür</th>
-                  <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Toplam Prim</th>
-                  <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Ödenen Tutar</th>
-                  <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Kalan Borç</th>
-                  <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Ödeme Planı</th>
-                  <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Durum</th>
-                  <th style={{ textAlign: 'center', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Aksiyonlar</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredRecords.length > 0 ? (
-                  filteredRecords.map(rec => {
-                    const paidInstallments = rec.installments.filter(i => i.status === 'Ödendi').length;
-                    return (
-                      <tr key={rec.id} style={{ borderBottom: '1px solid #edf2f7' }}>
-                        
-                        {/* Müşteri */}
-                        <td style={{ padding: '14px 16px' }}>
-                          <div style={{ fontWeight: 750, color: '#0f172a', fontSize: '0.95rem' }}>{rec.customerName}</div>
-                          <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '2px' }}>
-                            📞 {rec.customerPhone} {rec.customerTc !== '-' && `• TC: ${rec.customerTc}`}
-                          </div>
-                        </td>
-
-                        {/* Poliçe No */}
-                        <td style={{ padding: '14px 16px' }}>
-                          <div style={{ fontWeight: 700, color: '#1e40af', fontFamily: 'monospace', fontSize: '0.92rem' }}>
-                            {rec.policyNo}
-                          </div>
-                          <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                            {rec.insuranceType} • {rec.company}
-                          </div>
-                        </td>
-
-                        {/* Toplam Tutar */}
-                        <td style={{ padding: '14px 16px', fontWeight: 700, color: '#0f172a' }}>
-                          {rec.totalAmount.toLocaleString('tr-TR')} ₺
-                        </td>
-
-                        {/* Ödenen */}
-                        <td style={{ padding: '14px 16px', fontWeight: 700, color: '#059669' }}>
-                          {rec.paidAmount.toLocaleString('tr-TR')} ₺
-                        </td>
-
-                        {/* Kalan Borç */}
-                        <td style={{ padding: '14px 16px' }}>
-                          {rec.remainingAmount > 0 ? (
-                            <span style={{ padding: '4px 10px', borderRadius: '8px', backgroundColor: '#fef2f2', color: '#dc2626', fontWeight: 800, fontSize: '0.95rem' }}>
-                              {rec.remainingAmount.toLocaleString('tr-TR')} ₺
-                            </span>
-                          ) : (
-                            <span style={{ padding: '4px 10px', borderRadius: '8px', backgroundColor: '#ecfdf5', color: '#059669', fontWeight: 700, fontSize: '0.85rem' }}>
-                              ✓ Borcu Yok
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Ödeme Planı */}
-                        <td style={{ padding: '14px 16px' }}>
-                          <div style={{ fontSize: '0.86rem', fontWeight: 600, color: '#334155' }}>
-                            {rec.paymentType}
-                          </div>
-                          {rec.paymentType === 'Taksitli' && (
-                            <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                              {paidInstallments} / {rec.installmentCount} Taksit Ödendi
-                            </div>
-                          )}
-                        </td>
-
-                        {/* Durum */}
-                        <td style={{ padding: '14px 16px' }}>
-                          <span style={{
-                            padding: '4px 10px',
-                            borderRadius: '20px',
-                            fontSize: '0.78rem',
-                            fontWeight: 700,
-                            backgroundColor: rec.remainingAmount === 0 ? '#dcfce7' : (rec.paidAmount > 0 ? '#eff6ff' : '#fef3c7'),
-                            color: rec.remainingAmount === 0 ? '#15803d' : (rec.paidAmount > 0 ? '#1d4ed8' : '#b45309')
-                          }}>
-                            {rec.remainingAmount === 0 ? 'Ödendi' : (rec.paidAmount > 0 ? 'Kısmi Ödendi' : 'Ödeme Bekliyor')}
-                          </span>
-                        </td>
-
-                        {/* Aksiyonlar */}
-                        <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                            
-                            {/* Tahsilat Yap Butonu */}
-                            {rec.remainingAmount > 0 && (
-                              <button
-                                onClick={() => {
-                                  setSelectedRecord(rec);
-                                  setCollectAmount(rec.paymentType === 'Taksitli' ? String(Math.min(rec.remainingAmount, Math.round(rec.totalAmount / rec.installmentCount))) : String(rec.remainingAmount));
-                                  setIsCollectModalOpen(true);
-                                }}
-                                style={{
-                                  padding: '7px 12px',
-                                  backgroundColor: '#16a34a',
-                                  color: '#ffffff',
-                                  border: 'none',
-                                  borderRadius: '8px',
-                                  fontWeight: 700,
-                                  fontSize: '0.82rem',
-                                  cursor: 'pointer',
-                                  display: 'inline-flex',
-                                  alignItems: 'center',
-                                  gap: '4px'
-                                }}
-                              >
-                                💳 Tahsilat Yap
-                              </button>
-                            )}
-
-                            {/* Taksit Planı Butonu */}
-                            <button
-                              onClick={() => {
-                                setSelectedRecord(rec);
-                                setIsScheduleModalOpen(true);
-                              }}
-                              style={{
-                                padding: '7px 11px',
-                                backgroundColor: '#f1f5f9',
-                                color: '#334155',
-                                border: '1px solid #cbd5e1',
-                                borderRadius: '8px',
-                                fontWeight: 600,
-                                fontSize: '0.82rem',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              📋 Plan
-                            </button>
-
-                            {/* WhatsApp Hatırlat */}
-                            {rec.remainingAmount > 0 && rec.customerPhone !== '-' && (
-                              <button
-                                onClick={() => sendWhatsAppReminder(rec)}
-                                title="WhatsApp'tan borç hatırlatma mesajı gönder"
-                                style={{
-                                  padding: '7px 10px',
-                                  backgroundColor: '#25d366',
-                                  color: '#ffffff',
-                                  border: 'none',
-                                  borderRadius: '8px',
-                                  fontWeight: 600,
-                                  fontSize: '0.82rem',
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                💬
-                              </button>
-                            )}
-
-                            {/* Telegram'a Bildir */}
-                            {rec.remainingAmount > 0 && (
-                              <button
-                                onClick={() => sendTelegramReminder(rec)}
-                                title="Telegram botunuza borç özetini gönder"
-                                style={{
-                                  padding: '7px 10px',
-                                  backgroundColor: '#0088cc',
-                                  color: '#ffffff',
-                                  border: 'none',
-                                  borderRadius: '8px',
-                                  fontWeight: 600,
-                                  fontSize: '0.82rem',
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                🤖
-                              </button>
-                            )}
-
-                            {/* Sil */}
-                            <button
-                              onClick={() => {
-                                if (confirm(`${rec.customerName} müşterisinin ödeme kaydını silmek istiyor musunuz?`)) {
-                                  setRecords(records.filter(r => r.id !== rec.id));
-                                }
-                              }}
-                              style={{
-                                padding: '7px 9px',
-                                backgroundColor: '#fff',
-                                color: '#ef4444',
-                                border: '1px solid #fecaca',
-                                borderRadius: '8px',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              🗑️
-                            </button>
-
-                          </div>
-                        </td>
-
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
-                      Kayıtlı finans/borç kaydı bulunamadı. &ldquo;Yeni Poliçe Ödeme / Taksit Kaydı Ekle&rdquo; butonundan ekleyebilirsiniz.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          <div style={{ fontSize: '1.75rem', fontWeight: 850, color: '#16a34a', marginTop: '6px' }}>
+            {totalCredit.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
           </div>
-        )}
-
-        {/* TAB 2: KASA DEFTERİ (TAHSİLAT GEÇMİŞİ) */}
-        {activeTab === 'kasa' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#0f172a', margin: 0 }}>
-                Kasa Giriş / Çıkış Defteri ({cashLogs.length} İşlem)
-              </h3>
-            </div>
-
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#f8fafc' }}>
-                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>İşlem No / Tarih</th>
-                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Müşteri Adı</th>
-                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Poliçe No</th>
-                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Ödeme Yöntemi</th>
-                    <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Açıklama</th>
-                    <th style={{ textAlign: 'right', padding: '12px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Tahsil Edilen Tutar</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {cashLogs.length > 0 ? (
-                    cashLogs.map(log => (
-                      <tr key={log.id} style={{ borderBottom: '1px solid #edf2f7' }}>
-                        <td style={{ padding: '12px 16px', fontSize: '0.85rem' }}>
-                          <span style={{ fontWeight: 700, color: '#1e40af', fontFamily: 'monospace' }}>{log.id}</span>
-                          <div style={{ color: '#64748b', fontSize: '0.78rem' }}>{log.date}</div>
-                        </td>
-                        <td style={{ padding: '12px 16px', fontWeight: 700, color: '#0f172a' }}>{log.customerName}</td>
-                        <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontWeight: 600, color: '#475569' }}>{log.policyNo}</td>
-                        <td style={{ padding: '12px 16px', fontSize: '0.86rem', color: '#334155' }}>{log.paymentMethod}</td>
-                        <td style={{ padding: '12px 16px', fontSize: '0.85rem', color: '#64748b' }}>{log.description}</td>
-                        <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: '#059669', fontSize: '1rem' }}>
-                          +{log.amount.toLocaleString('tr-TR')} ₺
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={6} style={{ textAlign: 'center', padding: '30px', color: '#94a3b8' }}>
-                        Henüz kasa tahsilat kaydı bulunmuyor.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+          <div style={{ fontSize: '0.78rem', color: '#16a34a', marginTop: '4px', fontWeight: 600 }}>
+            Müşteriden yapılan tüm tahsilat & iadeler
           </div>
-        )}
+        </div>
+
+        <div className={styles.card} style={{ borderLeft: '5px solid #dc2626', padding: '18px 22px' }}>
+          <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            Kalan Net Bakiye (Müşteri Borcu)
+          </div>
+          <div style={{ fontSize: '1.75rem', fontWeight: 850, color: netRemainingBalance > 0 ? '#dc2626' : '#16a34a', marginTop: '6px' }}>
+            {netRemainingBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+          </div>
+          <div style={{ fontSize: '0.78rem', color: netRemainingBalance > 0 ? '#dc2626' : '#16a34a', marginTop: '4px', fontWeight: 700 }}>
+            {netRemainingBalance > 0 ? '🔴 Müşteri Borç Bakiyesi (Tahsil Edilecek)' : '🟢 Hesap Kapanmış / Alacaklı'}
+          </div>
+        </div>
 
       </div>
 
-      {/* MODAL 1: YENİ POLİÇE / BORÇ KAYDI EKLEME */}
+      {/* CARİ HESAP EKSTRESİ TABLOSU (Görsel 1 & 2 Birebir Tablo Tasarımı) */}
+      <div className={styles.card} style={{ padding: '24px' }}>
+        
+        {/* Tablo Üst Başlığı (Görsel 2'deki Başlık Tasarımı) */}
+        <div style={{ backgroundColor: '#e2e8f0', padding: '12px 18px', borderRadius: '8px 8px 0 0', border: '1px solid #cbd5e1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+          <div style={{ fontWeight: 850, fontSize: '1.05rem', color: '#1e293b', letterSpacing: '0.5px' }}>
+            {headerCustomerTitle}
+          </div>
+          <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569' }}>
+            Para Birimi: <strong style={{ color: '#0f172a' }}>TRY (₺)</strong>
+          </div>
+        </div>
+
+        {/* Tablo İçi Filtre & Arama */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', gap: '14px', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: '280px' }}>
+            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            <input 
+              type="text"
+              placeholder="Ekstrede ara (Poliçe no, plaka, fiş no, havale açıklaması...)"
+              value={tableSearchTerm}
+              onChange={(e) => setTableSearchTerm(e.target.value)}
+              style={{ width: '100%', padding: '9px 12px 9px 38px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.9rem' }}
+            />
+          </div>
+
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto' }}>
+            {['Tümü', 'Poliçe Tahakkuku', 'Banka Gelen Havale', 'Poliçe İptal / İade', 'Tarih Öncesi Devir Bakiye'].map(t => (
+              <button
+                key={t}
+                onClick={() => setActiveMovementTypeFilter(t)}
+                style={{
+                  padding: '7px 12px',
+                  borderRadius: '6px',
+                  border: activeMovementTypeFilter === t ? '1px solid #2563eb' : '1px solid #e2e8f0',
+                  backgroundColor: activeMovementTypeFilter === t ? '#eff6ff' : '#ffffff',
+                  color: activeMovementTypeFilter === t ? '#1d4ed8' : '#64748b',
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap'
+                }}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ANA CARİ EKSTRE TABLOSU */}
+        <div style={{ overflowX: 'auto', border: '1px solid #cbd5e1', borderRadius: '0 0 8px 8px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.88rem' }}>
+            <thead>
+              <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
+                <th style={{ textAlign: 'left', padding: '12px 14px', fontWeight: 800, color: '#334155', width: '95px' }}>Tarih</th>
+                <th style={{ textAlign: 'left', padding: '12px 14px', fontWeight: 800, color: '#334155', width: '95px' }}>Vade T.</th>
+                <th style={{ textAlign: 'center', padding: '12px 10px', fontWeight: 800, color: '#334155', width: '75px' }}>Fiş No</th>
+                <th style={{ textAlign: 'left', padding: '12px 14px', fontWeight: 800, color: '#334155' }}>Açıklama</th>
+                <th style={{ textAlign: 'left', padding: '12px 14px', fontWeight: 800, color: '#334155', width: '150px' }}>Hareket Türü</th>
+                <th style={{ textAlign: 'right', padding: '12px 14px', fontWeight: 800, color: '#334155', width: '125px' }}>Borç (₺)</th>
+                <th style={{ textAlign: 'right', padding: '12px 14px', fontWeight: 800, color: '#334155', width: '125px' }}>Alacak / Alınan (₺)</th>
+                <th style={{ textAlign: 'right', padding: '12px 14px', fontWeight: 800, color: '#334155', width: '135px' }}>Kalan Bakiye (₺)</th>
+                <th style={{ textAlign: 'center', padding: '12px 10px', fontWeight: 800, color: '#334155', width: '80px' }}>İşlem</th>
+              </tr>
+            </thead>
+            <tbody>
+              {movementsWithBalance.length > 0 ? (
+                movementsWithBalance.map((m, index) => {
+                  const isDebit = m.debitAmount > 0;
+                  const isCredit = m.creditAmount > 0;
+                  return (
+                    <tr 
+                      key={m.id} 
+                      style={{ 
+                        borderBottom: '1px solid #e2e8f0', 
+                        backgroundColor: index % 2 === 0 ? '#ffffff' : '#f8fafc' 
+                      }}
+                    >
+                      {/* Tarih */}
+                      <td style={{ padding: '10px 14px', color: '#1e293b', fontWeight: 600, whiteSpace: 'nowrap' }}>
+                        {m.date}
+                      </td>
+
+                      {/* Vade Tarihi */}
+                      <td style={{ padding: '10px 14px', color: '#64748b', fontSize: '0.84rem', whiteSpace: 'nowrap' }}>
+                        {m.dueDate || '-'}
+                      </td>
+
+                      {/* Fiş No */}
+                      <td style={{ padding: '10px 10px', textAlign: 'center', fontWeight: 700, fontFamily: 'monospace', color: '#475569' }}>
+                        {m.receiptNo || '-'}
+                      </td>
+
+                      {/* Açıklama */}
+                      <td style={{ padding: '10px 14px', fontWeight: 650, color: '#0f172a' }}>
+                        <div>{m.description}</div>
+                        {selectedCustomerId === 'ALL' && (
+                          <div style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 600 }}>👤 {m.customerName}</div>
+                        )}
+                      </td>
+
+                      {/* Hareket Türü */}
+                      <td style={{ padding: '10px 14px', color: '#475569', fontSize: '0.82rem', fontWeight: 600 }}>
+                        <span style={{
+                          padding: '3px 8px',
+                          borderRadius: '4px',
+                          backgroundColor: m.movementType.includes('Poliçe') ? '#eff6ff' : (m.movementType.includes('Havale') || m.movementType.includes('Kart') ? '#ecfdf5' : '#f1f5f9'),
+                          color: m.movementType.includes('Poliçe') ? '#1d4ed8' : (m.movementType.includes('Havale') || m.movementType.includes('Kart') ? '#047857' : '#475569'),
+                          display: 'inline-block'
+                        }}>
+                          {m.movementType}
+                        </span>
+                      </td>
+
+                      {/* Borç */}
+                      <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 750, color: isDebit ? '#0f172a' : '#94a3b8' }}>
+                        {isDebit ? m.debitAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                      </td>
+
+                      {/* Alacak / Alınan */}
+                      <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 750, color: isCredit ? '#16a34a' : '#94a3b8' }}>
+                        {isCredit ? m.creditAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '-'}
+                      </td>
+
+                      {/* Kalan Yürüyen Bakiye */}
+                      <td style={{ 
+                        padding: '10px 14px', 
+                        textAlign: 'right', 
+                        fontWeight: 800, 
+                        color: m.currentBalance > 0 ? '#b91c1c' : (m.currentBalance < 0 ? '#047857' : '#475569') 
+                      }}>
+                        {m.currentBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        <span style={{ fontSize: '0.74rem', marginLeft: '4px', color: '#64748b' }}>
+                          {m.currentBalance > 0 ? 'B' : (m.currentBalance < 0 ? 'A' : '')}
+                        </span>
+                      </td>
+
+                      {/* İşlemler */}
+                      <td style={{ padding: '10px 10px', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                          <button
+                            onClick={() => handleOpenEditModal(m)}
+                            title="Hareketi Düzenle"
+                            style={{ padding: '4px 6px', background: 'none', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer', color: '#475569' }}
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteMovement(m.id, m.description)}
+                            title="Hareketi Sil"
+                            style={{ padding: '4px 6px', background: 'none', border: '1px solid #fca5a5', borderRadius: '4px', cursor: 'pointer', color: '#dc2626' }}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan={9} style={{ textAlign: 'center', padding: '40px 16px', color: '#94a3b8' }}>
+                    Bu müşteri için henüz cari hesap hareketi kaydedilmedi. Yukarıdaki butonlardan poliçe borcu veya tahsilat ekleyebilirsiniz.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+
+            {/* DİP TOPLAM SATIRI (Görsel 1 & 2'deki Birebir Kalın Alt Çubuk) */}
+            <tfoot>
+              <tr style={{ backgroundColor: '#e2e8f0', borderTop: '2px solid #94a3b8', fontWeight: 850 }}>
+                <td colSpan={5} style={{ padding: '14px', textAlign: 'right', fontSize: '0.92rem', color: '#1e293b' }}>
+                  GENEL TOPLAMLAR:
+                </td>
+                <td style={{ padding: '14px', textAlign: 'right', fontSize: '0.95rem', color: '#0f172a' }}>
+                  {totalDebit.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+                <td style={{ padding: '14px', textAlign: 'right', fontSize: '0.95rem', color: '#16a34a' }}>
+                  {totalCredit.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </td>
+                <td style={{ padding: '14px', textAlign: 'right', fontSize: '1rem', color: netRemainingBalance > 0 ? '#b91c1c' : '#047857' }}>
+                  {netRemainingBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  <span style={{ fontSize: '0.8rem', marginLeft: '4px' }}>
+                    {netRemainingBalance > 0 ? 'B' : 'A'}
+                  </span>
+                </td>
+                <td></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+
+      </div>
+
+      {/* HAREKET EKLEME & DÜZENLEME MODALI */}
       {isAddModalOpen && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-          <div style={{ backgroundColor: 'white', borderRadius: '16px', width: '100%', maxWidth: '580px', maxHeight: '90vh', overflowY: 'auto', padding: '28px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '16px', width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', padding: '28px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
             
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #edf2f7', paddingBottom: '12px' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <ShieldCheck size={22} color="#2563eb" /> Yeni Poliçe Ödeme / Taksit Kaydı
-              </h2>
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', borderBottom: '1px solid #edf2f7', paddingBottom: '14px' }}>
+              <div>
+                <h2 style={{ fontSize: '1.25rem', fontWeight: 850, color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Receipt size={22} color="#2563eb" /> 
+                  {editingMovement ? 'Cari Hareketi Düzenle' : (
+                    modalActionType === 'BORC' ? 'Yeni Poliçe / Borç Kaydı' :
+                    modalActionType === 'TAHSILAT' ? 'Yeni Tahsilat / Havale Girişi' :
+                    modalActionType === 'IADE' ? 'Poliçe İptal / İade Girişi' : 'Devir Bakiye Girişi'
+                  )}
+                </h2>
+                <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '2px' }}>
+                  Cari ekstreye anında yansıyacak borç veya tahsilat hareketini girin.
+                </div>
+              </div>
               <button onClick={() => setIsAddModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
-                <X size={22} />
+                <X size={24} />
               </button>
             </div>
 
-            <form onSubmit={handleAddRecord}>
+            <form onSubmit={handleSaveMovement}>
               
-              {/* Müşteri Arama & Seçimi */}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 750, color: '#334155', marginBottom: '6px' }}>
-                  🔍 Kayıtlı Müşteri Ara & Seç (İsim, TC, Telefon, Poliçe No veya Plaka):
+              {/* Müşteri Seçimi */}
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 750, color: '#334155', marginBottom: '4px' }}>
+                  Müşteri Adı / Ünvanı *
                 </label>
-                
-                <div style={{ position: 'relative' }}>
-                  <input 
-                    type="text"
-                    placeholder="Örn: Ahmet, 384030..., 0551..., POL-123456 veya 38AHD233..."
-                    value={finansCustomerSearch}
-                    onChange={(e) => setFinansCustomerSearch(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '10px 12px 10px 36px',
-                      borderRadius: '8px',
-                      border: '1px solid #cbd5e1',
-                      backgroundColor: '#ffffff',
-                      fontSize: '0.9rem',
-                      outline: 'none'
-                    }}
-                  />
-                  <Search size={16} style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                  {finansCustomerSearch && (
-                    <button
-                      type="button"
-                      onClick={() => setFinansCustomerSearch('')}
-                      style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
-                    >
-                      <X size={16} />
-                    </button>
-                  )}
-                </div>
-
-                {/* Arama Sonuçları Listesi */}
-                {finansCustomerSearch.trim() && (
-                  <div style={{
-                    marginTop: '6px',
-                    maxHeight: '180px',
-                    overflowY: 'auto',
-                    backgroundColor: '#ffffff',
-                    borderRadius: '8px',
-                    border: '1px solid #93c5fd',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
-                    zIndex: 50
-                  }}>
-                    {customers.filter(c => {
-                      const q = finansCustomerSearch.toLowerCase();
-                      return c.name.toLowerCase().includes(q) ||
-                             (c.identityNo && c.identityNo.includes(q)) ||
-                             (c.phone && c.phone.includes(q)) ||
-                             (c.policyNo && c.policyNo.toLowerCase().includes(q)) ||
-                             (c.plate && c.plate.toLowerCase().includes(q));
-                    }).length > 0 ? (
-                      customers.filter(c => {
-                        const q = finansCustomerSearch.toLowerCase();
-                        return c.name.toLowerCase().includes(q) ||
-                               (c.identityNo && c.identityNo.includes(q)) ||
-                               (c.phone && c.phone.includes(q)) ||
-                               (c.policyNo && c.policyNo.toLowerCase().includes(q)) ||
-                               (c.plate && c.plate.toLowerCase().includes(q));
-                      }).map(c => (
-                        <div
-                          key={c.id}
-                          onClick={() => {
-                            handleCustomerSelect(c.id);
-                            setFinansCustomerSearch('');
-                          }}
-                          style={{
-                            padding: '10px 14px',
-                            borderBottom: '1px solid #f1f5f9',
-                            cursor: 'pointer',
-                            transition: 'background 0.2s',
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#eff6ff'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                        >
-                          <div>
-                            <div style={{ fontWeight: 750, color: '#0f172a', fontSize: '0.92rem' }}>
-                              {c.name} <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#1d4ed8', backgroundColor: '#dbeafe', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px' }}>{c.type}</span>
-                            </div>
-                            <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '3px' }}>
-                              📞 {c.phone} {c.identityNo && c.identityNo !== '-' ? `• 🆔 TC: ${c.identityNo}` : ''} {c.plate ? `• 🚗 ${c.plate}` : ''} {c.policyNo ? `• 📄 ${c.policyNo}` : ''}
-                            </div>
-                          </div>
-                          <span style={{ fontSize: '0.8rem', fontWeight: 750, color: '#2563eb' }}>Seç ➔</span>
-                        </div>
-                      ))
-                    ) : (
-                      <div style={{ padding: '12px', textAlign: 'center', fontSize: '0.84rem', color: '#94a3b8' }}>
-                        Kayıtlı müşteri bulunamadı. Aşağıdan manuel müşteri bilgisi yazabilirsiniz.
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Seçilen Müşteri Rozeti */}
-                {selectedCustomerId && selectedCustomerId !== 'custom' && (
-                  <div style={{ marginTop: '8px', padding: '9px 14px', backgroundColor: '#ecfdf5', borderRadius: '8px', border: '1px solid #a7f3d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 750, color: '#065f46' }}>
-                      ✓ Kayıtlı Müşteri Seçildi: {customCustomerName} ({customCustomerPhone})
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleCustomerSelect('custom')}
-                      style={{ fontSize: '0.8rem', fontWeight: 700, color: '#b91c1c', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
-                    >
-                      ✕ Seçimi Kaldır / Manuel Yaz
-                    </button>
-                  </div>
-                )}
+                <input 
+                  type="text"
+                  required
+                  value={formCustomerName}
+                  onChange={(e) => setFormCustomerName(e.target.value)}
+                  placeholder="Örn: KAYSERİ ÇOK YAŞAR POSTALLI veya Ahmet Yılmaz"
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontWeight: 700 }}
+                />
               </div>
 
-              {/* Manuel Müşteri Alanları */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '16px' }}>
+              {/* Tarih, Vade Tarihi, Fiş No */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '14px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Müşteri Ad Soyad *</label>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Tarih *</label>
                   <input 
                     type="text" 
                     required 
-                    value={customCustomerName} 
-                    onChange={(e) => setCustomCustomerName(e.target.value)} 
-                    placeholder="Örn: Ahmet Yılmaz" 
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }} 
+                    value={formDate} 
+                    onChange={(e) => setFormDate(e.target.value)} 
+                    placeholder="DD.MM.YYYY" 
+                    style={{ width: '100%', padding: '9px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }} 
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Telefon Numarası</label>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Vade Tarihi</label>
                   <input 
                     type="text" 
-                    value={customCustomerPhone} 
-                    onChange={(e) => setCustomCustomerPhone(e.target.value)} 
-                    placeholder="05XX XXX XX XX" 
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }} 
+                    value={formDueDate} 
+                    onChange={(e) => setFormDueDate(e.target.value)} 
+                    placeholder="DD.MM.YYYY" 
+                    style={{ width: '100%', padding: '9px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }} 
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Fiş / Dekont No</label>
+                  <input 
+                    type="text" 
+                    value={formReceiptNo} 
+                    onChange={(e) => setFormReceiptNo(e.target.value)} 
+                    placeholder="Örn: 7339" 
+                    style={{ width: '100%', padding: '9px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontFamily: 'monospace', fontWeight: 700 }} 
                   />
                 </div>
               </div>
 
-              {/* Poliçe Numarası & Türü & Şirket */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px', marginBottom: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#334155', marginBottom: '4px' }}>Poliçe Numarası (Manuel Yazın)</label>
-                  <input 
-                    type="text" 
-                    value={policyNo} 
-                    onChange={(e) => setPolicyNo(e.target.value)} 
-                    placeholder="Örn: 312984920/0 veya AK-2024-912" 
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontWeight: 700, fontFamily: 'monospace' }} 
-                  />
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Sigorta Türü</label>
-                  <select value={insuranceType} onChange={(e) => setInsuranceType(e.target.value)} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}>
-                    <option value="Kasko">Kasko</option>
-                    <option value="Trafik">Trafik</option>
-                    <option value="DASK">DASK Deprem</option>
-                    <option value="Konut">Konut</option>
-                    <option value="İşyeri">İşyeri</option>
-                    <option value="Özel Sağlık">Özel Sağlık</option>
-                    <option value="Tamamlayıcı Sağlık (TSS)">Tamamlayıcı Sağlık (TSS)</option>
-                    <option value="Yabancı Sağlık">Yabancı Sağlık</option>
-                    <option value="Seyahat Sağlık">Seyahat Sağlık</option>
-                    <option value="Ferdi Kaza">Ferdi Kaza</option>
-                    <option value="Nakliyat">Nakliyat</option>
-                    <option value="Mesleki Sorumluluk">Mesleki Sorumluluk</option>
-                    <option value="TARSİM Tarım">TARSİM Tarım</option>
-                    <option value="Tekne / Yat">Tekne / Yat</option>
-                    <option value="DIGER">➕ Diğer (Manuel Tür Yaz...)</option>
-                  </select>
-                  {insuranceType === 'DIGER' && (
-                    <input 
-                      type="text" 
-                      required 
-                      value={customInsuranceType} 
-                      onChange={(e) => setCustomInsuranceType(e.target.value)} 
-                      placeholder="Sigorta türünü yazın..." 
-                      style={{ width: '100%', marginTop: '6px', padding: '8px 10px', borderRadius: '6px', border: '2px solid #0284c7', outline: 'none', fontWeight: 600, backgroundColor: '#f0f9ff' }} 
-                    />
-                  )}
-                </div>
-              </div>
-
-              {/* Sigorta Şirketi */}
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Sigorta Şirketi</label>
-                <select value={company} onChange={(e) => setCompany(e.target.value)} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}>
-                  <option value="HDI Sigorta">HDI Sigorta</option>
-                  <option value="Ak Sigorta">Ak Sigorta</option>
-                  <option value="Sompo Sigorta">Sompo Sigorta</option>
-                  <option value="Allianz">Allianz</option>
-                  <option value="Anadolu Sigorta">Anadolu Sigorta</option>
-                  <option value="Quick Sigorta">Quick Sigorta</option>
-                  <option value="Emaa Sigorta">Emaa Sigorta</option>
-                  <option value="Türkiye Sigorta">Türkiye Sigorta</option>
-                  <option value="Axa Sigorta">Axa Sigorta</option>
-                  <option value="Ray Sigorta">Ray Sigorta</option>
-                  <option value="Neova Sigorta">Neova Sigorta</option>
-                  <option value="Hepiyi Sigorta">Hepiyi Sigorta</option>
-                  <option value="Generali Sigorta">Generali Sigorta</option>
-                  <option value="Unico Sigorta">Unico Sigorta</option>
-                  <option value="Corpus Sigorta">Corpus Sigorta</option>
-                  <option value="Koru Sigorta">Koru Sigorta</option>
-                  <option value="Bereket Sigorta">Bereket Sigorta</option>
-                  <option value="Mapfre Sigorta">Mapfre Sigorta</option>
-                  <option value="Orient Sigorta">Orient Sigorta</option>
-                  <option value="Ankara Sigorta">Ankara Sigorta</option>
-                  <option value="Zurich Sigorta">Zurich Sigorta</option>
-                  <option value="DIGER">➕ Diğer (Manuel Şirket Yaz...)</option>
+              {/* Hareket Türü */}
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>İşlem / Hareket Türü</label>
+                <select
+                  value={formMovementType}
+                  onChange={(e) => setFormMovementType(e.target.value as any)}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontWeight: 600 }}
+                >
+                  <option value="Poliçe Tahakkuku">Poliçe Tahakkuku (Borçlandırma)</option>
+                  <option value="Banka Gelen Havale">Banka Gelen Havale (Tahsilat)</option>
+                  <option value="Banka Giden Havale">Banka Giden Havale (Ödeme)</option>
+                  <option value="Kredi Kartı Tahsilat">Kredi Kartı Tahsilat</option>
+                  <option value="Hizmet Alım Faturası">Hizmet Alım Faturası</option>
+                  <option value="Cari Mahsup Çıkışı">Cari Mahsup Çıkışı</option>
+                  <option value="Cari Hareket Girişi">Cari Hareket Girişi</option>
+                  <option value="Poliçe İptal / İade">Poliçe İptal / İade</option>
+                  <option value="Tarih Öncesi Devir Bakiye">Tarih Öncesi Devir Bakiye</option>
                 </select>
-                {company === 'DIGER' && (
-                  <input 
-                    type="text" 
-                    required 
-                    value={customCompany} 
-                    onChange={(e) => setCustomCompany(e.target.value)} 
-                    placeholder="Sigorta şirketini yazın..." 
-                    style={{ width: '100%', marginTop: '6px', padding: '8px 10px', borderRadius: '6px', border: '2px solid #0284c7', outline: 'none', fontWeight: 600, backgroundColor: '#f0f9ff' }} 
-                  />
-                )}
               </div>
 
-              {/* Toplam Prim & Peşin / Taksit */}
-              <div style={{ padding: '14px', backgroundColor: '#f0f9ff', borderRadius: '12px', border: '1px solid #bae6fd', marginBottom: '16px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px', marginBottom: '12px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 750, color: '#0369a1', marginBottom: '4px' }}>Toplam Prim / Borç Tutarı (₺) *</label>
-                    <input 
-                      type="number" 
-                      required 
-                      value={totalAmount} 
-                      onChange={(e) => setTotalAmount(e.target.value)} 
-                      placeholder="Örn: 15000" 
-                      style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #7dd3fc', outline: 'none', fontWeight: 800, fontSize: '1.05rem' }} 
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 750, color: '#0369a1', marginBottom: '4px' }}>Ödeme Şekli</label>
-                    <select value={paymentType} onChange={(e) => setPaymentType(e.target.value as any)} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #7dd3fc', outline: 'none', fontWeight: 700 }}>
-                      <option value="Peşin / Tek Çekim">Peşin / Tek Çekim</option>
-                      <option value="Taksitli">Taksitli Ödeme</option>
-                    </select>
-                  </div>
+              {/* Açıklama (Poliçe No, Plaka, Şirket vb.) */}
+              <div style={{ marginBottom: '14px' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 750, color: '#334155', marginBottom: '4px' }}>
+                  Açıklama (Poliçe No, Plaka, Şirket vb.) *
+                </label>
+                <input 
+                  type="text"
+                  required
+                  value={formDescription}
+                  onChange={(e) => setFormDescription(e.target.value)}
+                  placeholder="Örn: 2000270031266 / 0 HDI KASKO 34MNP977 KAYSERİ ÇOK YAŞAR"
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontWeight: 650 }}
+                />
+              </div>
+
+              {/* Borç & Alacak Tutarları */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
+                <div style={{ padding: '12px', backgroundColor: '#fef2f2', borderRadius: '8px', border: '1px solid #fecaca' }}>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800, color: '#991b1b', marginBottom: '4px' }}>
+                    Borç Tutarı (₺) [Poliçe Bedeli]
+                  </label>
+                  <input 
+                    type="number"
+                    step="0.01"
+                    value={formDebitAmount}
+                    onChange={(e) => setFormDebitAmount(e.target.value)}
+                    placeholder="0.00"
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #f87171', outline: 'none', fontWeight: 800, fontSize: '1rem', color: '#991b1b' }}
+                  />
                 </div>
 
-                {paymentType === 'Taksitli' ? (
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#0369a1', marginBottom: '4px' }}>Taksit Sayısı</label>
-                    <select value={installmentCount} onChange={(e) => setInstallmentCount(Number(e.target.value))} style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #7dd3fc', outline: 'none', fontWeight: 700 }}>
-                      <option value={2}>2 Taksit</option>
-                      <option value={3}>3 Taksit</option>
-                      <option value={4}>4 Taksit</option>
-                      <option value={6}>6 Taksit</option>
-                      <option value={9}>9 Taksit</option>
-                      <option value={12}>12 Taksit</option>
-                    </select>
-                    {totalAmount && (
-                      <div style={{ marginTop: '8px', fontSize: '0.82rem', color: '#0284c7', fontWeight: 700 }}>
-                        💡 Her ay ödenecek taksit: {(Number(totalAmount) / installmentCount).toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ₺
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#0369a1', marginBottom: '4px' }}>Peşin Tahsil Edilen Tutar (₺)</label>
-                    <input 
-                      type="number" 
-                      value={initialPaidAmount} 
-                      onChange={(e) => setInitialPaidAmount(e.target.value)} 
-                      placeholder={totalAmount || "Örn: 15000"} 
-                      style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #7dd3fc', outline: 'none', fontWeight: 700 }} 
-                    />
-                  </div>
-                )}
+                <div style={{ padding: '12px', backgroundColor: '#ecfdf5', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800, color: '#065f46', marginBottom: '4px' }}>
+                    Alacak / Alınan Tutar (₺) [Tahsilat]
+                  </label>
+                  <input 
+                    type="number"
+                    step="0.01"
+                    value={formCreditAmount}
+                    onChange={(e) => setFormCreditAmount(e.target.value)}
+                    placeholder="0.00"
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #34d399', outline: 'none', fontWeight: 800, fontSize: '1rem', color: '#065f46' }}
+                  />
+                </div>
               </div>
 
-              {/* Not */}
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Ödeme Notu / Açıklama</label>
-                <textarea 
-                  value={notes} 
-                  onChange={(e) => setNotes(e.target.value)} 
-                  placeholder="Örn: 2. taksit 15 Eylül'de ödenecek..." 
-                  rows={2} 
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}
-                ></textarea>
+              {/* Notlar */}
+              <div style={{ marginBottom: '22px' }}>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Ek Not (Opsiyonel)</label>
+                <input 
+                  type="text" 
+                  value={formNotes} 
+                  onChange={(e) => setFormNotes(e.target.value)} 
+                  placeholder="Zeyil, banka dekont ref no vb." 
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }} 
+                />
               </div>
 
               {/* Butonlar */}
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button type="button" onClick={() => setIsAddModalOpen(false)} style={{ padding: '10px 18px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f1f5f9', cursor: 'pointer', fontWeight: 600 }}>İptal</button>
-                <button type="submit" className={styles.btnCrm} style={{ padding: '10px 22px' }}>Kaydet ve Listeye Ekle</button>
-              </div>
-
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 2: TAHSİLAT YAP (PARÇALI VEYA TAKSİT ÖDEMESİ ALMA) */}
-      {isCollectModalOpen && selectedRecord && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-          <div style={{ backgroundColor: 'white', borderRadius: '16px', width: '100%', maxWidth: '480px', padding: '28px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid #edf2f7', paddingBottom: '12px' }}>
-              <div>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#16a34a' }}>TAHSİLAT İŞLEMİ</span>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: '2px 0 0 0' }}>
-                  {selectedRecord.customerName}
-                </h2>
-              </div>
-              <button onClick={() => setIsCollectModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
-                <X size={22} />
-              </button>
-            </div>
-
-            {/* Bakiye Özeti */}
-            <div style={{ padding: '14px', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '18px', display: 'flex', justifyContent: 'space-between' }}>
-              <div>
-                <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Poliçe Toplamı</div>
-                <div style={{ fontWeight: 750, color: '#0f172a' }}>{selectedRecord.totalAmount.toLocaleString('tr-TR')} ₺</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Şimdiye Kadar Ödenen</div>
-                <div style={{ fontWeight: 750, color: '#059669' }}>{selectedRecord.paidAmount.toLocaleString('tr-TR')} ₺</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Kalan Borç</div>
-                <div style={{ fontWeight: 850, color: '#dc2626' }}>{selectedRecord.remainingAmount.toLocaleString('tr-TR')} ₺</div>
-              </div>
-            </div>
-
-            <form onSubmit={handleCollectPayment}>
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 750, color: '#0f172a', marginBottom: '6px' }}>
-                  Tahsil Edilecek Tutar (₺) *
-                </label>
-                <input 
-                  type="number" 
-                  required 
-                  max={selectedRecord.remainingAmount}
-                  value={collectAmount} 
-                  onChange={(e) => setCollectAmount(e.target.value)} 
-                  placeholder="0" 
-                  style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '2px solid #16a34a', outline: 'none', fontWeight: 850, fontSize: '1.2rem', color: '#16a34a' }} 
-                />
-              </div>
-
-              <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Ödeme Yöntemi</label>
-                <select 
-                  value={collectMethod} 
-                  onChange={(e) => setCollectMethod(e.target.value as any)} 
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontWeight: 600 }}
+                <button 
+                  type="button" 
+                  onClick={() => setIsAddModalOpen(false)} 
+                  style={{ padding: '10px 18px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f1f5f9', cursor: 'pointer', fontWeight: 600, color: '#475569' }}
                 >
-                  <option value="Kredi Kartı">Kredi Kartı (Pos)</option>
-                  <option value="Banka Havalesi / EFT">Banka Havalesi / EFT</option>
-                  <option value="Nakit">Nakit Para</option>
-                </select>
-              </div>
-
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#475569', marginBottom: '6px' }}>Açıklama / Makbuz Notu</label>
-                <input 
-                  type="text" 
-                  value={collectNote} 
-                  onChange={(e) => setCollectNote(e.target.value)} 
-                  placeholder="Örn: 2. taksit tahsilatı yapıldı..." 
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }} 
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                <button type="button" onClick={() => setIsCollectModalOpen(false)} style={{ padding: '10px 18px', borderRadius: '8px', border: '1px solid #cbd5e1', backgroundColor: '#f1f5f9', cursor: 'pointer', fontWeight: 600 }}>İptal</button>
-                <button type="submit" style={{ padding: '10px 22px', backgroundColor: '#16a34a', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 750, cursor: 'pointer' }}>
-                  ✓ Tahsilatı Kaydet ve Kasaya Ekle
+                  İptal
+                </button>
+                <button 
+                  type="submit" 
+                  className={styles.btnCrm} 
+                  style={{ padding: '10px 24px', fontSize: '0.92rem', fontWeight: 750 }}
+                >
+                  ✓ Cari Hareketi Kaydet
                 </button>
               </div>
+
             </form>
-
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 3: TAKSİT PLANI DETAYI */}
-      {isScheduleModalOpen && selectedRecord && (
-        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
-          <div style={{ backgroundColor: 'white', borderRadius: '16px', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto', padding: '28px', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }}>
-            
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px', borderBottom: '1px solid #edf2f7', paddingBottom: '12px' }}>
-              <div>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#2563eb' }}>TAKSİT VE ÖDEME PLANI</span>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0f172a', margin: '2px 0 0 0' }}>
-                  {selectedRecord.customerName}
-                </h2>
-                <div style={{ fontSize: '0.82rem', color: '#64748b' }}>Poliçe No: {selectedRecord.policyNo} ({selectedRecord.insuranceType})</div>
-              </div>
-              <button onClick={() => setIsScheduleModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
-                <X size={22} />
-              </button>
-            </div>
-
-            {/* Taksit Listesi */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
-              {selectedRecord.installments.map((inst) => (
-                <div 
-                  key={inst.installmentNo}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '12px 16px',
-                    borderRadius: '10px',
-                    backgroundColor: inst.status === 'Ödendi' ? '#f0fdf4' : (inst.status === 'Gecikmede' ? '#fef2f2' : '#f8fafc'),
-                    border: `1px solid ${inst.status === 'Ödendi' ? '#bbf7d0' : (inst.status === 'Gecikmede' ? '#fecaca' : '#e2e8f0')}`
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 750, color: '#0f172a', fontSize: '0.92rem' }}>
-                      {inst.installmentNo}. Taksit: {inst.amount.toLocaleString('tr-TR')} ₺
-                    </div>
-                    <div style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                      Vade Tarihi: {inst.dueDate} {inst.paidDate && `• Ödendiği Tarih: ${inst.paidDate}`}
-                    </div>
-                  </div>
-
-                  <span style={{
-                    padding: '4px 10px',
-                    borderRadius: '20px',
-                    fontSize: '0.75rem',
-                    fontWeight: 750,
-                    backgroundColor: inst.status === 'Ödendi' ? '#dcfce7' : (inst.status === 'Gecikmede' ? '#fee2e2' : '#fef3c7'),
-                    color: inst.status === 'Ödendi' ? '#15803d' : (inst.status === 'Gecikmede' ? '#dc2626' : '#b45309')
-                  }}>
-                    {inst.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: '0.9rem', fontWeight: 750, color: '#dc2626' }}>
-                Kalan Toplam Borç: {selectedRecord.remainingAmount.toLocaleString('tr-TR')} ₺
-              </div>
-              <button onClick={() => setIsScheduleModalOpen(false)} style={{ padding: '8px 18px', backgroundColor: '#0f172a', color: '#ffffff', border: 'none', borderRadius: '8px', fontWeight: 600, cursor: 'pointer' }}>
-                Kapat
-              </button>
-            </div>
 
           </div>
         </div>
