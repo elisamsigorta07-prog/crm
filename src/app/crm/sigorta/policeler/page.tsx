@@ -480,47 +480,84 @@ export default function PolicelerPage() {
       setPolicies([newPolicyRecord, ...policies]);
     }
 
-    // 3. AUTO-SYNC WITH FINANS & CASH LOGS
+    // 3. AUTO-SYNC WITH FINANS & CARİ HESAP EKSTRESİ (elisam_cari_movements)
     try {
-      const savedDebts = JSON.parse(localStorage.getItem('elisam_debt_records') || '[]');
-      const installments = generateInstallments(prem, instCount, startDate, paid);
-      const newDebt = {
-        id: `REC-${Math.floor(1000 + Math.random() * 9000)}`,
-        customerId,
-        customerName,
-        customerPhone: customerPhone || '-',
-        customerTc: customerTc || '-',
-        policyNo: finalPolicyNo,
-        insuranceType: finalType,
-        company: finalCompany,
-        totalAmount: prem,
-        paidAmount: paid,
-        remainingAmount: remaining,
-        paymentType,
-        installmentCount: instCount,
-        installments,
-        status: remaining === 0 ? 'Ödendi' : (paid > 0 ? 'Kısmi Ödendi' : 'Bekliyor'),
-        startDate: startDate ? new Date(startDate).toLocaleDateString('tr-TR') : new Date().toLocaleDateString('tr-TR'),
-        notes: notes || 'Poliçe kesimi ile otomatik kaydedildi.'
+      const savedMovs = JSON.parse(localStorage.getItem('elisam_cari_movements') || '[]');
+      
+      const getNextReceiptNo = (currentMovements: any[]): string => {
+        if (!currentMovements || currentMovements.length === 0) return 'E000001';
+        const numbers = currentMovements
+          .map(m => {
+            const match = m.receiptNo?.match(/^E(\d+)$/i);
+            return match ? parseInt(match[1], 10) : 0;
+          })
+          .filter(n => !isNaN(n) && n > 0);
+        const maxNum = numbers.length > 0 ? Math.max(...numbers) : currentMovements.length;
+        return `E${String(maxNum + 1).padStart(6, '0')}`;
       };
-      localStorage.setItem('elisam_debt_records', JSON.stringify([newDebt, ...savedDebts.filter((d: any) => d.policyNo !== finalPolicyNo)]));
 
+      // Filter out any old movement of this policy if editing
+      let updatedMovs = savedMovs.filter((m: any) => !(m.receiptNo === finalPolicyNo || m.description?.includes(finalPolicyNo)));
+      
+      const formattedStartDate = startDate ? (startDate.includes('-') ? startDate.split('-').reverse().join('.') : startDate) : new Date().toLocaleDateString('tr-TR');
+      const formattedEndDate = endDate ? (endDate.includes('-') ? endDate.split('-').reverse().join('.') : endDate) : '';
+
+      // 1. Borç Kaydı: Poliçe Tahakkuku
+      const receiptNoDebt = getNextReceiptNo(updatedMovs);
+      const debtMovement = {
+        id: `CAR-${Math.floor(1000 + Math.random() * 9000)}`,
+        date: formattedStartDate,
+        dueDate: formattedEndDate || undefined,
+        receiptNo: receiptNoDebt,
+        customerId: customerId,
+        customerName: customerName.trim(),
+        description: `${finalPolicyNo} nolu ${finalCompany} ${finalType} Poliçesi Tahakkuku${plate ? ` (${plate})` : ''}`,
+        movementType: 'Poliçe Tahakkuku',
+        debitAmount: prem,
+        creditAmount: 0,
+        notes: notes || 'Poliçe kesimi ile otomatik oluşturuldu.'
+      };
+      updatedMovs = [debtMovement, ...updatedMovs];
+
+      // 2. Tahsilat Kaydı (Peşin tahsilat yapıldıysa)
       if (paid > 0) {
-        const savedLogs = JSON.parse(localStorage.getItem('elisam_cash_logs') || '[]');
-        const newCashLog = {
-          id: `LOG-${Math.floor(1000 + Math.random() * 9000)}`,
-          date: new Date().toLocaleDateString('tr-TR'),
-          customerName,
-          policyNo: finalPolicyNo,
-          amount: paid,
-          paymentMethod: 'Kredi Kartı',
-          type: 'Tahsilat',
-          description: `${finalPolicyNo} nolu ${finalType} poliçesi ilk tahsilatı.`
+        const receiptNoPaid = getNextReceiptNo(updatedMovs);
+        const paidMovement = {
+          id: `CAR-${Math.floor(1000 + Math.random() * 9000)}`,
+          date: formattedStartDate,
+          dueDate: undefined,
+          receiptNo: receiptNoPaid,
+          customerId: customerId,
+          customerName: customerName.trim(),
+          description: `${finalPolicyNo} nolu ${finalCompany} ${finalType} Poliçesi Tahsilatı (${paymentType})`,
+          movementType: paymentType === 'Peşin / Tek Çekim' ? 'Kredi Kartı Tahsilat' : 'Banka Gelen Havale',
+          debitAmount: 0,
+          creditAmount: paid,
+          notes: 'Poliçe kesiminde tahsil edildi.'
         };
-        localStorage.setItem('elisam_cash_logs', JSON.stringify([newCashLog, ...savedLogs]));
+        updatedMovs = [paidMovement, ...updatedMovs];
+      }
+
+      localStorage.setItem('elisam_cari_movements', JSON.stringify(updatedMovs));
+
+      // Also ensure customer exists in elisam_customers storage
+      const savedCusts = JSON.parse(localStorage.getItem('elisam_customers') || '[]');
+      const custExists = savedCusts.some((c: any) => c.id === customerId || c.name.toLowerCase() === customerName.toLowerCase());
+      if (!custExists) {
+        const custToStore = {
+          id: customerId,
+          name: customerName.trim(),
+          type: customerType,
+          phone: customerPhone || '-',
+          email: customerEmail || '-',
+          identityNo: customerTc || '-',
+          address: customerAddress || 'Alanya / Antalya',
+          createdAt: new Date().toLocaleDateString('tr-TR')
+        };
+        localStorage.setItem('elisam_customers', JSON.stringify([custToStore, ...savedCusts]));
       }
     } catch (err) {
-      console.error('Finans sync hatası:', err);
+      console.error('Finans cari sync hatası:', err);
     }
 
     setIsAddModalOpen(false);
@@ -529,9 +566,20 @@ export default function PolicelerPage() {
 
   // Delete Policy
   const handleDeletePolicy = (id: string, name: string) => {
-    if (confirm(`${name} müşterisine ait ${id} numaralı poliçeyi silmek istediğinize emin misiniz?`)) {
+    const polToDelete = policies.find(p => p.id === id);
+    const polNo = polToDelete?.policyNo || id;
+
+    if (confirm(`${name} müşterisine ait ${polNo} numaralı poliçeyi silmek istediğinize emin misiniz?`)) {
       setPolicies(policies.filter(p => p.id !== id));
       if (selectedPolicy?.id === id) setSelectedPolicy(null);
+
+      try {
+        const savedMovs = JSON.parse(localStorage.getItem('elisam_cari_movements') || '[]');
+        const updatedMovs = savedMovs.filter((m: any) => !(m.receiptNo === polNo || m.description?.includes(polNo)));
+        localStorage.setItem('elisam_cari_movements', JSON.stringify(updatedMovs));
+      } catch (err) {
+        console.error(err);
+      }
     }
   };
 
