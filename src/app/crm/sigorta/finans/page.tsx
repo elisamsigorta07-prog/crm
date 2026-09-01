@@ -113,6 +113,7 @@ export default function SigortaFinansPage() {
 
   // New Record Form State
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [finansCustomerSearch, setFinansCustomerSearch] = useState('');
   const [customCustomerName, setCustomCustomerName] = useState('');
   const [customCustomerPhone, setCustomCustomerPhone] = useState('');
   const [customCustomerTc, setCustomCustomerTc] = useState('');
@@ -794,21 +795,120 @@ export default function SigortaFinansPage() {
 
             <form onSubmit={handleAddRecord}>
               
-              {/* Müşteri Seçimi */}
+              {/* Müşteri Arama & Seçimi */}
               <div style={{ marginBottom: '16px' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
-                  Kayıtlı Müşteri Seçin veya Manuel Girin *
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 750, color: '#334155', marginBottom: '6px' }}>
+                  🔍 Kayıtlı Müşteri Ara & Seç (İsim, TC, Telefon, Poliçe No veya Plaka):
                 </label>
-                <select 
-                  value={selectedCustomerId} 
-                  onChange={(e) => handleCustomerSelect(e.target.value)}
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontWeight: 600, backgroundColor: '#f8fafc' }}
-                >
-                  <option value="custom">-- Manuel Müşteri Bilgisi Yazacağım --</option>
-                  {customers.map(c => (
-                    <option key={c.id} value={c.id}>{c.name} ({c.type} - {c.phone})</option>
-                  ))}
-                </select>
+                
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    type="text"
+                    placeholder="Örn: Ahmet, 384030..., 0551..., POL-123456 veya 38AHD233..."
+                    value={finansCustomerSearch}
+                    onChange={(e) => setFinansCustomerSearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px 10px 36px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      backgroundColor: '#ffffff',
+                      fontSize: '0.9rem',
+                      outline: 'none'
+                    }}
+                  />
+                  <Search size={16} style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                  {finansCustomerSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setFinansCustomerSearch('')}
+                      style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Arama Sonuçları Listesi */}
+                {finansCustomerSearch.trim() && (
+                  <div style={{
+                    marginTop: '6px',
+                    maxHeight: '180px',
+                    overflowY: 'auto',
+                    backgroundColor: '#ffffff',
+                    borderRadius: '8px',
+                    border: '1px solid #93c5fd',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
+                    zIndex: 50
+                  }}>
+                    {customers.filter(c => {
+                      const q = finansCustomerSearch.toLowerCase();
+                      return c.name.toLowerCase().includes(q) ||
+                             (c.identityNo && c.identityNo.includes(q)) ||
+                             (c.phone && c.phone.includes(q)) ||
+                             (c.policyNo && c.policyNo.toLowerCase().includes(q)) ||
+                             (c.plate && c.plate.toLowerCase().includes(q));
+                    }).length > 0 ? (
+                      customers.filter(c => {
+                        const q = finansCustomerSearch.toLowerCase();
+                        return c.name.toLowerCase().includes(q) ||
+                               (c.identityNo && c.identityNo.includes(q)) ||
+                               (c.phone && c.phone.includes(q)) ||
+                               (c.policyNo && c.policyNo.toLowerCase().includes(q)) ||
+                               (c.plate && c.plate.toLowerCase().includes(q));
+                      }).map(c => (
+                        <div
+                          key={c.id}
+                          onClick={() => {
+                            handleCustomerSelect(c.id);
+                            setFinansCustomerSearch('');
+                          }}
+                          style={{
+                            padding: '10px 14px',
+                            borderBottom: '1px solid #f1f5f9',
+                            cursor: 'pointer',
+                            transition: 'background 0.2s',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#eff6ff'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          <div>
+                            <div style={{ fontWeight: 750, color: '#0f172a', fontSize: '0.92rem' }}>
+                              {c.name} <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#1d4ed8', backgroundColor: '#dbeafe', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px' }}>{c.type}</span>
+                            </div>
+                            <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '3px' }}>
+                              📞 {c.phone} {c.identityNo && c.identityNo !== '-' ? `• 🆔 TC: ${c.identityNo}` : ''} {c.plate ? `• 🚗 ${c.plate}` : ''} {c.policyNo ? `• 📄 ${c.policyNo}` : ''}
+                            </div>
+                          </div>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 750, color: '#2563eb' }}>Seç ➔</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{ padding: '12px', textAlign: 'center', fontSize: '0.84rem', color: '#94a3b8' }}>
+                        Kayıtlı müşteri bulunamadı. Aşağıdan manuel müşteri bilgisi yazabilirsiniz.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Seçilen Müşteri Rozeti */}
+                {selectedCustomerId && selectedCustomerId !== 'custom' && (
+                  <div style={{ marginTop: '8px', padding: '9px 14px', backgroundColor: '#ecfdf5', borderRadius: '8px', border: '1px solid #a7f3d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 750, color: '#065f46' }}>
+                      ✓ Kayıtlı Müşteri Seçildi: {customCustomerName} ({customCustomerPhone})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleCustomerSelect('custom')}
+                      style={{ fontSize: '0.8rem', fontWeight: 700, color: '#b91c1c', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      ✕ Seçimi Kaldır / Manuel Yaz
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Manuel Müşteri Alanları */}

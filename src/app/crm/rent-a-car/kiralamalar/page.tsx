@@ -59,6 +59,7 @@ export default function KiralamalarPage() {
   // Form State
   const [selectedVehicleId, setSelectedVehicleId] = useState(vehicles[0]?.id || '');
   const [selectedCustomerId, setSelectedCustomerId] = useState(customers[0]?.id || '');
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
   const [pickupDate, setPickupDate] = useState('2026-08-01');
   const [returnDate, setReturnDate] = useState('2026-08-05');
   const [paymentMethod, setPaymentMethod] = useState<RentalBooking['paymentMethod']>('Kredi Kartı');
@@ -383,21 +384,111 @@ export default function KiralamalarPage() {
                 </select>
               </div>
 
-              {/* Relational Customer Dropdown */}
+              {/* Relational Customer Search & Picker */}
               <div style={{ marginBottom: '15px' }}>
-                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Sürücü / Müşteri Seçin *</label>
-                <select 
-                  required 
-                  value={selectedCustomerId} 
-                  onChange={(e) => setSelectedCustomerId(e.target.value)} 
-                  style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }}
-                >
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} ({c.country} - {c.identityOrPassport})
-                    </option>
-                  ))}
-                </select>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, color: '#334155', marginBottom: '6px' }}>
+                  🔍 Sürücü / Müşteri Ara & Seç (İsim, Pasaport/TC, Telefon veya Ülke):
+                </label>
+
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    type="text"
+                    placeholder="Örn: John, Hans, Mehmet, TC123456... veya 05XX..."
+                    value={customerSearchQuery}
+                    onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px 10px 36px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      backgroundColor: '#ffffff',
+                      fontSize: '0.9rem',
+                      outline: 'none'
+                    }}
+                  />
+                  <Search size={16} style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                  {customerSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setCustomerSearchQuery('')}
+                      style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Autocomplete dropdown */}
+                {customerSearchQuery.trim() && (
+                  <div style={{
+                    marginTop: '6px',
+                    maxHeight: '180px',
+                    overflowY: 'auto',
+                    backgroundColor: '#ffffff',
+                    borderRadius: '8px',
+                    border: '1px solid #93c5fd',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.1)',
+                    zIndex: 50
+                  }}>
+                    {customers.filter(c => {
+                      const q = customerSearchQuery.toLowerCase();
+                      return c.name.toLowerCase().includes(q) ||
+                             c.identityOrPassport.toLowerCase().includes(q) ||
+                             c.phone.includes(q) ||
+                             c.country.toLowerCase().includes(q);
+                    }).length > 0 ? (
+                      customers.filter(c => {
+                        const q = customerSearchQuery.toLowerCase();
+                        return c.name.toLowerCase().includes(q) ||
+                               c.identityOrPassport.toLowerCase().includes(q) ||
+                               c.phone.includes(q) ||
+                               c.country.toLowerCase().includes(q);
+                      }).map(c => (
+                        <div
+                          key={c.id}
+                          onClick={() => {
+                            setSelectedCustomerId(c.id);
+                            setCustomerSearchQuery('');
+                          }}
+                          style={{
+                            padding: '10px 14px',
+                            borderBottom: '1px solid #f1f5f9',
+                            cursor: 'pointer',
+                            transition: 'background 0.2s',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center'
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#eff6ff'}
+                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                        >
+                          <div>
+                            <div style={{ fontWeight: 750, color: '#0f172a', fontSize: '0.92rem' }}>
+                              {c.name} <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#1d4ed8', backgroundColor: '#dbeafe', padding: '2px 6px', borderRadius: '4px', marginLeft: '6px' }}>{c.country}</span>
+                            </div>
+                            <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '3px' }}>
+                              📞 {c.phone} • 🆔 {c.identityOrPassport} • Ehliyet: {c.licenseClass}
+                            </div>
+                          </div>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#2563eb' }}>Seç ➔</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div style={{ padding: '12px', textAlign: 'center', fontSize: '0.84rem', color: '#94a3b8' }}>
+                        Kayıtlı sürücü bulunamadı.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Selected Driver Pill */}
+                {selectedCustomerId && (
+                  <div style={{ marginTop: '8px', padding: '9px 14px', backgroundColor: '#ecfdf5', borderRadius: '8px', border: '1px solid #a7f3d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 750, color: '#065f46' }}>
+                      ✓ Seçilen Sürücü: {customers.find(c => c.id === selectedCustomerId)?.name} ({customers.find(c => c.id === selectedCustomerId)?.phone})
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* KM Parameters Section */}
