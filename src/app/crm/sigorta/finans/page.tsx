@@ -61,140 +61,8 @@ export interface CariMovement {
   notes?: string;
 }
 
-// Örnek Başlangıç Cari Hareket Verileri (Kullanıcının görsellerindeki gerçekçi veriler)
-const initialCariMovements: CariMovement[] = [
-  {
-    id: 'CAR-001',
-    date: '31.12.2025',
-    receiptNo: '-',
-    customerId: 'CUST-001',
-    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
-    description: 'TARİH ÖNCESİ BAKİYE TL (DEVİR)',
-    movementType: 'Tarih Öncesi Devir Bakiye',
-    debitAmount: 1415883.27,
-    creditAmount: 1396366.99,
-    notes: 'Geçmiş dönem devir bakiyesi'
-  },
-  {
-    id: 'CAR-002',
-    date: '09.01.2026',
-    receiptNo: '101',
-    customerId: 'CUST-001',
-    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
-    description: 'İŞ BNK ELİSAM SİG',
-    movementType: 'Banka Gelen Havale',
-    debitAmount: 0,
-    creditAmount: 10000.00
-  },
-  {
-    id: 'CAR-003',
-    date: '14.01.2026',
-    dueDate: '14.01.2026',
-    receiptNo: '7339',
-    customerId: 'CUST-001',
-    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
-    description: '2000270031266 / 0 HDI KASKO 34MNP977 KAYSERİ ÇOK YAŞAR',
-    movementType: 'Poliçe Tahakkuku',
-    debitAmount: 32838.57,
-    creditAmount: 0
-  },
-  {
-    id: 'CAR-004',
-    date: '31.01.2026',
-    dueDate: '31.01.2026',
-    receiptNo: '7335',
-    customerId: 'CUST-001',
-    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
-    description: '20002700411661 / 0 HDI KASKO 38SZ184 KAYSERİ ÇOK YAŞAR',
-    movementType: 'Poliçe Tahakkuku',
-    debitAmount: 31662.62,
-    creditAmount: 0
-  },
-  {
-    id: 'CAR-005',
-    date: '31.01.2026',
-    dueDate: '31.01.2026',
-    receiptNo: '7336',
-    customerId: 'CUST-001',
-    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
-    description: '2000270044808 / 0 HDI KASKO 38YD923 KAYSERİ ÇOK YAŞAR',
-    movementType: 'Poliçe Tahakkuku',
-    debitAmount: 38399.36,
-    creditAmount: 0
-  },
-  {
-    id: 'CAR-006',
-    date: '31.01.2026',
-    dueDate: '31.01.2026',
-    receiptNo: '7337',
-    customerId: 'CUST-001',
-    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
-    description: '2000270049308 / 0 HDI KASKO 38EB739 KAYSERİ ÇOK YAŞAR',
-    movementType: 'Poliçe Tahakkuku',
-    debitAmount: 37672.98,
-    creditAmount: 0
-  },
-  {
-    id: 'CAR-007',
-    date: '31.01.2026',
-    dueDate: '31.01.2026',
-    receiptNo: '7338',
-    customerId: 'CUST-001',
-    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
-    description: '2000270051912 / 0 HDI KASKO 38JD384 KAYSERİ ÇOK YAŞAR',
-    movementType: 'Poliçe Tahakkuku',
-    debitAmount: 43088.07,
-    creditAmount: 0
-  },
-  {
-    id: 'CAR-008',
-    date: '23.02.2026',
-    dueDate: '23.02.2026',
-    receiptNo: '7772',
-    customerId: 'CUST-001',
-    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
-    description: '2000284839432 / 0 HDI KASKO 38NT923 KAYSERİ ÇOK YAŞAR',
-    movementType: 'Poliçe Tahakkuku',
-    debitAmount: 41128.80,
-    creditAmount: 0
-  },
-  {
-    id: 'CAR-009',
-    date: '23.02.2026',
-    dueDate: '23.02.2026',
-    receiptNo: '7774',
-    customerId: 'CUST-001',
-    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
-    description: '2000284842165 / 0 HDI KASKO 38DC673 KAYSERİ ÇOK YAŞAR',
-    movementType: 'Poliçe Tahakkuku',
-    debitAmount: 43157.56,
-    creditAmount: 0
-  },
-  {
-    id: 'CAR-010',
-    date: '24.02.2026',
-    dueDate: '24.02.2026',
-    receiptNo: '7773',
-    customerId: 'CUST-001',
-    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
-    description: '2000284836488 / 0 HDI KASKO 38LJ521 KAYSERİ ÇOK YAŞAR',
-    movementType: 'Poliçe Tahakkuku',
-    debitAmount: 42495.66,
-    creditAmount: 0
-  },
-  {
-    id: 'CAR-011',
-    date: '16.04.2026',
-    receiptNo: '8324',
-    customerId: 'CUST-001',
-    customerName: 'KAYSERİ ÇOK YAŞAR POSTALLI',
-    description: 'İptal 2000255346766 / 1 HDI KASKO 34CYT106 KAYSERİ ÇOK YAŞAR',
-    movementType: 'Poliçe İptal / İade',
-    debitAmount: 0,
-    creditAmount: 18506.57,
-    notes: 'Poliçe zeyil / iptal iade hareketi'
-  }
-];
+// Cari Hareket Verileri (Boş Başlangıç)
+const initialCariMovements: CariMovement[] = [];
 
 export default function SigortaFinansPage() {
   const [movements, setMovements] = useState<CariMovement[]>(initialCariMovements);
@@ -480,6 +348,18 @@ export default function SigortaFinansPage() {
     link.click();
   };
 
+  // Clear all movements
+  const handleClearAllMovements = () => {
+    if (confirm('Tüm cari ekstre hareketlerini temizlemek ve sıfırlamak istediğinize emin misiniz?')) {
+      setMovements([]);
+      try {
+        localStorage.removeItem('elisam_cari_movements');
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
   return (
     <div>
       {/* Top Header */}
@@ -531,6 +411,28 @@ export default function SigortaFinansPage() {
           >
             <Download size={16} /> Excel (CSV)
           </button>
+
+          {movements.length > 0 && (
+            <button 
+              onClick={handleClearAllMovements}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '10px 14px',
+                backgroundColor: '#fef2f2',
+                color: '#dc2626',
+                borderRadius: '10px',
+                border: '1px solid #fecaca',
+                fontWeight: 700,
+                fontSize: '0.88rem',
+                cursor: 'pointer'
+              }}
+              title="Tüm ekstre hareketlerini temizle"
+            >
+              <Trash2 size={16} /> Ekstreyi Sıfırla
+            </button>
+          )}
         </div>
       </div>
 
@@ -562,7 +464,6 @@ export default function SigortaFinansPage() {
                 }}
               >
                 <option value="ALL">📋 TÜM MÜŞTERİLERİN GENEL CARİ HESAP EKSTRESİ</option>
-                <option value="KAYSERİ ÇOK YAŞAR POSTALLI">🏢 KAYSERİ ÇOK YAŞAR POSTALLI</option>
                 {customers.map(c => (
                   <option key={c.id} value={c.id}>👤 {c.name} ({c.type} - {c.phone})</option>
                 ))}
@@ -1037,8 +938,7 @@ export default function SigortaFinansPage() {
                     style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none', backgroundColor: '#ffffff', fontSize: '0.86rem', fontWeight: 600 }}
                   >
                     <option value="NEW">-- Yeni / Farklı Müşteri Tanımlayacağım --</option>
-                    <option value="CUST-001">🏢 KAYSERİ ÇOK YAŞAR POSTALLI</option>
-                    {customers.filter(c => c.id !== 'CUST-001').map(c => (
+                    {customers.map(c => (
                       <option key={c.id} value={c.id}>👤 {c.name} ({c.type} - {c.phone})</option>
                     ))}
                   </select>
