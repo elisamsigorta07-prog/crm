@@ -92,15 +92,31 @@ export default function SigortaFinansPage() {
   const [formCreditAmount, setFormCreditAmount] = useState('');
   const [formNotes, setFormNotes] = useState('');
 
-  // Hydration-safe initial load from localStorage
+  // Hydration-safe initial load from localStorage & purge old mock data
   useEffect(() => {
     setIsMounted(true);
     try {
       const savedMov = localStorage.getItem('elisam_cari_movements');
-      if (savedMov) setMovements(JSON.parse(savedMov));
+      if (savedMov) {
+        const parsed: CariMovement[] = JSON.parse(savedMov);
+        // Filter out any mock/sample items that were previously seeded
+        const cleanMovs = parsed.filter(m => 
+          !m.customerName.toUpperCase().includes('KAYSERİ ÇOK YAŞAR') && 
+          !m.id.startsWith('CAR-00')
+        );
+        setMovements(cleanMovs);
+        localStorage.setItem('elisam_cari_movements', JSON.stringify(cleanMovs));
+      } else {
+        setMovements([]);
+      }
 
       const savedCust = localStorage.getItem('elisam_customers');
-      if (savedCust) setCustomers(JSON.parse(savedCust));
+      if (savedCust) {
+        const parsedCust: Customer[] = JSON.parse(savedCust);
+        const cleanCust = parsedCust.filter(c => !c.name.toUpperCase().includes('KAYSERİ ÇOK YAŞAR'));
+        setCustomers(cleanCust);
+        localStorage.setItem('elisam_customers', JSON.stringify(cleanCust));
+      }
     } catch (err) {
       console.error('LocalStorage load error:', err);
     }
