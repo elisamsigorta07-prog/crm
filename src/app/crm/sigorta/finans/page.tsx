@@ -321,7 +321,40 @@ export default function SigortaFinansPage() {
   // Delete Movement
   const handleDeleteMovement = (id: string, desc: string) => {
     if (confirm(`"${desc}" hareketini silmek istediğinize emin misiniz?`)) {
-      setMovements(movements.filter(m => m.id !== id));
+      const updated = movements.filter(m => m.id !== id);
+      setMovements(updated);
+      try {
+        localStorage.setItem('elisam_cari_movements', JSON.stringify(updated));
+      } catch (err) {
+        console.error(err);
+      }
+    }
+  };
+
+  // Delete Customer and all their movements
+  const handleDeleteCustomer = (customerIdToDelete: string) => {
+    const targetCust = customers.find(c => c.id === customerIdToDelete);
+    const name = targetCust?.name || customerIdToDelete;
+
+    if (confirm(`"${name}" müşterisini ve bu müşteriye ait tüm cari/finans hareketlerini sistemden tamamen silmek istediğinize emin misiniz?`)) {
+      const updatedCustList = customers.filter(c => c.id !== customerIdToDelete && c.name.toLowerCase() !== customerIdToDelete.toLowerCase());
+      setCustomers(updatedCustList);
+      try {
+        localStorage.setItem('elisam_customers', JSON.stringify(updatedCustList));
+      } catch (err) {
+        console.error(err);
+      }
+
+      const updatedMovs = movements.filter(m => m.customerId !== customerIdToDelete && m.customerName.toLowerCase() !== name.toLowerCase());
+      setMovements(updatedMovs);
+      try {
+        localStorage.setItem('elisam_cari_movements', JSON.stringify(updatedMovs));
+      } catch (err) {
+        console.error(err);
+      }
+
+      setSelectedCustomerId('ALL');
+      alert(`"${name}" müşterisi ve tüm cari hareketleri başarıyla silindi.`);
     }
   };
 
@@ -533,26 +566,49 @@ export default function SigortaFinansPage() {
       </div>
 
       {/* MÜŞTERİ SEÇİM & FİLTRELEME ÇUBUĞU */}
-      <div className={styles.card} style={{ marginBottom: '20px', padding: '16px 20px', backgroundColor: '#f8fafc', border: '1px solid #cbd5e1' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '15px' }}>
+      <div className={styles.card} style={{ marginBottom: '16px', padding: '12px 16px', backgroundColor: '#f8fafc', border: '1px solid #cbd5e1' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
           
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: '300px' }}>
-            <Building2 size={22} color="#2563eb" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: '300px' }}>
+            <Building2 size={20} color="#2563eb" />
             <div style={{ flex: 1 }}>
-              <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800, color: '#334155', marginBottom: '4px' }}>
-                HESAP ÖZETİ GÖRÜNTÜLENECEK MÜŞTERİ:
-              </label>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155' }}>
+                  HESAP ÖZETİ GÖRÜNTÜLENECEK MÜŞTERİ:
+                </label>
+                {selectedCustomerId !== 'ALL' && (
+                  <button
+                    onClick={() => handleDeleteCustomer(selectedCustomerId)}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      padding: '3px 8px',
+                      backgroundColor: '#fee2e2',
+                      color: '#dc2626',
+                      border: '1px solid #fca5a5',
+                      borderRadius: '6px',
+                      fontWeight: 750,
+                      fontSize: '0.74rem',
+                      cursor: 'pointer'
+                    }}
+                    title="Bu müşteriyi ve tüm cari kayıtlarını sistemden sil"
+                  >
+                    <Trash2 size={12} /> Bu Müşteriyi & Kayıtlarını Sil
+                  </button>
+                )}
+              </div>
               <select
                 value={selectedCustomerId}
                 onChange={(e) => setSelectedCustomerId(e.target.value)}
                 style={{
                   width: '100%',
                   maxWidth: '480px',
-                  padding: '9px 14px',
-                  borderRadius: '8px',
-                  border: '2px solid #2563eb',
+                  padding: '7px 12px',
+                  borderRadius: '6px',
+                  border: '1.5px solid #2563eb',
                   backgroundColor: '#ffffff',
-                  fontSize: '0.95rem',
+                  fontSize: '0.88rem',
                   fontWeight: 800,
                   color: '#0f172a',
                   outline: 'none',
@@ -568,24 +624,24 @@ export default function SigortaFinansPage() {
           </div>
 
           {/* Hızlı Hareket Ekleme Butonları */}
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
             <button
               onClick={() => handleOpenAddModal('BORC')}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '9px 13px',
+                gap: '5px',
+                padding: '7px 11px',
                 backgroundColor: '#eff6ff',
                 color: '#1d4ed8',
                 border: '1px solid #bfdbfe',
-                borderRadius: '8px',
+                borderRadius: '6px',
                 fontWeight: 750,
-                fontSize: '0.84rem',
+                fontSize: '0.78rem',
                 cursor: 'pointer'
               }}
             >
-              <Plus size={15} /> ➕ Poliçe / Borç Kaydı
+              <Plus size={14} /> ➕ Borç Kaydı
             </button>
 
             <button
@@ -593,18 +649,18 @@ export default function SigortaFinansPage() {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '9px 13px',
+                gap: '5px',
+                padding: '7px 11px',
                 backgroundColor: '#ecfdf5',
                 color: '#047857',
                 border: '1px solid #a7f3d0',
-                borderRadius: '8px',
+                borderRadius: '6px',
                 fontWeight: 750,
-                fontSize: '0.84rem',
+                fontSize: '0.78rem',
                 cursor: 'pointer'
               }}
             >
-              <Plus size={15} /> 💳 Gelen Tahsilat Ekle
+              <Plus size={14} /> 💳 Tahsilat Ekle
             </button>
 
             <button
@@ -612,18 +668,18 @@ export default function SigortaFinansPage() {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '9px 13px',
+                gap: '5px',
+                padding: '7px 11px',
                 backgroundColor: '#fef3c7',
                 color: '#92400e',
                 border: '1px solid #fde68a',
-                borderRadius: '8px',
+                borderRadius: '6px',
                 fontWeight: 750,
-                fontSize: '0.84rem',
+                fontSize: '0.78rem',
                 cursor: 'pointer'
               }}
             >
-              <Plus size={15} /> 📤 Giden Ödeme Yap (Havale/Nakit)
+              <Plus size={14} /> 📤 Giden Ödeme
             </button>
 
             <button
@@ -631,18 +687,18 @@ export default function SigortaFinansPage() {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '9px 13px',
+                gap: '5px',
+                padding: '7px 11px',
                 backgroundColor: '#f3e8ff',
                 color: '#6b21a8',
                 border: '1px solid #e9d5ff',
-                borderRadius: '8px',
+                borderRadius: '6px',
                 fontWeight: 750,
-                fontSize: '0.84rem',
+                fontSize: '0.78rem',
                 cursor: 'pointer'
               }}
             >
-              <Plus size={15} /> ↩️ İptal / İade Girişi
+              <Plus size={14} /> ↩️ İptal / İade
             </button>
 
             <button
@@ -650,62 +706,62 @@ export default function SigortaFinansPage() {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '6px',
-                padding: '9px 13px',
+                gap: '5px',
+                padding: '7px 11px',
                 backgroundColor: '#f8fafc',
                 color: '#475569',
                 border: '1px solid #cbd5e1',
-                borderRadius: '8px',
+                borderRadius: '6px',
                 fontWeight: 750,
-                fontSize: '0.84rem',
+                fontSize: '0.78rem',
                 cursor: 'pointer'
               }}
             >
-              <Plus size={15} /> 📜 Devir Bakiye
+              <Plus size={14} /> 📜 Devir Bakiye
             </button>
           </div>
 
         </div>
       </div>
 
-      {/* KPI ÖZET KUTULARI (İki Yönlü Borç / Alacak Dengesi) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '22px' }}>
+      {/* KPI ÖZET KUTULARI (İki Yönlü Borç / Alacak Dengesi - Kompakt) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', marginBottom: '18px' }}>
         
-        <div className={styles.card} style={{ borderLeft: '5px solid #1e3a8a', padding: '18px 22px' }}>
-          <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div className={styles.card} style={{ borderLeft: '4px solid #1e3a8a', padding: '12px 16px' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
             Toplam Borç Hareketleri
           </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 850, color: '#1e3a8a', marginTop: '6px' }}>
+          <div style={{ fontSize: '1.4rem', fontWeight: 850, color: '#1e3a8a', marginTop: '3px' }}>
             {totalDebit.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
           </div>
-          <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>
-            Poliçeler, faturalar ve acenteden giden ödemeler
+          <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px' }}>
+            Poliçeler, faturalar ve acente ödemeleri
           </div>
         </div>
 
-        <div className={styles.card} style={{ borderLeft: '5px solid #16a34a', padding: '18px 22px' }}>
-          <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div className={styles.card} style={{ borderLeft: '4px solid #16a34a', padding: '12px 16px' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
             Toplam Alacak Hareketleri
           </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 850, color: '#16a34a', marginTop: '6px' }}>
+          <div style={{ fontSize: '1.4rem', fontWeight: 850, color: '#16a34a', marginTop: '3px' }}>
             {totalCredit.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
           </div>
-          <div style={{ fontSize: '0.78rem', color: '#16a34a', marginTop: '4px', fontWeight: 600 }}>
+          <div style={{ fontSize: '0.72rem', color: '#16a34a', marginTop: '2px', fontWeight: 600 }}>
             Gelen tahsilatlar, havaleler ve iadeler
           </div>
         </div>
 
-        <div className={styles.card} style={{ borderLeft: `5px solid ${netRemainingBalance > 0 ? '#dc2626' : (netRemainingBalance < 0 ? '#2563eb' : '#16a34a')}`, padding: '18px 22px' }}>
-          <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+        <div className={styles.card} style={{ borderLeft: `4px solid ${netRemainingBalance > 0 ? '#dc2626' : (netRemainingBalance < 0 ? '#2563eb' : '#16a34a')}`, padding: '12px 16px' }}>
+          <div style={{ fontSize: '0.75rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.4px' }}>
             Net Bakiye Durumu
           </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 850, color: netRemainingBalance > 0 ? '#dc2626' : (netRemainingBalance < 0 ? '#2563eb' : '#16a34a'), marginTop: '6px' }}>
+          <div style={{ fontSize: '1.4rem', fontWeight: 850, color: netRemainingBalance > 0 ? '#dc2626' : (netRemainingBalance < 0 ? '#2563eb' : '#16a34a'), marginTop: '3px' }}>
             {Math.abs(netRemainingBalance).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
-            <span style={{ fontSize: '0.9rem', marginLeft: '6px', fontWeight: 700 }}>
+            <span style={{ fontSize: '0.8rem', marginLeft: '5px', fontWeight: 700 }}>
               {netRemainingBalance > 0 ? '(Borçlu - B)' : (netRemainingBalance < 0 ? '(Alacaklı - A)' : '')}
             </span>
           </div>
-          <div style={{ fontSize: '0.78rem', color: netRemainingBalance > 0 ? '#dc2626' : (netRemainingBalance < 0 ? '#2563eb' : '#16a34a'), marginTop: '4px', fontWeight: 700 }}>
+          <div style={{ fontSize: '0.72rem', color: netRemainingBalance > 0 ? '#dc2626' : (netRemainingBalance < 0 ? '#2563eb' : '#16a34a'), marginTop: '2px', fontWeight: 700 }}>
             {netRemainingBalance > 0 
               ? '🔴 Karşı Taraf Borçlu (Tahsil Edilecek Alacak)' 
               : (netRemainingBalance < 0 
@@ -716,8 +772,8 @@ export default function SigortaFinansPage() {
 
       </div>
 
-      {/* CARİ HESAP EKSTRESİ TABLOSU (Görsel 1 & 2 Birebir Tablo Tasarımı) */}
-      <div className={styles.card} style={{ padding: '24px' }}>
+      {/* CARİ HESAP EKSTRESİ TABLOSU (Kompakt ve Şık Tasarım) */}
+      <div className={styles.card} style={{ padding: '16px 18px' }}>
         
         {/* Tablo Üst Başlığı (Görsel 2'deki Başlık Tasarımı) */}
         <div style={{ backgroundColor: '#e2e8f0', padding: '12px 18px', borderRadius: '8px 8px 0 0', border: '1px solid #cbd5e1', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
