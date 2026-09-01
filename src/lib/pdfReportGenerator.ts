@@ -8,6 +8,13 @@ export interface PDFReportConfig {
   subtitle?: string;
   category: 'SİGORTA ACENTELİĞİ' | 'RENT A CAR FİLO';
   dateRange?: string;
+  customerInfo?: {
+    name: string;
+    phone?: string;
+    identityNo?: string;
+    type?: string;
+    address?: string;
+  };
   kpis?: { label: string; value: string; color?: string }[];
   headers: string[];
   rows: (string | number)[][];
@@ -319,6 +326,22 @@ export function generateModernPDF(config: PDFReportConfig) {
       ${config.dateRange ? `Filtre Aralığı: <strong>${config.dateRange}</strong>` : 'Kapsam: <strong>Tüm Kayıtlar</strong>'}
     </div>
   </div>
+
+  <!-- Customer Info Box (if provided) -->
+  ${config.customerInfo ? `
+  <div style="display: flex; justify-content: space-between; align-items: center; background: #f0f9ff; border: 1px solid #bae6fd; border-left: 5px solid #0284c7; padding: 12px 18px; border-radius: 8px; margin-bottom: 18px;">
+    <div>
+      <div style="font-size: 10px; font-weight: 800; color: #0369a1; text-transform: uppercase; letter-spacing: 0.5px;">CARİ / MÜŞTERİ HESAP SAHİBİ</div>
+      <div style="font-size: 16px; font-weight: 850; color: #0c4a6e; margin-top: 2px;">${config.customerInfo.name}</div>
+    </div>
+    <div style="text-align: right; font-size: 11.5px; color: #334155; line-height: 1.5;">
+      ${config.customerInfo.type ? `<div><strong>Müşteri Türü:</strong> ${config.customerInfo.type}</div>` : ''}
+      ${config.customerInfo.identityNo && config.customerInfo.identityNo !== '-' ? `<div><strong>TCKN / VKN:</strong> ${config.customerInfo.identityNo}</div>` : ''}
+      ${config.customerInfo.phone && config.customerInfo.phone !== '-' ? `<div><strong>Telefon:</strong> ${config.customerInfo.phone}</div>` : ''}
+      ${config.customerInfo.address && config.customerInfo.address !== '-' ? `<div><strong>Adres:</strong> ${config.customerInfo.address}</div>` : ''}
+    </div>
+  </div>
+  ` : ''}
 
   <!-- KPI Metrics (if provided) -->
   ${config.kpis && config.kpis.length > 0 ? `

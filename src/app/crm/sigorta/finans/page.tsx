@@ -130,6 +130,22 @@ export default function SigortaFinansPage() {
 
   const [modalCustomerSearch, setModalCustomerSearch] = useState('');
 
+  // Otomatik Sıralı Fiş No Üretici (E000001'den başlar, sırayla artar)
+  const getNextReceiptNo = (currentMovements: CariMovement[]): string => {
+    if (!currentMovements || currentMovements.length === 0) return 'E000001';
+    
+    const numbers = currentMovements
+      .map(m => {
+        const match = m.receiptNo?.match(/^E(\d+)$/i);
+        return match ? parseInt(match[1], 10) : 0;
+      })
+      .filter(n => !isNaN(n) && n > 0);
+
+    const maxNum = numbers.length > 0 ? Math.max(...numbers) : currentMovements.length;
+    const nextNum = maxNum + 1;
+    return `E${String(nextNum).padStart(6, '0')}`;
+  };
+
   // Open Add Movement Modal
   const handleOpenAddModal = (type: 'BORC' | 'TAHSILAT' | 'GIDEN_ODEME' | 'IADE' | 'DEVIR') => {
     setEditingMovement(null);
@@ -137,7 +153,7 @@ export default function SigortaFinansPage() {
     setModalCustomerSearch('');
     setFormDate(new Date().toLocaleDateString('tr-TR'));
     setFormDueDate('');
-    setFormReceiptNo(String(Math.floor(1000 + Math.random() * 9000)));
+    setFormReceiptNo(getNextReceiptNo(movements));
     
     // Set default customer if filtered, otherwise leave empty for user selection
     if (selectedCustomerId !== 'ALL') {
@@ -314,20 +330,50 @@ export default function SigortaFinansPage() {
     ? 'GENEL CARİ HESAP EKSTRESİ (TÜM MÜŞTERİLER)' 
     : (currentCustomerObj ? `${currentCustomerObj.name.toUpperCase()} - HESAP ÖZETİ` : `${selectedCustomerId.toUpperCase()} - HESAP ÖZETİ`);
 
-  // Export to Branded PDF (Görsellerdeki Birebir Format)
+  // Export to Branded PDF (Müşteri Bilgili Resmi Cari Ekstre Formatı)
   const handleExportPDF = () => {
+    const matchedCustomer = customers.find(c => c.id === selectedCustomerId || c.name.toLowerCase() === selectedCustomerId.toLowerCase());
+    
     generateModernPDF({
       title: headerCustomerTitle,
-      subtitle: 'Elisam Sigorta • Müşteri Borç / Alacak ve Cari Hareket Ekstresi',
+      subtitle: 'Elisam Sigorta Aracılık Hizmetleri • Cari Hesap Ekstresi & Borç-Alacak Dökümü',
       category: 'SİGORTA ACENTELİĞİ',
       dateRange: `Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}`,
+      customerInfo: selectedCustomerId !== 'ALL' ? {
+        name: matchedCustomer?.name || selectedCustomerId,
+        type: matchedCustomer?.type || 'Bireysel / Kurumsal Cari',
+        phone: matchedCustomer?.phone || '-',
+        identityNo: matchedCustomer?.identityNo || '-',
+        address: matchedCustomer?.address || 'Alanya / Antalya'
+      } : (movements.length > 0 && movements[0]?.customerName ? {
+        name: `Genel Döküm (${customers.length} Kayıtlı Müşteri / Cari)`,
+        type: 'Konsolide Cari Hesap Dökümü',
+        phone: '0551 438 77 71',
+        address: 'Alanya / Antalya'
+      } : undefined),
       kpis: [
-        { label: 'TOPLAM BORÇ (POLİÇELER)', value: `${totalDebit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`, color: '#1e3a8a' },
-        { label: 'TOPLAM ALINAN (TAHSİLAT)', value: `${totalCredit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`, color: '#16a34a' },
-        { label: 'KALAN BAKİYE (BORÇ)', value: `${netRemainingBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`, color: netRemainingBalance > 0 ? '#dc2626' : '#16a34a' }
+        { label: 'TOPLAM BORÇ HAREKETLERİ', value: `${totalDebit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`, color: '#1e3a8a' },
+        { label: 'TOPLAM ALACAK HAREKETLERİ', value: `${totalCredit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`, color: '#16a34a' },
+        { 
+          label: 'NET BAKİYE', 
+          value: `${Math.abs(netRemainingBalance).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺ ${netRemainingBalance > 0 ? '(Borçlu)' : (netRemainingBalance < 0 ? '(Alacaklı)' : '')}`, 
+          color: netRemainingBalance > 0 ? '#dc2626' : (netRemainingBalance < 0 ? '#2563eb' : '#16a34a') 
+        }
       ],
-      headers: ['Tarih', 'Vade T.', 'Fiş No', 'Açıklama', 'Hareket Türü', 'Borç (₺)', 'Alacak (₺)', 'Kalan Bakiye (₺)'],
-      rows: movementsWithBalance.map(m => [
+      headers: selectedCustomerId === 'ALL'
+        ? ['Tarih', 'Vade T.', 'Fiş No', 'Müşteri / Cari', 'Açıklama', 'Hareket Türü', 'Borç (₺)', 'Alacak (₺)', 'Bakiye (₺)']
+        : ['Tarih', 'Vade T.', 'Fiş No', 'Açıklama', 'Hareket Türü', 'Borç (₺)', 'Alacak (₺)', 'Bakiye (₺)'],
+      rows: movementsWithBalance.map(m => selectedCustomerId === 'ALL' ? [
+        m.date,
+        m.dueDate || '-',
+        m.receiptNo || '-',
+        m.customerName,
+        m.description,
+        m.movementType,
+        m.debitAmount > 0 ? m.debitAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) : '-',
+        m.creditAmount > 0 ? m.creditAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) : '-',
+        `${m.currentBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ${m.currentBalance > 0 ? 'B' : (m.currentBalance < 0 ? 'A' : '')}`
+      ] : [
         m.date,
         m.dueDate || '-',
         m.receiptNo || '-',
@@ -335,10 +381,10 @@ export default function SigortaFinansPage() {
         m.movementType,
         m.debitAmount > 0 ? m.debitAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) : '-',
         m.creditAmount > 0 ? m.creditAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 }) : '-',
-        m.currentBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })
+        `${m.currentBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ${m.currentBalance > 0 ? 'B' : (m.currentBalance < 0 ? 'A' : '')}`
       ]),
       summaryNotes: [
-        `DİP TOPLAMLAR: Toplam Borç: ${totalDebit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺ | Toplam Alacak/Tahsilat: ${totalCredit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺ | Net Bakiye: ${netRemainingBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`,
+        `DİP TOPLAMLAR: Toplam Borç: ${totalDebit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺ | Toplam Alacak/Tahsilat: ${totalCredit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺ | Net Bakiye: ${Math.abs(netRemainingBalance).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺ ${netRemainingBalance > 0 ? '(Borçlu Bakiye)' : (netRemainingBalance < 0 ? '(Alacaklı Bakiye)' : '(Hesap Denk)')}`,
         'İşbu cari hesap ekstresi Elisam Sigorta acente otomasyonu tarafından üretilmiş resmi hesap özetidir.'
       ]
     });
