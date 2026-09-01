@@ -88,8 +88,8 @@ export default function SigortaFinansPage() {
   const [formCustomerName, setFormCustomerName] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formMovementType, setFormMovementType] = useState<CariMovement['movementType']>('Poliçe Tahakkuku');
-  const [formDebitAmount, setFormDebitAmount] = useState('');
-  const [formCreditAmount, setFormCreditAmount] = useState('');
+  const [formAmount, setFormAmount] = useState('');
+  const [devirDirection, setDevirDirection] = useState<'BORC' | 'ALACAK'>('BORC');
   const [formNotes, setFormNotes] = useState('');
 
   // Hydration-safe initial load from localStorage & purge old mock data
@@ -154,6 +154,7 @@ export default function SigortaFinansPage() {
     setFormDate(new Date().toLocaleDateString('tr-TR'));
     setFormDueDate('');
     setFormReceiptNo(getNextReceiptNo(movements));
+    setFormAmount('');
     
     // Set default customer if filtered, otherwise leave empty for user selection
     if (selectedCustomerId !== 'ALL') {
@@ -168,28 +169,19 @@ export default function SigortaFinansPage() {
     if (type === 'BORC') {
       setFormMovementType('Poliçe Tahakkuku');
       setFormDescription('');
-      setFormDebitAmount('');
-      setFormCreditAmount('0');
     } else if (type === 'TAHSILAT') {
       setFormMovementType('Banka Gelen Havale');
       setFormDescription('GELEN HAVALE / TAHSİLAT');
-      setFormDebitAmount('0');
-      setFormCreditAmount('');
     } else if (type === 'GIDEN_ODEME') {
       setFormMovementType('Banka Giden Havale');
       setFormDescription('ACENTEDEN GİDEN HAVALE / ÖDEME');
-      setFormDebitAmount('');
-      setFormCreditAmount('0');
     } else if (type === 'IADE') {
       setFormMovementType('Poliçe İptal / İade');
       setFormDescription('İPTAL / ZEYİL İADE BEDELİ');
-      setFormDebitAmount('0');
-      setFormCreditAmount('');
     } else if (type === 'DEVIR') {
       setFormMovementType('Tarih Öncesi Devir Bakiye');
       setFormDescription('TARİH ÖNCESİ BAKİYE TL (DEVİR)');
-      setFormDebitAmount('');
-      setFormCreditAmount('0');
+      setDevirDirection('BORC');
     }
 
     setFormNotes('');
@@ -207,8 +199,23 @@ export default function SigortaFinansPage() {
     setFormCustomerName(mov.customerName);
     setFormDescription(mov.description);
     setFormMovementType(mov.movementType);
-    setFormDebitAmount(String(mov.debitAmount));
-    setFormCreditAmount(String(mov.creditAmount));
+    
+    const isDebit = mov.debitAmount > 0;
+    setFormAmount(String(isDebit ? mov.debitAmount : mov.creditAmount));
+    setDevirDirection(isDebit ? 'BORC' : 'ALACAK');
+
+    if (mov.movementType === 'Poliçe Tahakkuku' || mov.movementType === 'Hizmet Alım Faturası') {
+      setModalActionType('BORC');
+    } else if (mov.movementType === 'Banka Gelen Havale' || mov.movementType === 'Kredi Kartı Tahsilat') {
+      setModalActionType('TAHSILAT');
+    } else if (mov.movementType === 'Banka Giden Havale' || mov.movementType === 'Cari Mahsup Çıkışı') {
+      setModalActionType('GIDEN_ODEME');
+    } else if (mov.movementType === 'Poliçe İptal / İade') {
+      setModalActionType('IADE');
+    } else {
+      setModalActionType('DEVIR');
+    }
+
     setFormNotes(mov.notes || '');
     setIsAddModalOpen(true);
   };
@@ -216,13 +223,36 @@ export default function SigortaFinansPage() {
   // Save Movement
   const handleSaveMovement = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formCustomerName.trim() || (!formDebitAmount && !formCreditAmount)) {
-      alert('Lütfen müşteri adını ve tutar bilgilerini girin.');
+    if (!formCustomerName.trim() || !formAmount || Number(formAmount) <= 0) {
+      alert('Lütfen müşteri adını ve geçerli bir tutar girin.');
       return;
     }
 
-    const dAmount = Number(formDebitAmount) || 0;
-    const cAmount = Number(formCreditAmount) || 0;
+    const amt = Number(formAmount) || 0;
+    let dAmount = 0;
+    let cAmount = 0;
+
+    if (modalActionType === 'BORC') {
+      dAmount = amt;
+      cAmount = 0;
+    } else if (modalActionType === 'TAHSILAT') {
+      dAmount = 0;
+      cAmount = amt;
+    } else if (modalActionType === 'GIDEN_ODEME') {
+      dAmount = amt;
+      cAmount = 0;
+    } else if (modalActionType === 'IADE') {
+      dAmount = 0;
+      cAmount = amt;
+    } else if (modalActionType === 'DEVIR') {
+      if (devirDirection === 'BORC') {
+        dAmount = amt;
+        cAmount = 0;
+      } else {
+        dAmount = 0;
+        cAmount = amt;
+      }
+    }
 
     // Convert date string if from datepicker
     let formattedDate = formDate;
@@ -1137,34 +1167,90 @@ export default function SigortaFinansPage() {
                 />
               </div>
 
-              {/* Borç & Alacak Tutarları */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '16px' }}>
-                <div style={{ padding: '12px', backgroundColor: '#fef2f2', borderRadius: '8px', border: '1px solid #fecaca' }}>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800, color: '#991b1b', marginBottom: '4px' }}>
-                    Borç Tutarı (₺) [Poliçe Bedeli]
+              {/* İŞLEM TUTARI GİRİŞ ALANI (TEK VE ANLAŞILIR KUTU) */}
+              <div style={{
+                padding: '16px',
+                borderRadius: '10px',
+                marginBottom: '16px',
+                backgroundColor: modalActionType === 'BORC' ? '#eff6ff' :
+                                 modalActionType === 'TAHSILAT' ? '#ecfdf5' :
+                                 modalActionType === 'GIDEN_ODEME' ? '#fffbeb' :
+                                 modalActionType === 'IADE' ? '#f3e8ff' : '#f8fafc',
+                border: `2px solid ${
+                  modalActionType === 'BORC' ? '#3b82f6' :
+                  modalActionType === 'TAHSILAT' ? '#10b981' :
+                  modalActionType === 'GIDEN_ODEME' ? '#f59e0b' :
+                  modalActionType === 'IADE' ? '#a855f7' : '#94a3b8'
+                }`
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '6px' }}>
+                  <label style={{
+                    fontSize: '0.92rem',
+                    fontWeight: 850,
+                    color: modalActionType === 'BORC' ? '#1e40af' :
+                           modalActionType === 'TAHSILAT' ? '#065f46' :
+                           modalActionType === 'GIDEN_ODEME' ? '#92400e' :
+                           modalActionType === 'IADE' ? '#6b21a8' : '#334155'
+                  }}>
+                    {modalActionType === 'BORC' && '🔴 Poliçe / Hizmet Tutarı (₺) *'}
+                    {modalActionType === 'TAHSILAT' && '🟢 Gelen Tahsilat / Alınan Tutar (₺) *'}
+                    {modalActionType === 'GIDEN_ODEME' && '📤 Ödenen / Acenteden Çıkan Tutar (₺) *'}
+                    {modalActionType === 'IADE' && '↩️ İptal / Zeyil İade Tutarı (₺) *'}
+                    {modalActionType === 'DEVIR' && '📜 Devir Bakiye Tutarı (₺) *'}
                   </label>
-                  <input 
-                    type="number"
-                    step="0.01"
-                    value={formDebitAmount}
-                    onChange={(e) => setFormDebitAmount(e.target.value)}
-                    placeholder="0.00"
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #f87171', outline: 'none', fontWeight: 800, fontSize: '1rem', color: '#991b1b' }}
-                  />
+                  <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b' }}>
+                    {modalActionType === 'BORC' && 'Müşteriye borç kaydedilir (+)'}
+                    {modalActionType === 'TAHSILAT' && 'Müşteri borcundan düşülür (-)'}
+                    {modalActionType === 'GIDEN_ODEME' && 'Acentenin yaptığı ödeme olarak işlenir'}
+                    {modalActionType === 'IADE' && 'İade alacağı olarak hesaba yansır (-)'}
+                  </span>
                 </div>
 
-                <div style={{ padding: '12px', backgroundColor: '#ecfdf5', borderRadius: '8px', border: '1px solid #a7f3d0' }}>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800, color: '#065f46', marginBottom: '4px' }}>
-                    Alacak / Alınan Tutar (₺) [Tahsilat]
-                  </label>
+                {/* Devir Bakiye Yönü Seçimi */}
+                {modalActionType === 'DEVIR' && (
+                  <div style={{ display: 'flex', gap: '15px', marginBottom: '10px', padding: '6px 0' }}>
+                    <label style={{ fontSize: '0.84rem', fontWeight: 750, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      <input 
+                        type="radio" 
+                        name="devirDir" 
+                        checked={devirDirection === 'BORC'} 
+                        onChange={() => setDevirDirection('BORC')} 
+                      />
+                      🔴 Müşterinin Devreden Borcu
+                    </label>
+                    <label style={{ fontSize: '0.84rem', fontWeight: 750, color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      <input 
+                        type="radio" 
+                        name="devirDir" 
+                        checked={devirDirection === 'ALACAK'} 
+                        onChange={() => setDevirDirection('ALACAK')} 
+                      />
+                      🔵 Müşterinin Devreden Alacağı / Avansı
+                    </label>
+                  </div>
+                )}
+
+                <div style={{ position: 'relative' }}>
                   <input 
                     type="number"
                     step="0.01"
-                    value={formCreditAmount}
-                    onChange={(e) => setFormCreditAmount(e.target.value)}
+                    required
+                    value={formAmount}
+                    onChange={(e) => setFormAmount(e.target.value)}
                     placeholder="0.00"
-                    style={{ width: '100%', padding: '9px 12px', borderRadius: '6px', border: '1px solid #34d399', outline: 'none', fontWeight: 800, fontSize: '1rem', color: '#065f46' }}
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px 12px 42px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      outline: 'none',
+                      fontWeight: 900,
+                      fontSize: '1.25rem',
+                      color: '#0f172a',
+                      backgroundColor: '#ffffff'
+                    }}
                   />
+                  <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', fontWeight: 900, fontSize: '1.2rem', color: '#64748b' }}>₺</span>
                 </div>
               </div>
 
