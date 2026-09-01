@@ -17,7 +17,12 @@ import {
   Layers
 } from 'lucide-react';
 import { Customer, Policy } from '@/data/crmData';
-import { CariMovement } from '../finans/page';
+import { 
+  CariMovement, 
+  fetchPoliciesFromCloud, 
+  fetchCustomersFromCloud, 
+  fetchCariMovementsFromCloud 
+} from '@/lib/supabaseService';
 import { generateModernPDF } from '@/lib/pdfReportGenerator';
 import styles from '../layout.module.css';
 
@@ -38,21 +43,24 @@ export default function SigortaRaporlarPage() {
   const [endDate, setEndDate] = useState('');
   const [quickRange, setQuickRange] = useState('');
 
-  // Hydration-safe initial load from localStorage
+  // Hydration-safe initial load from Supabase Cloud (with Local fallback)
   useEffect(() => {
     setIsMounted(true);
-    try {
-      const savedCust = localStorage.getItem('elisam_customers');
-      if (savedCust) setCustomers(JSON.parse(savedCust));
-
-      const savedPol = localStorage.getItem('elisam_policies');
-      if (savedPol) setPolicies(JSON.parse(savedPol));
-
-      const savedMov = localStorage.getItem('elisam_cari_movements');
-      if (savedMov) setMovements(JSON.parse(savedMov));
-    } catch (err) {
-      console.error('LocalStorage load error:', err);
+    async function loadCloudData() {
+      try {
+        const [cloudPols, cloudCusts, cloudMovs] = await Promise.all([
+          fetchPoliciesFromCloud(),
+          fetchCustomersFromCloud(),
+          fetchCariMovementsFromCloud()
+        ]);
+        if (cloudCusts) setCustomers(cloudCusts);
+        if (cloudPols) setPolicies(cloudPols);
+        if (cloudMovs) setMovements(cloudMovs);
+      } catch (err) {
+        console.error('Supabase reports load error:', err);
+      }
     }
+    loadCloudData();
   }, []);
 
   // Tarihe göre dönem filtreleme fonksiyonları

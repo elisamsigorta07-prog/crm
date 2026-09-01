@@ -3,6 +3,14 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, KeyRound, Eye, X, Calendar, User, CarFront, Gauge, Fuel, MapPin, ShieldCheck, DollarSign, Printer, Send } from 'lucide-react';
 import { RentalBooking, RentVehicle, RentCustomer, initialBookingsData, initialVehiclesData, initialRentCustomersData } from '@/data/rentCrmData';
+import { 
+  fetchRentBookingsFromCloud, 
+  fetchRentCustomersFromCloud, 
+  fetchRentVehiclesFromCloud,
+  upsertRentBookingToCloud,
+  upsertRentVehicleToCloud,
+  deleteRentBookingFromCloud
+} from '@/lib/supabaseService';
 import styles from '../layout.module.css';
 
 export default function KiralamalarPage() {
@@ -17,31 +25,22 @@ export default function KiralamalarPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    try {
-      const savedBookings = localStorage.getItem('elisam_rent_bookings');
-      if (savedBookings) setBookings(JSON.parse(savedBookings));
-
-      const savedVehicles = localStorage.getItem('elisam_rent_vehicles');
-      if (savedVehicles) setVehicles(JSON.parse(savedVehicles));
-
-      const savedCustomers = localStorage.getItem('elisam_rent_customers');
-      if (savedCustomers) setCustomers(JSON.parse(savedCustomers));
-    } catch (err) {
-      console.error(err);
+    async function loadCloudData() {
+      try {
+        const [cloudBookings, cloudVehs, cloudCusts] = await Promise.all([
+          fetchRentBookingsFromCloud(),
+          fetchRentVehiclesFromCloud(),
+          fetchRentCustomersFromCloud()
+        ]);
+        if (cloudBookings) setBookings(cloudBookings);
+        if (cloudVehs) setVehicles(cloudVehs);
+        if (cloudCusts) setCustomers(cloudCusts);
+      } catch (err) {
+        console.error('Supabase rent load error:', err);
+      }
     }
+    loadCloudData();
   }, []);
-
-  useEffect(() => {
-    if (isMounted) {
-      localStorage.setItem('elisam_rent_bookings', JSON.stringify(bookings));
-    }
-  }, [bookings, isMounted]);
-
-  useEffect(() => {
-    if (isMounted) {
-      localStorage.setItem('elisam_rent_vehicles', JSON.stringify(vehicles));
-    }
-  }, [vehicles, isMounted]);
 
   // Form State
   const [selectedVehicleId, setSelectedVehicleId] = useState(vehicles[0]?.id || '');
@@ -115,9 +114,11 @@ export default function KiralamalarPage() {
       if (endKm) {
         matchedVehicle.currentKm = Number(endKm);
       }
+      upsertRentVehicleToCloud(matchedVehicle);
     }
 
     setBookings([newBooking, ...bookings]);
+    upsertRentBookingToCloud(newBooking);
     setIsAddModalOpen(false);
 
     // Reset

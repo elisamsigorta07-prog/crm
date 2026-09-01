@@ -34,39 +34,22 @@ import {
   Policy, 
   initialPoliciesData 
 } from '@/data/crmData';
+import { 
+  CariMovement,
+  fetchCariMovementsFromCloud,
+  fetchCustomersFromCloud,
+  upsertCariMovementToCloud,
+  deleteCariMovementFromCloud,
+  clearCariMovementsFromCloud,
+  upsertCustomerToCloud,
+  deleteCustomerFromCloud
+} from '@/lib/supabaseService';
 import { generateModernPDF } from '@/lib/pdfReportGenerator';
 import styles from '../layout.module.css';
 
-// Cari Hesap Hareketi Modeli (Görsellerdeki Birebir Yapı)
-export interface CariMovement {
-  id: string;
-  date: string;               // Tarih (DD.MM.YYYY)
-  dueDate?: string;           // Vade Tarihi (opsiyonel)
-  receiptNo?: string;         // Fiş / Dekont / Belge No (örn: 7339, 27)
-  customerId: string;         // Müşteri ID
-  customerName: string;       // Müşteri Adı / Ünvanı
-  description: string;        // Açıklama (Poliçe No, Şirket, Plaka, Banka Bilgisi vb.)
-  movementType: 
-    | 'Poliçe Tahakkuku' 
-    | 'Banka Giden Havale' 
-    | 'Banka Gelen Havale' 
-    | 'Kredi Kartı Tahsilat' 
-    | 'Hizmet Alım Faturası' 
-    | 'Cari Mahsup Çıkışı' 
-    | 'Cari Hareket Girişi' 
-    | 'Poliçe İptal / İade' 
-    | 'Tarih Öncesi Devir Bakiye';
-  debitAmount: number;        // Borç (Poliçe Bedeli / Fatura vb.)
-  creditAmount: number;       // Alacak / Alınan (Ödeme / Havale / İade)
-  notes?: string;
-}
-
-// Cari Hareket Verileri (Boş Başlangıç)
-const initialCariMovements: CariMovement[] = [];
-
 export default function SigortaFinansPage() {
-  const [movements, setMovements] = useState<CariMovement[]>(initialCariMovements);
-  const [customers, setCustomers] = useState<Customer[]>(initialCustomersData);
+  const [movements, setMovements] = useState<CariMovement[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   
   // Selected Customer Filter (Default: ALL or specific customer)
@@ -92,41 +75,23 @@ export default function SigortaFinansPage() {
   const [devirDirection, setDevirDirection] = useState<'BORC' | 'ALACAK'>('BORC');
   const [formNotes, setFormNotes] = useState('');
 
-  // Hydration-safe initial load from localStorage & purge old mock data
+  // Hydration-safe initial load from Supabase Cloud (with Local fallback)
   useEffect(() => {
     setIsMounted(true);
-    try {
-      const savedMov = localStorage.getItem('elisam_cari_movements');
-      if (savedMov) {
-        const parsed: CariMovement[] = JSON.parse(savedMov);
-        const cleanMovs = parsed.filter(m => 
-          !m.customerName.toUpperCase().includes('KAYSERİ ÇOK YAŞAR') && 
-          !m.id.startsWith('CAR-00')
-        );
-        setMovements(cleanMovs);
-        localStorage.setItem('elisam_cari_movements', JSON.stringify(cleanMovs));
-      } else {
-        setMovements([]);
+    async function loadInitialData() {
+      try {
+        const [cloudMovs, cloudCusts] = await Promise.all([
+          fetchCariMovementsFromCloud(),
+          fetchCustomersFromCloud()
+        ]);
+        if (cloudMovs) setMovements(cloudMovs);
+        if (cloudCusts) setCustomers(cloudCusts);
+      } catch (err) {
+        console.error('Supabase initial load error:', err);
       }
-
-      const savedCust = localStorage.getItem('elisam_customers');
-      if (savedCust) {
-        const parsedCust: Customer[] = JSON.parse(savedCust);
-        const cleanCust = parsedCust.filter(c => !c.name.toUpperCase().includes('KAYSERİ ÇOK YAŞAR'));
-        setCustomers(cleanCust);
-        localStorage.setItem('elisam_customers', JSON.stringify(cleanCust));
-      }
-    } catch (err) {
-      console.error('LocalStorage load error:', err);
     }
+    loadInitialData();
   }, []);
-
-  // Persist movements to localStorage after mount
-  useEffect(() => {
-    if (isMounted) {
-      localStorage.setItem('elisam_cari_movements', JSON.stringify(movements));
-    }
-  }, [movements, isMounted]);
 
   const [modalCustomerSearch, setModalCustomerSearch] = useState('');
 
@@ -286,11 +251,7 @@ export default function SigortaFinansPage() {
       };
       const updatedCustList = [newCust, ...customers];
       setCustomers(updatedCustList);
-      try {
-        localStorage.setItem('elisam_customers', JSON.stringify(updatedCustList));
-      } catch (err) {
-        console.error(err);
-      }
+      upsertCustomerToCloud(newCust);
     } else {
       custId = existingCust.id;
     }
@@ -314,6 +275,8 @@ export default function SigortaFinansPage() {
     } else {
       setMovements([...movements, newMov]);
     }
+    // Async Cloud Save
+    upsertCariMovementToCloud(newMov);
 
     setIsAddModalOpen(false);
   };
@@ -321,13 +284,8 @@ export default function SigortaFinansPage() {
   // Delete Movement
   const handleDeleteMovement = (id: string, desc: string) => {
     if (confirm(`"${desc}" hareketini silmek istediğinize emin misiniz?`)) {
-      const updated = movements.filter(m => m.id !== id);
-      setMovements(updated);
-      try {
-        localStorage.setItem('elisam_cari_movements', JSON.stringify(updated));
-      } catch (err) {
-        console.error(err);
-      }
+      setMovements(movements.filter(m => m.id !== id));
+      deleteCariMovementFromCloud(id);
     }
   };
 
@@ -337,21 +295,10 @@ export default function SigortaFinansPage() {
     const name = targetCust?.name || customerIdToDelete;
 
     if (confirm(`"${name}" müşterisini ve bu müşteriye ait tüm cari/finans hareketlerini sistemden tamamen silmek istediğinize emin misiniz?`)) {
-      const updatedCustList = customers.filter(c => c.id !== customerIdToDelete && c.name.toLowerCase() !== customerIdToDelete.toLowerCase());
-      setCustomers(updatedCustList);
-      try {
-        localStorage.setItem('elisam_customers', JSON.stringify(updatedCustList));
-      } catch (err) {
-        console.error(err);
-      }
+      setCustomers(customers.filter(c => c.id !== customerIdToDelete && c.name.toLowerCase() !== customerIdToDelete.toLowerCase()));
+      setMovements(movements.filter(m => m.customerId !== customerIdToDelete && m.customerName.toLowerCase() !== name.toLowerCase()));
 
-      const updatedMovs = movements.filter(m => m.customerId !== customerIdToDelete && m.customerName.toLowerCase() !== name.toLowerCase());
-      setMovements(updatedMovs);
-      try {
-        localStorage.setItem('elisam_cari_movements', JSON.stringify(updatedMovs));
-      } catch (err) {
-        console.error(err);
-      }
+      deleteCustomerFromCloud(customerIdToDelete);
 
       setSelectedCustomerId('ALL');
       alert(`"${name}" müşterisi ve tüm cari hareketleri başarıyla silindi.`);
@@ -481,11 +428,7 @@ export default function SigortaFinansPage() {
   const handleClearAllMovements = () => {
     if (confirm('Tüm cari ekstre hareketlerini temizlemek ve sıfırlamak istediğinize emin misiniz?')) {
       setMovements([]);
-      try {
-        localStorage.removeItem('elisam_cari_movements');
-      } catch (err) {
-        console.error(err);
-      }
+      clearCariMovementsFromCloud();
     }
   };
 

@@ -3,6 +3,11 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, Phone, Mail, X, UserCheck, Eye, Globe, CreditCard } from 'lucide-react';
 import { RentCustomer, initialRentCustomersData, initialBookingsData } from '@/data/rentCrmData';
+import { 
+  fetchRentCustomersFromCloud, 
+  upsertRentCustomerToCloud, 
+  deleteRentCustomerFromCloud 
+} from '@/lib/supabaseService';
 import styles from '../layout.module.css';
 
 export default function RentMusterilerPage() {
@@ -15,19 +20,16 @@ export default function RentMusterilerPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    try {
-      const saved = localStorage.getItem('elisam_rent_customers');
-      if (saved) setCustomers(JSON.parse(saved));
-    } catch (err) {
-      console.error(err);
+    async function loadCloudData() {
+      try {
+        const cloudCusts = await fetchRentCustomersFromCloud();
+        if (cloudCusts) setCustomers(cloudCusts);
+      } catch (err) {
+        console.error('Supabase rent customers load error:', err);
+      }
     }
+    loadCloudData();
   }, []);
-
-  useEffect(() => {
-    if (isMounted) {
-      localStorage.setItem('elisam_rent_customers', JSON.stringify(customers));
-    }
-  }, [customers, isMounted]);
 
   // Form state
   const [name, setName] = useState('');
@@ -57,6 +59,7 @@ export default function RentMusterilerPage() {
     };
 
     setCustomers([newCustomer, ...customers]);
+    upsertRentCustomerToCloud(newCustomer);
     setIsAddModalOpen(false);
 
     // Reset Form

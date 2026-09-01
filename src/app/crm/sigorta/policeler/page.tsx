@@ -36,6 +36,15 @@ import {
   initialCustomersData,
   Installment
 } from '@/data/crmData';
+import { 
+  fetchPoliciesFromCloud, 
+  fetchCustomersFromCloud, 
+  upsertPolicyToCloud, 
+  upsertCustomerToCloud, 
+  deletePolicyFromCloud, 
+  upsertCariMovementToCloud,
+  fetchCariMovementsFromCloud
+} from '@/lib/supabaseService';
 import styles from '../layout.module.css';
 
 export default function PolicelerPage() {
@@ -94,32 +103,23 @@ export default function PolicelerPage() {
   // Dynamic note adding inside detail modal
   const [newDetailNote, setNewDetailNote] = useState('');
 
-  // Hydration-safe initial load from localStorage
+  // Hydration-safe initial load from Supabase Cloud (with Local fallback)
   useEffect(() => {
     setIsMounted(true);
-    try {
-      const savedPol = localStorage.getItem('elisam_policies');
-      if (savedPol) setPolicies(JSON.parse(savedPol));
-
-      const savedCust = localStorage.getItem('elisam_customers');
-      if (savedCust) setCustomers(JSON.parse(savedCust));
-    } catch (err) {
-      console.error('LocalStorage load error:', err);
+    async function loadInitialData() {
+      try {
+        const [cloudPols, cloudCusts] = await Promise.all([
+          fetchPoliciesFromCloud(),
+          fetchCustomersFromCloud()
+        ]);
+        if (cloudPols) setPolicies(cloudPols);
+        if (cloudCusts) setCustomers(cloudCusts);
+      } catch (err) {
+        console.error('Supabase initial load error:', err);
+      }
     }
+    loadInitialData();
   }, []);
-
-  // Persist policies & customers to localStorage after mount
-  useEffect(() => {
-    if (isMounted) {
-      localStorage.setItem('elisam_policies', JSON.stringify(policies));
-    }
-  }, [policies, isMounted]);
-
-  useEffect(() => {
-    if (isMounted) {
-      localStorage.setItem('elisam_customers', JSON.stringify(customers));
-    }
-  }, [customers, isMounted]);
 
   // Reset form helper
   const resetForm = () => {
@@ -396,11 +396,12 @@ export default function PolicelerPage() {
 
     // 1. SAVE / UPDATE CUSTOMER
     let customerId = selectedExistingCustomerId !== 'NEW' ? selectedExistingCustomerId : `CUST-${Math.floor(100 + Math.random() * 900)}`;
+    let customerToSave: Customer;
     
     const existingCust = customers.find(c => c.id === customerId || c.name.toLowerCase() === customerName.toLowerCase());
     if (existingCust) {
       customerId = existingCust.id;
-      const updatedCustomer: Customer = {
+      customerToSave = {
         ...existingCust,
         name: customerName,
         type: customerType,
@@ -422,9 +423,9 @@ export default function PolicelerPage() {
         vehicleRegistrationDate: vehicleRegistrationDate || existingCust.vehicleRegistrationDate,
         vehicleValue: vehicleValue || existingCust.vehicleValue
       };
-      setCustomers(customers.map(c => c.id === customerId ? updatedCustomer : c));
+      setCustomers(customers.map(c => c.id === customerId ? customerToSave : c));
     } else {
-      const newCustomer: Customer = {
+      customerToSave = {
         id: customerId,
         name: customerName,
         type: customerType,
@@ -448,8 +449,10 @@ export default function PolicelerPage() {
         vehicleRegistrationDate,
         vehicleValue
       };
-      setCustomers([newCustomer, ...customers]);
+      setCustomers([customerToSave, ...customers]);
     }
+    // Async Cloud Save Customer
+    upsertCustomerToCloud(customerToSave);
 
     // 2. SAVE / UPDATE POLICY
     const newPolicyRecord: Policy = {
@@ -471,6 +474,7 @@ export default function PolicelerPage() {
       commissionRate: Number(commissionRate) || 15,
       paymentStatus: remaining === 0 ? 'Ödendi' : (paid > 0 ? 'Kısmi Ödendi' : 'Bekliyor'),
       status: 'Aktif',
+      plate: plate || undefined,
       notes: notes || 'Yeni poliçe kaydı.'
     };
 
@@ -479,6 +483,8 @@ export default function PolicelerPage() {
     } else {
       setPolicies([newPolicyRecord, ...policies]);
     }
+    // Async Cloud Save Policy
+    upsertPolicyToCloud(newPolicyRecord);
 
     // 3. AUTO-SYNC WITH FINANS & CARİ HESAP EKSTRESİ (elisam_cari_movements)
     try {
@@ -496,7 +502,6 @@ export default function PolicelerPage() {
         return `E${String(maxNum + 1).padStart(6, '0')}`;
       };
 
-      // Filter out any old movement of this policy if editing
       let updatedMovs = savedMovs.filter((m: any) => !(m.receiptNo === finalPolicyNo || m.description?.includes(finalPolicyNo)));
       
       const formattedStartDate = startDate ? (startDate.includes('-') ? startDate.split('-').reverse().join('.') : startDate) : new Date().toLocaleDateString('tr-TR');
@@ -512,12 +517,13 @@ export default function PolicelerPage() {
         customerId: customerId,
         customerName: customerName.trim(),
         description: `${finalPolicyNo} nolu ${finalCompany} ${finalType} Poliçesi Tahakkuku${plate ? ` (${plate})` : ''}`,
-        movementType: 'Poliçe Tahakkuku',
+        movementType: 'Poliçe Tahakkuku' as const,
         debitAmount: prem,
         creditAmount: 0,
         notes: notes || 'Poliçe kesimi ile otomatik oluşturuldu.'
       };
       updatedMovs = [debtMovement, ...updatedMovs];
+      upsertCariMovementToCloud(debtMovement);
 
       // 2. Tahsilat Kaydı (Peşin tahsilat yapıldıysa)
       if (paid > 0) {
@@ -530,32 +536,16 @@ export default function PolicelerPage() {
           customerId: customerId,
           customerName: customerName.trim(),
           description: `${finalPolicyNo} nolu ${finalCompany} ${finalType} Poliçesi Tahsilatı (${paymentType})`,
-          movementType: paymentType === 'Peşin / Tek Çekim' ? 'Kredi Kartı Tahsilat' : 'Banka Gelen Havale',
+          movementType: paymentType === 'Peşin / Tek Çekim' ? ('Kredi Kartı Tahsilat' as const) : ('Banka Gelen Havale' as const),
           debitAmount: 0,
           creditAmount: paid,
           notes: 'Poliçe kesiminde tahsil edildi.'
         };
         updatedMovs = [paidMovement, ...updatedMovs];
+        upsertCariMovementToCloud(paidMovement);
       }
 
       localStorage.setItem('elisam_cari_movements', JSON.stringify(updatedMovs));
-
-      // Also ensure customer exists in elisam_customers storage
-      const savedCusts = JSON.parse(localStorage.getItem('elisam_customers') || '[]');
-      const custExists = savedCusts.some((c: any) => c.id === customerId || c.name.toLowerCase() === customerName.toLowerCase());
-      if (!custExists) {
-        const custToStore = {
-          id: customerId,
-          name: customerName.trim(),
-          type: customerType,
-          phone: customerPhone || '-',
-          email: customerEmail || '-',
-          identityNo: customerTc || '-',
-          address: customerAddress || 'Alanya / Antalya',
-          createdAt: new Date().toLocaleDateString('tr-TR')
-        };
-        localStorage.setItem('elisam_customers', JSON.stringify([custToStore, ...savedCusts]));
-      }
     } catch (err) {
       console.error('Finans cari sync hatası:', err);
     }
@@ -572,6 +562,9 @@ export default function PolicelerPage() {
     if (confirm(`${name} müşterisine ait ${polNo} numaralı poliçeyi silmek istediğinize emin misiniz?`)) {
       setPolicies(policies.filter(p => p.id !== id));
       if (selectedPolicy?.id === id) setSelectedPolicy(null);
+
+      // Async Cloud Delete
+      deletePolicyFromCloud(id);
 
       try {
         const savedMovs = JSON.parse(localStorage.getItem('elisam_cari_movements') || '[]');

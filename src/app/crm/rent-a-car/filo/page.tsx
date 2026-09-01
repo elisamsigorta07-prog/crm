@@ -3,6 +3,11 @@
 import { useState, useEffect } from 'react';
 import { Search, Plus, Filter, CarFront, Eye, X, Fuel, Gauge, ShieldCheck } from 'lucide-react';
 import { RentVehicle, initialVehiclesData, initialBookingsData } from '@/data/rentCrmData';
+import { 
+  fetchRentVehiclesFromCloud, 
+  upsertRentVehicleToCloud, 
+  deleteRentVehicleFromCloud 
+} from '@/lib/supabaseService';
 import styles from '../layout.module.css';
 
 export default function FiloPage() {
@@ -15,19 +20,16 @@ export default function FiloPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    try {
-      const saved = localStorage.getItem('elisam_rent_vehicles');
-      if (saved) setVehicles(JSON.parse(saved));
-    } catch (err) {
-      console.error(err);
+    async function loadCloudData() {
+      try {
+        const cloudVehs = await fetchRentVehiclesFromCloud();
+        if (cloudVehs) setVehicles(cloudVehs);
+      } catch (err) {
+        console.error('Supabase filo load error:', err);
+      }
     }
+    loadCloudData();
   }, []);
-
-  useEffect(() => {
-    if (isMounted) {
-      localStorage.setItem('elisam_rent_vehicles', JSON.stringify(vehicles));
-    }
-  }, [vehicles, isMounted]);
 
   // Form State
   const [brand, setBrand] = useState('');
@@ -59,6 +61,7 @@ export default function FiloPage() {
     };
 
     setVehicles([newVehicle, ...vehicles]);
+    upsertRentVehicleToCloud(newVehicle);
     setIsAddModalOpen(false);
 
     // Reset Form

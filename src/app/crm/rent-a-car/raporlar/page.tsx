@@ -11,7 +11,12 @@ import {
   Database, 
   Car
 } from 'lucide-react';
-import { initialRentCustomersData, initialBookingsData, initialVehiclesData, RentCustomer, RentalBooking, RentVehicle } from '@/data/rentCrmData';
+import { RentCustomer, RentalBooking, RentVehicle } from '@/data/rentCrmData';
+import { 
+  fetchRentBookingsFromCloud, 
+  fetchRentCustomersFromCloud, 
+  fetchRentVehiclesFromCloud 
+} from '@/lib/supabaseService';
 import { generateModernPDF } from '@/lib/pdfReportGenerator';
 import styles from '../layout.module.css';
 
@@ -32,16 +37,21 @@ export default function RentRaporlarPage() {
 
   useEffect(() => {
     setIsMounted(true);
-    try {
-      const savedBook = localStorage.getItem('elisam_rent_bookings');
-      const savedCust = localStorage.getItem('elisam_rent_customers');
-      const savedVeh = localStorage.getItem('elisam_rent_vehicles');
-      setBookings(savedBook ? JSON.parse(savedBook) : initialBookingsData);
-      setCustomers(savedCust ? JSON.parse(savedCust) : initialRentCustomersData);
-      setVehicles(savedVeh ? JSON.parse(savedVeh) : initialVehiclesData);
-    } catch (err) {
-      console.error('LocalStorage load error:', err);
+    async function loadCloudData() {
+      try {
+        const [cloudBookings, cloudCusts, cloudVehs] = await Promise.all([
+          fetchRentBookingsFromCloud(),
+          fetchRentCustomersFromCloud(),
+          fetchRentVehiclesFromCloud()
+        ]);
+        if (cloudBookings) setBookings(cloudBookings);
+        if (cloudCusts) setCustomers(cloudCusts);
+        if (cloudVehs) setVehicles(cloudVehs);
+      } catch (err) {
+        console.error('Supabase rent load error:', err);
+      }
     }
+    loadCloudData();
   }, []);
 
   const isDateInPeriod = (dateStr?: string, period?: string): boolean => {
