@@ -52,6 +52,7 @@ export interface Policy {
   installments?: Installment[]; // Taksit dökümü
   paymentStatus: 'Ödendi' | 'Bekliyor' | 'Taksitli' | 'Kısmi Ödendi' | 'Gecikmede';
   status: 'Aktif' | 'Yaklaşıyor' | 'Biten';
+  plate?: string;
   notes?: string;
 }
 

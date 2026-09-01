@@ -1,17 +1,75 @@
 "use client";
 
-import { useState } from 'react';
-import { Download, Calendar, FileSpreadsheet, FileText } from 'lucide-react';
-import { initialRentCustomersData, initialBookingsData, initialVehiclesData } from '@/data/rentCrmData';
+import { useState, useEffect } from 'react';
+import { 
+  Download, 
+  Calendar, 
+  FileSpreadsheet, 
+  FileText, 
+  Printer, 
+  Archive, 
+  Database, 
+  Car
+} from 'lucide-react';
+import { initialRentCustomersData, initialBookingsData, initialVehiclesData, RentCustomer, RentalBooking, RentVehicle } from '@/data/rentCrmData';
 import { generateModernPDF } from '@/lib/pdfReportGenerator';
 import styles from '../layout.module.css';
 
 type RentReportType = 'kiralamalar' | 'arac_kullanim' | 'musteriler' | 'gelir_ozeti';
 
 export default function RentRaporlarPage() {
+  const [isMounted, setIsMounted] = useState(false);
+  const [bookings, setBookings] = useState<RentalBooking[]>([]);
+  const [customers, setCustomers] = useState<RentCustomer[]>([]);
+  const [vehicles, setVehicles] = useState<RentVehicle[]>([]);
+
+  const currentYearMonth = new Date().toISOString().slice(0, 7);
+  const [backupPeriod, setBackupPeriod] = useState<string>(currentYearMonth);
+
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [quickRange, setQuickRange] = useState('');
+
+  useEffect(() => {
+    setIsMounted(true);
+    try {
+      const savedBook = localStorage.getItem('elisam_rent_bookings');
+      const savedCust = localStorage.getItem('elisam_rent_customers');
+      const savedVeh = localStorage.getItem('elisam_rent_vehicles');
+      setBookings(savedBook ? JSON.parse(savedBook) : initialBookingsData);
+      setCustomers(savedCust ? JSON.parse(savedCust) : initialRentCustomersData);
+      setVehicles(savedVeh ? JSON.parse(savedVeh) : initialVehiclesData);
+    } catch (err) {
+      console.error('LocalStorage load error:', err);
+    }
+  }, []);
+
+  const isDateInPeriod = (dateStr?: string, period?: string): boolean => {
+    if (!dateStr || !period || period === 'ALL') return true;
+    if (dateStr.includes('.')) {
+      const parts = dateStr.split('.');
+      if (parts.length === 3) {
+        const ym = `${parts[2]}-${parts[1].padStart(2, '0')}`;
+        return ym === period;
+      }
+    }
+    if (dateStr.includes('-')) {
+      return dateStr.startsWith(period);
+    }
+    return true;
+  };
+
+  const monthlyBookings = bookings.filter(b => isDateInPeriod(b.pickupDate, backupPeriod));
+  const monthlyTotalRevenue = monthlyBookings.reduce((s, b) => s + (Number(b.totalAmount) || 0), 0);
+  const monthlyTotalDays = monthlyBookings.reduce((s, b) => s + (Number(b.days) || 0), 0);
+
+  const getPeriodLabel = (period: string) => {
+    if (period === 'ALL') return 'TÜM ZAMANLAR (KONSOLİDE YILLIK)';
+    const [year, month] = period.split('-');
+    const months = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+    const mIdx = parseInt(month, 10) - 1;
+    return `${months[mIdx] || month} ${year}`;
+  };
 
   const setRange = (range: string) => {
     setQuickRange(range);
@@ -24,283 +82,173 @@ export default function RentRaporlarPage() {
     setEndDate(now.toISOString().split('T')[0]);
   };
 
-  const downloadCSV = (filename: string, rows: (string | number)[][]) => {
+  const downloadCSV = (filename: string, contentString: string) => {
     const bom = '\uFEFF';
-    const csv = bom + rows.map(r => r.map(v => '"' + String(v || '').replace(/"/g, '""') + '"').join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([bom + contentString], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
   };
 
+  const handleDownloadMonthlyExcelBackup = () => {
+    const periodName = getPeriodLabel(backupPeriod);
+    const dateStamp = new Date().toLocaleDateString('tr-TR');
+    let csv = `ELİSAM RENT A CAR - AYLIK TAM SİSTEM YEDEĞİ & FAALİYET DÖKÜMÜ\nDönem:;${periodName}\nYedek Alma Tarihi:;${dateStamp}\n\n=== 1. DÖNEM ÖZETİ ===\nToplam Kiralama Sözleşmesi;${monthlyBookings.length} Adet\nToplam Kiralanan Gün Sayısı;${monthlyTotalDays} Gün\nToplam Kiralama Geliri;${monthlyTotalRevenue.toFixed(2)} TL\n\n=== 2. KİRALAMA SÖZLEŞMELERİ (${monthlyBookings.length} ADET) ===\nSözleşme No;Araç Modeli;Plaka;Müşteri / Sürücü;Teslim Tarihi;İade Tarihi;Gün;Tutar (TL);Ödeme Yöntemi;Durum\n`;
+    if (monthlyBookings.length > 0) {
+      monthlyBookings.forEach(b => { csv += `"${b.id}";"${b.vehicleName}";"${b.vehiclePlate}";"${b.customerName}";"${b.pickupDate}";"${b.returnDate}";"${b.days}";"${b.totalAmount}";"${b.paymentMethod}";"${b.status}"\n`; });
+    } else { csv += `"(Bu dönemde kiralama kaydı bulunmamaktadır)";"";"";"";"";"";"";"";"";""\n`; }
+    csv += `\n=== 3. SÜRÜCÜ & MÜŞTERİ PORTFÖYÜ (${customers.length} KİŞİ) ===\nMüşteri No;Ad Soyad;Ülke;TCKN / Pasaport;Telefon;E-Posta\n`;
+    customers.forEach(c => { csv += `"${c.id}";"${c.name}";"${c.country}";"${c.identityOrPassport}";"${c.phone}";"${c.email}"\n`; });
+    downloadCSV(`Elisam_RentACar_Aylik_Tam_Yedek_${backupPeriod.replace('-', '_')}.csv`, csv);
+  };
+
+  const handleDownloadMonthlyPDFReport = () => {
+    const periodName = getPeriodLabel(backupPeriod);
+    const dateStamp = new Date().toLocaleDateString('tr-TR');
+    const headers = ['Sözleşme No', 'Araç / Plaka', 'Müşteri / Sürücü', 'Teslim', 'İade', 'Gün', 'Tutar (₺)', 'Durum'];
+    const rows = monthlyBookings.length > 0 ? monthlyBookings.map(b => [b.id, `${b.vehicleName} (${b.vehiclePlate})`, b.customerName, b.pickupDate, b.returnDate, `${b.days} Gün`, `${b.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`, b.status]) : [['-', '-', 'Bu dönem için kayıtlı kiralama bulunamadı', '-', '-', '-', '-', '-']];
+    generateModernPDF({
+      title: `${periodName.toUpperCase()} RENT A CAR FAALİYET VE YEDEK RAPORU`,
+      subtitle: `Elisam Rent A Car Filo Yönetimi • ${periodName} Dönemi Kiralama ve Hasılat Dökümü`,
+      category: 'RENT A CAR FİLO',
+      dateRange: `Seçili Dönem: ${periodName} (Rapor Tarihi: ${dateStamp})`,
+      kpis: [
+        { label: 'TOPLAM KİRALAMA', value: `${monthlyBookings.length} İşlem`, color: '#e67e22' },
+        { label: 'KİRALANAN GÜN', value: `${monthlyTotalDays} Gün`, color: '#0284c7' },
+        { label: 'TOPLAM CİRO', value: `${monthlyTotalRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`, color: '#16a34a' }
+      ],
+      headers,
+      rows,
+      summaryNotes: [`DÖNEM TOPLAMLARI: Kiralama: ${monthlyBookings.length} İşlem | Toplam Gün: ${monthlyTotalDays} Gün | Toplam Ciro: ${monthlyTotalRevenue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`]
+    });
+  };
+
+  const handleDownloadJSONBackup = () => {
+    const backupData = { backupTitle: 'Elisam Rent A Car Tam Sistem Veritabanı Yedeği', backupCreatedAt: new Date().toISOString(), backupPeriod, totalBookings: bookings.length, totalCustomers: customers.length, totalVehicles: vehicles.length, bookings, customers, vehicles };
+    const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backupData, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute('href', dataStr);
+    downloadAnchor.setAttribute('download', `Elisam_RentACar_Veritabani_Yedegi_${backupPeriod.replace('-', '_')}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
+
   const handleDownloadCSV = (type: RentReportType) => {
     const today = new Date().toLocaleDateString('tr-TR');
     if (type === 'kiralamalar') {
-      const rows = [
-        ['Sözleşme No', 'Araç', 'Plaka', 'Müşteri', 'Teslim Tarihi', 'İade Tarihi', 'Gün', 'Toplam Tutar (TL)', 'Ödeme Yöntemi', 'Durum'],
-        ...initialBookingsData.map(b => [b.id, b.vehicleName, b.vehiclePlate, b.customerName, b.pickupDate, b.returnDate, String(b.days), String(b.totalAmount), b.paymentMethod, b.status])
-      ];
-      if (rows.length === 1) rows.push(['(Kayıtlı kiralama bulunamadı)', '', '', '', '', '', '', '', '', '']);
-      downloadCSV(`elisam-rent-kiralamalar-${today}.csv`, rows);
+      const rows = [['Sözleşme No', 'Araç', 'Plaka', 'Müşteri', 'Teslim Tarihi', 'İade Tarihi', 'Gün', 'Toplam Tutar (TL)', 'Ödeme Yöntemi', 'Durum'], ...bookings.map(b => [b.id, b.vehicleName, b.vehiclePlate, b.customerName, b.pickupDate, b.returnDate, String(b.days), String(b.totalAmount), b.paymentMethod, b.status])];
+      downloadCSV(`elisam-rent-kiralamalar-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n'));
     } else if (type === 'arac_kullanim') {
-      const map: Record<string, { name: string; plate: string; bookings: number; totalDays: number; totalRevenue: number }> = {};
-      initialBookingsData.forEach(b => {
-        if (!map[b.vehicleId]) map[b.vehicleId] = { name: b.vehicleName, plate: b.vehiclePlate, bookings: 0, totalDays: 0, totalRevenue: 0 };
-        map[b.vehicleId].bookings++;
-        map[b.vehicleId].totalDays += b.days;
-        map[b.vehicleId].totalRevenue += b.totalAmount;
-      });
-      const rows = [
-        ['Araç Modeli', 'Plaka', 'Kiralama Adedi', 'Toplam Kiralanan Gün', 'Toplam Gelir (TL)'],
-        ...Object.values(map).map(v => [v.name, v.plate, String(v.bookings), String(v.totalDays), String(v.totalRevenue)])
-      ];
-      if (rows.length === 1) rows.push(['(Veri yok)', '', '', '', '']);
-      downloadCSV(`elisam-rent-arac-kullanim-${today}.csv`, rows);
+      const map: Record<string, any> = {};
+      bookings.forEach(b => { if (!map[b.vehicleId]) map[b.vehicleId] = { name: b.vehicleName, plate: b.vehiclePlate, bookings: 0, totalDays: 0, totalRevenue: 0 }; map[b.vehicleId].bookings++; map[b.vehicleId].totalDays += b.days; map[b.vehicleId].totalRevenue += b.totalAmount; });
+      const rows = [['Araç Modeli', 'Plaka', 'Kiralama Adedi', 'Toplam Kiralanan Gün', 'Toplam Gelir (TL)'], ...Object.values(map).map((v: any) => [v.name, v.plate, String(v.bookings), String(v.totalDays), String(v.totalRevenue)])];
+      downloadCSV(`elisam-rent-arac-kullanim-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n'));
     } else if (type === 'musteriler') {
-      const rows = [
-        ['Müşteri ID', 'Ad Soyad', 'Ülke', 'Kimlik / Pasaport', 'Telefon', 'E-Posta', 'Toplam Kiralama'],
-        ...initialRentCustomersData.map(c => [c.id, c.name, c.country, c.identityOrPassport, c.phone, c.email, String(c.totalRentals)])
-      ];
-      if (rows.length === 1) rows.push(['(Kayıtlı müşteri bulunamadı)', '', '', '', '', '', '']);
-      downloadCSV(`elisam-rent-musteri-listesi-${today}.csv`, rows);
+      const rows = [['Müşteri ID', 'Ad Soyad', 'Ülke', 'Kimlik / Pasaport', 'Telefon', 'E-Posta', 'Toplam Kiralama'], ...customers.map(c => [c.id, c.name, c.country, c.identityOrPassport, c.phone, c.email, String(c.totalRentals)])];
+      downloadCSV(`elisam-rent-musteri-listesi-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n'));
     } else if (type === 'gelir_ozeti') {
-      const totalRevenue = initialBookingsData.reduce((s, b) => s + b.totalAmount, 0);
+      const totalRevenue = bookings.reduce((s, b) => s + b.totalAmount, 0);
       const byPayment: Record<string, number> = {};
-      initialBookingsData.forEach(b => {
-        byPayment[b.paymentMethod] = (byPayment[b.paymentMethod] || 0) + b.totalAmount;
-      });
-      const rows = [
-        ['Ödeme Yöntemi', 'Toplam Gelir (TL)', 'İşlem Adedi'],
-        ...Object.entries(byPayment).map(([k, v]) => [k, String(v), String(initialBookingsData.filter(b => b.paymentMethod === k).length)]),
-        ['GENEL TOPLAM', String(totalRevenue), String(initialBookingsData.length)]
-      ];
-      downloadCSV(`elisam-rent-gelir-ozeti-${today}.csv`, rows);
+      bookings.forEach(b => { byPayment[b.paymentMethod] = (byPayment[b.paymentMethod] || 0) + b.totalAmount; });
+      const rows = [['Ödeme Yöntemi', 'Toplam Gelir (TL)', 'İşlem Adedi'], ...Object.entries(byPayment).map(([k, v]) => [k, String(v), String(bookings.filter(b => b.paymentMethod === k).length)]), ['GENEL TOPLAM', String(totalRevenue), String(bookings.length)]];
+      downloadCSV(`elisam-rent-gelir-ozeti-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n'));
     }
   };
 
   const handleDownloadPDF = (type: RentReportType) => {
-    const totalRev = initialBookingsData.reduce((s, b) => s + b.totalAmount, 0);
+    const totalRev = bookings.reduce((s, b) => s + b.totalAmount, 0);
     const dateRangeStr = (startDate && endDate) ? `${startDate} - ${endDate}` : undefined;
-
     if (type === 'kiralamalar') {
-      generateModernPDF({
-        title: 'RENT A CAR KİRALAMA VE SÖZLEŞME RAPORU',
-        subtitle: 'Filomuzdaki tüm araçların kiralama sözleşmeleri, teslim-iade tarihleri ve gelir dökümü',
-        category: 'RENT A CAR FİLO',
-        dateRange: dateRangeStr,
-        kpis: [
-          { label: 'TOPLAM KİRALAMA', value: `${initialBookingsData.length} İşlem`, color: '#e67e22' },
-          { label: 'TOPLAM CİRO', value: `${totalRev.toLocaleString('tr-TR')} ₺`, color: '#16a34a' },
-          { label: 'AKTİF KİRADA', value: `${initialBookingsData.filter(b => b.status === 'Aktif').length} Araç`, color: '#2563eb' }
-        ],
-        headers: ['Sözleşme No', 'Araç / Plaka', 'Müşteri / Sürücü', 'Teslim', 'İade', 'Gün', 'Tutar (₺)', 'Durum'],
-        rows: initialBookingsData.length > 0 ? initialBookingsData.map(b => [
-          b.id,
-          `${b.vehicleName} (${b.vehiclePlate})`,
-          b.customerName,
-          b.pickupDate,
-          b.returnDate,
-          `${b.days} Gün`,
-          `${b.totalAmount.toLocaleString('tr-TR')} ₺`,
-          b.status
-        ]) : [['-', 'Kayıtlı kiralama bulunamadı', '-', '-', '-', '-', '-', '-']]
-      });
+      generateModernPDF({ title: 'RENT A CAR KİRALAMA VE SÖZLEŞME RAPORU', category: 'RENT A CAR FİLO', dateRange: dateRangeStr, kpis: [{ label: 'TOPLAM KİRALAMA', value: `${bookings.length} İşlem`, color: '#e67e22' }, { label: 'TOPLAM CİRO', value: `${totalRev.toLocaleString('tr-TR')} ₺`, color: '#16a34a' }], headers: ['Sözleşme No', 'Araç / Plaka', 'Müşteri / Sürücü', 'Teslim', 'İade', 'Gün', 'Tutar (₺)', 'Durum'], rows: bookings.map(b => [b.id, `${b.vehicleName} (${b.vehiclePlate})`, b.customerName, b.pickupDate, b.returnDate, `${b.days} Gün`, `${b.totalAmount.toLocaleString('tr-TR')} ₺`, b.status]) });
     } else if (type === 'arac_kullanim') {
-      const map: Record<string, { name: string; plate: string; bookings: number; totalDays: number; totalRevenue: number }> = {};
-      initialBookingsData.forEach(b => {
-        if (!map[b.vehicleId]) map[b.vehicleId] = { name: b.vehicleName, plate: b.vehiclePlate, bookings: 0, totalDays: 0, totalRevenue: 0 };
-        map[b.vehicleId].bookings++;
-        map[b.vehicleId].totalDays += b.days;
-        map[b.vehicleId].totalRevenue += b.totalAmount;
-      });
-
-      generateModernPDF({
-        title: 'ARAÇ KULLANIM VE VERİMLİLİK ANALİZİ',
-        subtitle: 'Araç bazında toplam kiralanma gün sayısı, talep adedi ve üretilen hasılat',
-        category: 'RENT A CAR FİLO',
-        dateRange: dateRangeStr,
-        kpis: [
-          { label: 'FİLO ADEDİ', value: `${initialVehiclesData.length} Araç`, color: '#2563eb' },
-          { label: 'TOPLAM HASILAT', value: `${totalRev.toLocaleString('tr-TR')} ₺`, color: '#16a34a' }
-        ],
-        headers: ['Araç Modeli', 'Plaka', 'Kiralama Adedi', 'Toplam Kiralanan Gün', 'Üretilen Gelir (₺)'],
-        rows: Object.values(map).map(v => [
-          v.name,
-          v.plate,
-          `${v.bookings} Kez`,
-          `${v.totalDays} Gün`,
-          `${v.totalRevenue.toLocaleString('tr-TR')} ₺`
-        ])
-      });
+      const map: Record<string, any> = {};
+      bookings.forEach(b => { if (!map[b.vehicleId]) map[b.vehicleId] = { name: b.vehicleName, plate: b.vehiclePlate, bookings: 0, totalDays: 0, totalRevenue: 0 }; map[b.vehicleId].bookings++; map[b.vehicleId].totalDays += b.days; map[b.vehicleId].totalRevenue += b.totalAmount; });
+      generateModernPDF({ title: 'ARAÇ KULLANIM VE VERİMLİLİK ANALİZİ', category: 'RENT A CAR FİLO', dateRange: dateRangeStr, kpis: [{ label: 'TOPLAM FİLO', value: `${vehicles.length} Araç`, color: '#3498db' }, { label: 'TOPLAM GELİR', value: `${totalRev.toLocaleString('tr-TR')} ₺`, color: '#16a34a' }], headers: ['Araç Modeli', 'Plaka', 'Kiralama Sayısı', 'Toplam Gün', 'Toplam Gelir (₺)'], rows: Object.values(map).map((v: any) => [v.name, v.plate, `${v.bookings} Kez`, `${v.totalDays} Gün`, `${v.totalRevenue.toLocaleString('tr-TR')} ₺`]) });
     } else if (type === 'musteriler') {
-      generateModernPDF({
-        title: 'RENT A CAR MÜŞTERİ VE SÜRÜCÜ LİSTESİ',
-        subtitle: 'Kayıtlı yerli ve yabancı müşteri/sürücü portföyü ve kiralama sayıları',
-        category: 'RENT A CAR FİLO',
-        dateRange: dateRangeStr,
-        kpis: [
-          { label: 'TOPLAM MÜŞTERİ', value: `${initialRentCustomersData.length} Sürücü`, color: '#e67e22' }
-        ],
-        headers: ['Müşteri No', 'Ad Soyad', 'Ülke', 'Kimlik / Pasaport', 'Telefon', 'Toplam Kiralama'],
-        rows: initialRentCustomersData.length > 0 ? initialRentCustomersData.map(c => [
-          c.id,
-          c.name,
-          c.country,
-          c.identityOrPassport,
-          c.phone,
-          `${c.totalRentals} İşlem`
-        ]) : [['-', 'Kayıtlı müşteri bulunamadı', '-', '-', '-', '-']]
-      });
+      generateModernPDF({ title: 'RENT A CAR MÜŞTERİ & SÜRÜCÜ LİSTESİ', category: 'RENT A CAR FİLO', dateRange: dateRangeStr, kpis: [{ label: 'TOPLAM SÜRÜCÜ', value: `${customers.length} Kişi`, color: '#e67e22' }], headers: ['Müşteri No', 'Ad Soyad', 'Ülke', 'Kimlik / Pasaport No', 'Telefon', 'Toplam Kiralama'], rows: customers.map(c => [c.id, c.name, c.country, c.identityOrPassport, c.phone, `${c.totalRentals} İşlem`]) });
     } else if (type === 'gelir_ozeti') {
       const byPayment: Record<string, number> = {};
-      initialBookingsData.forEach(b => {
-        byPayment[b.paymentMethod] = (byPayment[b.paymentMethod] || 0) + b.totalAmount;
-      });
-
-      generateModernPDF({
-        title: 'ÖDEME YÖNTEMLERİNE GÖRE GELİR VE KASA ÖZETİ',
-        subtitle: 'Nakit, Kredi Kartı ve Havale kanallarından tahsil edilen kiralama gelirleri dağılımı',
-        category: 'RENT A CAR FİLO',
-        dateRange: dateRangeStr,
-        kpis: [
-          { label: 'TOPLAM GELİR', value: `${totalRev.toLocaleString('tr-TR')} ₺`, color: '#16a34a' },
-          { label: 'İŞLEM SAYISI', value: `${initialBookingsData.length} Adet`, color: '#2563eb' }
-        ],
-        headers: ['Ödeme Kanalı', 'Toplam Tahsil Edilen Gelir (₺)', 'Kiralama Adedi', 'Pay (%)'],
-        rows: Object.entries(byPayment).map(([k, v]) => [
-          k,
-          `${v.toLocaleString('tr-TR')} ₺`,
-          `${initialBookingsData.filter(b => b.paymentMethod === k).length} İşlem`,
-          `%${totalRev > 0 ? Math.round((v / totalRev) * 100) : 0}`
-        ])
-      });
+      bookings.forEach(b => { byPayment[b.paymentMethod] = (byPayment[b.paymentMethod] || 0) + b.totalAmount; });
+      generateModernPDF({ title: 'FİLO GELİR VE ÖDEME YÖNTEMLERİ ANALİZİ', category: 'RENT A CAR FİLO', dateRange: dateRangeStr, kpis: [{ label: 'TOPLAM GELİR', value: `${totalRev.toLocaleString('tr-TR')} ₺`, color: '#16a34a' }, { label: 'İŞLEM ADEDİ', value: `${bookings.length} Adet`, color: '#3498db' }], headers: ['Ödeme Yöntemi / Kanal', 'Toplam Hasılat (₺)', 'İşlem Adedi', 'Pay (%)'], rows: Object.entries(byPayment).map(([k, v]) => [k, `${v.toLocaleString('tr-TR')} ₺`, `${bookings.filter(b => b.paymentMethod === k).length} İşlem`, `%${totalRev > 0 ? Math.round((v / totalRev) * 100) : 0}`]) });
     }
   };
 
-  const reports: { type: RentReportType; title: string; desc: string; icon: string; color: string }[] = [
-    { type: 'kiralamalar', title: 'Kiralama & Sözleşme Listesi', desc: 'Tüm kiralamalar — araç, müşteri, tarihler, tutar, durum', icon: '🚗', color: '#fff7ed' },
-    { type: 'arac_kullanim', title: 'Araç Kullanım & Verimlilik', desc: 'Araç bazlı toplam gün, kiralama adedi ve gelir analizi', icon: '🏎️', color: '#f0fdf4' },
-    { type: 'musteriler', title: 'Rent Müşteri & Sürücü Listesi', desc: 'Müşteri bilgileri — TC/Pasaport, telefon, kiralama sayısı', icon: '👥', color: '#eff6ff' },
-    { type: 'gelir_ozeti', title: 'Gelir & Kasa Dağılımı', desc: 'Ödeme yöntemine göre toplam gelir ve tahsilat dökümü', icon: '💵', color: '#fdf4ff' },
+  const reports = [
+    { type: 'kiralamalar', title: 'Tüm Kiralama Sözleşmeleri', desc: 'Sözleşme no, araç, müşteri, teslim-iade tarihleri, tutar', icon: '📋', color: '#fffaf0' },
+    { type: 'arac_kullanim', title: 'Araç Kullanım & Verimlilik', desc: 'Hangi araç kaç gün kiralandı, ne kadar gelir getirdi', icon: '🚗', color: '#ebf8ff' },
+    { type: 'gelir_ozeti', title: 'Gelir & Ödeme Dağılımı', desc: 'Nakit, kredi kartı, havale/EFT gelir toplamları', icon: '💰', color: '#f0fff4' },
+    { type: 'musteriler', title: 'Müşteri & Sürücü Portföyü', desc: 'Tüm kayıtlı sürücüler, pasaport/TC, telefon ve kiralama sayısı', icon: '👤', color: '#faf5ff' },
   ];
 
-  const totalRevenue = initialBookingsData.reduce((s, b) => s + b.totalAmount, 0);
+  const periodOptions = [
+    { value: currentYearMonth, label: `🗓️ ${getPeriodLabel(currentYearMonth)} (Bu Ay)` },
+    { value: 'ALL', label: '🌐 TÜM ZAMANLAR (Tüm Yıllık Konsolide Yedek)' }
+  ];
+
+  if (!isMounted) return null;
 
   return (
     <div>
       <div className={styles.pageHeader}>
         <div>
-          <h1 className={styles.pageTitle}>Rent A Car Filo & Gelir Raporları</h1>
-          <p style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '2px' }}>
-            Kurumsal logolu modern PDF veya Excel (CSV) formatında tek tıkla resmi raporlar üretin ve indirin.
-          </p>
+          <h1 className={styles.pageTitle} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Car size={28} color="#e67e22" /> Rent A Car Raporlama & Yedekleme
+          </h1>
         </div>
       </div>
 
-      {/* Date Range Filter */}
+      <div className={styles.card} style={{ marginBottom: '26px', padding: '24px', border: '2px solid #e67e22', borderRadius: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
+          <div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 850, color: '#0f172a' }}>📦 Aylık Filo Kiralama Yedeği</div>
+            <div style={{ fontSize: '0.84rem', color: '#64748b' }}>Tüm verileri arşivleyin.</div>
+          </div>
+          <select value={backupPeriod} onChange={(e) => setBackupPeriod(e.target.value)} style={{ padding: '10px', borderRadius: '10px', border: '2px solid #e67e22', cursor: 'pointer' }}>
+            {periodOptions.map(opt => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}
+          </select>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '14px', marginBottom: '22px' }}>
+          <div style={{ padding: '14px', backgroundColor: '#f8fafc', borderLeft: '4px solid #e67e22' }}>
+            <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Kiralama</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800 }}>{monthlyBookings.length} İşlem</div>
+          </div>
+          <div style={{ padding: '14px', backgroundColor: '#f8fafc', borderLeft: '4px solid #16a34a' }}>
+            <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Hasılat</div>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800 }}>{monthlyTotalRevenue.toLocaleString('tr-TR')} ₺</div>
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '14px' }}>
+          <button onClick={handleDownloadMonthlyExcelBackup} style={{ padding: '12px', backgroundColor: '#047857', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer' }}>Excel Yedeği</button>
+          <button onClick={handleDownloadMonthlyPDFReport} style={{ padding: '12px', backgroundColor: '#e67e22', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer' }}>PDF Rapor</button>
+          <button onClick={handleDownloadJSONBackup} style={{ padding: '12px', backgroundColor: '#334155', color: 'white', borderRadius: '8px', border: 'none', cursor: 'pointer' }}>JSON Veritabanı</button>
+        </div>
+      </div>
+
       <div className={styles.card} style={{ marginBottom: '24px' }}>
-        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#2d3748', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Calendar size={18} color="#e67e22" /> Tarih Aralığı Filtresi
-        </h3>
-        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#718096', marginBottom: '6px' }}>Başlangıç</label>
-            <input type="date" value={startDate} onChange={(e) => { setStartDate(e.target.value); setQuickRange(''); }} style={{ padding: '9px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }} />
-          </div>
-          <div>
-            <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#718096', marginBottom: '6px' }}>Bitiş</label>
-            <input type="date" value={endDate} onChange={(e) => { setEndDate(e.target.value); setQuickRange(''); }} style={{ padding: '9px 12px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }} />
-          </div>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            {[{ key: 'bu_hafta', label: 'Bu Hafta' }, { key: 'bu_ay', label: 'Bu Ay' }, { key: 'bu_yil', label: 'Bu Yıl' }].map(r => (
-              <button key={r.key} onClick={() => setRange(r.key)} style={{ padding: '9px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: quickRange === r.key ? '#e67e22' : '#edf2f7', color: quickRange === r.key ? 'white' : '#4a5568', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer' }}>
-                {r.label}
-              </button>
-            ))}
-          </div>
+        <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '14px' }}><Calendar size={18} /> Tarih Aralığı Filtresi</h3>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+          <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ padding: '8px', borderRadius: '8px', border: '1px solid #ddd' }} />
+          <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={{ padding: '8px', borderRadius: '8px', border: '1px solid #ddd' }} />
+          <button onClick={() => { setStartDate(''); setEndDate(''); }} style={{ padding: '8px 12px', background: '#eee', borderRadius: '8px', border: 'none', cursor: 'pointer' }}>Sıfırla</button>
         </div>
-        {(startDate || endDate) && (
-          <div style={{ marginTop: '12px', fontSize: '0.82rem', color: '#718096' }}>
-            Seçili aralık: <strong>{startDate || '...'}</strong> — <strong>{endDate || '...'}</strong>
-            {' '}<button onClick={() => { setStartDate(''); setEndDate(''); setQuickRange(''); }} style={{ background: 'none', border: 'none', color: '#e53e3e', cursor: 'pointer', fontSize: '0.82rem', fontWeight: 600 }}>Temizle</button>
-          </div>
-        )}
       </div>
 
-      {/* Summary Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-        {[
-          { label: 'TOPLAM MÜŞTERİ', value: initialRentCustomersData.length + ' Sürücü', color: '#e67e22' },
-          { label: 'TOPLAM ARAÇ', value: initialVehiclesData.length + ' Araç', color: '#3498db' },
-          { label: 'TOPLAM KİRALAMA', value: initialBookingsData.length + ' İşlem', color: '#2ecc71' },
-          { label: 'TOPLAM GELİR', value: totalRevenue.toLocaleString('tr-TR') + ' ₺', color: '#27ae60' },
-        ].map(({ label, value, color }) => (
-          <div key={label} className={styles.card} style={{ borderLeft: '4px solid ' + color }}>
-            <div style={{ fontSize: '0.78rem', color: '#718096', fontWeight: 700 }}>{label}</div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: '#2d3748', marginTop: '4px' }}>{value}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Report Download Cards */}
       <div className={styles.card}>
-        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#2d3748', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <FileSpreadsheet size={18} color="#e67e22" /> İndirilebilir Kurumsal Raporlar
-        </h3>
+        <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '20px' }}><FileSpreadsheet size={18} /> Modül Bazlı Raporlar</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
           {reports.map(r => (
-            <div key={r.type} style={{ padding: '22px', borderRadius: '14px', border: '1px solid #e2e8f0', backgroundColor: r.color, display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              <div style={{ fontSize: '1.8rem' }}>{r.icon}</div>
-              <div>
-                <div style={{ fontWeight: 800, color: '#1e293b', fontSize: '1rem' }}>{r.title}</div>
-                <div style={{ fontSize: '0.84rem', color: '#64748b', marginTop: '4px', lineHeight: '1.4' }}>{r.desc}</div>
+            <div key={r.type} style={{ padding: '20px', borderRadius: '12px', border: '1px solid #eee', backgroundColor: r.color }}>
+              <div style={{ fontSize: '1.5rem', marginBottom: '10px' }}>{r.icon}</div>
+              <div style={{ fontWeight: 800, marginBottom: '5px' }}>{r.title}</div>
+              <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '15px' }}>{r.desc}</div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button onClick={() => handleDownloadPDF(r.type as RentReportType)} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: 'none', background: '#0f172a', color: 'white', cursor: 'pointer' }}>PDF</button>
+                <button onClick={() => handleDownloadCSV(r.type as RentReportType)} style={{ flex: 1, padding: '8px', borderRadius: '6px', border: '1px solid #ccc', background: 'white', cursor: 'pointer' }}>CSV</button>
               </div>
-
-              {/* Dual Download Buttons */}
-              <div style={{ marginTop: 'auto', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <button
-                  onClick={() => handleDownloadPDF(r.type)}
-                  style={{
-                    flex: 1,
-                    padding: '9px 12px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: '#0f172a',
-                    color: 'white',
-                    fontWeight: 700,
-                    fontSize: '0.84rem',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '6px',
-                    boxShadow: '0 2px 6px rgba(15, 23, 42, 0.2)'
-                  }}
-                >
-                  <FileText size={15} color="#fb923c" /> PDF İndir
-                </button>
-
-                <button
-                  onClick={() => handleDownloadCSV(r.type)}
-                  style={{
-                    padding: '9px 12px',
-                    borderRadius: '8px',
-                    border: '1px solid #cbd5e1',
-                    background: 'white',
-                    color: '#334155',
-                    fontWeight: 700,
-                    fontSize: '0.84rem',
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '5px'
-                  }}
-                >
-                  <Download size={14} /> Excel (CSV)
-                </button>
-              </div>
-
             </div>
           ))}
         </div>
