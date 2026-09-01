@@ -245,22 +245,25 @@ export default function SigortaFinansPage() {
     }
   }, [movements, isMounted]);
 
+  const [modalCustomerSearch, setModalCustomerSearch] = useState('');
+
   // Open Add Movement Modal
   const handleOpenAddModal = (type: 'BORC' | 'TAHSILAT' | 'IADE' | 'DEVIR') => {
     setEditingMovement(null);
     setModalActionType(type);
-    setFormDate(new Date().toISOString().split('T')[0]);
+    setModalCustomerSearch('');
+    setFormDate(new Date().toLocaleDateString('tr-TR'));
     setFormDueDate('');
     setFormReceiptNo(String(Math.floor(1000 + Math.random() * 9000)));
     
-    // Set default customer
+    // Set default customer if filtered, otherwise leave empty for user selection
     if (selectedCustomerId !== 'ALL') {
       const matched = customers.find(c => c.id === selectedCustomerId);
       setFormCustomerId(selectedCustomerId);
-      setFormCustomerName(matched?.name || 'KAYSERİ ÇOK YAŞAR POSTALLI');
+      setFormCustomerName(matched?.name || selectedCustomerId);
     } else {
-      setFormCustomerId(customers[0]?.id || 'CUST-001');
-      setFormCustomerName(customers[0]?.name || 'KAYSERİ ÇOK YAŞAR POSTALLI');
+      setFormCustomerId('');
+      setFormCustomerName('');
     }
 
     if (type === 'BORC') {
@@ -292,6 +295,7 @@ export default function SigortaFinansPage() {
   // Open Edit Modal
   const handleOpenEditModal = (mov: CariMovement) => {
     setEditingMovement(mov);
+    setModalCustomerSearch('');
     setFormDate(mov.date);
     setFormDueDate(mov.dueDate || '');
     setFormReceiptNo(mov.receiptNo || '');
@@ -308,8 +312,8 @@ export default function SigortaFinansPage() {
   // Save Movement
   const handleSaveMovement = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formCustomerName || (!formDebitAmount && !formCreditAmount)) {
-      alert('Lütfen müşteri adı ve tutar bilgilerini girin.');
+    if (!formCustomerName.trim() || (!formDebitAmount && !formCreditAmount)) {
+      alert('Lütfen müşteri adını ve tutar bilgilerini girin.');
       return;
     }
 
@@ -329,13 +333,41 @@ export default function SigortaFinansPage() {
       if (p.length === 3) formattedDueDate = `${p[2]}.${p[1]}.${p[0]}`;
     }
 
+    // Auto create customer in customer list if new
+    let custId = formCustomerId;
+    const existingCust = customers.find(c => c.id === custId || c.name.toLowerCase() === formCustomerName.trim().toLowerCase());
+    if (!existingCust) {
+      custId = `CUST-${Math.floor(100 + Math.random() * 900)}`;
+      const isCorp = /(?:ŞİRKETİ|LİMİTED|LTD|A\.Ş|SANAYİ|TİCARET|AŞ|HOLDİNG)/i.test(formCustomerName);
+      const newCust: Customer = {
+        id: custId,
+        name: formCustomerName.trim(),
+        type: isCorp ? 'Kurumsal' : 'Bireysel',
+        phone: '-',
+        email: '-',
+        identityNo: '-',
+        address: 'Alanya / Antalya',
+        createdAt: new Date().toLocaleDateString('tr-TR'),
+        notes: 'Cari hareket ile otomatik tanımlandı.'
+      };
+      const updatedCustList = [newCust, ...customers];
+      setCustomers(updatedCustList);
+      try {
+        localStorage.setItem('elisam_customers', JSON.stringify(updatedCustList));
+      } catch (err) {
+        console.error(err);
+      }
+    } else {
+      custId = existingCust.id;
+    }
+
     const newMov: CariMovement = {
       id: editingMovement ? editingMovement.id : `CAR-${Math.floor(1000 + Math.random() * 9000)}`,
       date: formattedDate,
       dueDate: formattedDueDate || undefined,
       receiptNo: formReceiptNo || '-',
-      customerId: formCustomerId || 'CUSTOM',
-      customerName: formCustomerName,
+      customerId: custId,
+      customerName: formCustomerName.trim(),
       description: formDescription,
       movementType: formMovementType,
       debitAmount: dAmount,
@@ -883,19 +915,164 @@ export default function SigortaFinansPage() {
 
             <form onSubmit={handleSaveMovement}>
               
-              {/* Müşteri Seçimi */}
-              <div style={{ marginBottom: '14px' }}>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 750, color: '#334155', marginBottom: '4px' }}>
-                  Müşteri Adı / Ünvanı *
-                </label>
-                <input 
-                  type="text"
-                  required
-                  value={formCustomerName}
-                  onChange={(e) => setFormCustomerName(e.target.value)}
-                  placeholder="Örn: KAYSERİ ÇOK YAŞAR POSTALLI veya Ahmet Yılmaz"
-                  style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontWeight: 700 }}
-                />
+              {/* Müşteri Seçimi & Arama & Manuel Ekleme */}
+              <div style={{ backgroundColor: '#f8fafc', padding: '14px', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
+                
+                {/* Arama Kutusu */}
+                <div style={{ marginBottom: '10px' }}>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 750, color: '#334155', marginBottom: '4px' }}>
+                    🔍 Kayıtlı Müşterilerden Ara & Seç:
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input 
+                      type="text"
+                      placeholder="Müşteri adı, TC, telefon veya plaka yazarak arayın..."
+                      value={modalCustomerSearch}
+                      onChange={(e) => setModalCustomerSearch(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '9px 12px 9px 34px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        backgroundColor: '#ffffff',
+                        fontSize: '0.88rem',
+                        outline: 'none'
+                      }}
+                    />
+                    <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    {modalCustomerSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setModalCustomerSearch('')}
+                        style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+                      >
+                        <X size={15} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Arama Sonuçları */}
+                  {modalCustomerSearch.trim() && (
+                    <div style={{
+                      marginTop: '6px',
+                      maxHeight: '170px',
+                      overflowY: 'auto',
+                      backgroundColor: '#ffffff',
+                      borderRadius: '8px',
+                      border: '1px solid #93c5fd',
+                      boxShadow: '0 8px 20px rgba(0,0,0,0.1)',
+                      zIndex: 50
+                    }}>
+                      {customers.filter(c => {
+                        const q = modalCustomerSearch.toLowerCase();
+                        return c.name.toLowerCase().includes(q) ||
+                               (c.identityNo && c.identityNo.includes(q)) ||
+                               (c.phone && c.phone.includes(q)) ||
+                               (c.plate && c.plate.toLowerCase().includes(q)) ||
+                               (c.policyNo && c.policyNo.toLowerCase().includes(q));
+                      }).length > 0 ? (
+                        customers.filter(c => {
+                          const q = modalCustomerSearch.toLowerCase();
+                          return c.name.toLowerCase().includes(q) ||
+                                 (c.identityNo && c.identityNo.includes(q)) ||
+                                 (c.phone && c.phone.includes(q)) ||
+                                 (c.plate && c.plate.toLowerCase().includes(q)) ||
+                                 (c.policyNo && c.policyNo.toLowerCase().includes(q));
+                        }).map(c => (
+                          <div
+                            key={c.id}
+                            onClick={() => {
+                              setFormCustomerId(c.id);
+                              setFormCustomerName(c.name);
+                              setModalCustomerSearch('');
+                            }}
+                            style={{
+                              padding: '9px 12px',
+                              borderBottom: '1px solid #f1f5f9',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center'
+                            }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#eff6ff'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                          >
+                            <div>
+                              <div style={{ fontWeight: 750, color: '#0f172a', fontSize: '0.9rem' }}>
+                                {c.name} <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1d4ed8', backgroundColor: '#dbeafe', padding: '1px 5px', borderRadius: '4px', marginLeft: '4px' }}>{c.type}</span>
+                              </div>
+                              <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '2px' }}>
+                                📞 {c.phone} {c.identityNo && c.identityNo !== '-' ? `• TC: ${c.identityNo}` : ''} {c.plate ? `• 🚗 ${c.plate}` : ''}
+                              </div>
+                            </div>
+                            <span style={{ fontSize: '0.78rem', fontWeight: 750, color: '#2563eb' }}>Seç ➔</span>
+                          </div>
+                        ))
+                      ) : (
+                        <div style={{ padding: '10px', textAlign: 'center', fontSize: '0.82rem', color: '#94a3b8' }}>
+                          Eşleşen müşteri bulunamadı. Aşağıya direkt yeni müşteri adı yazabilirsiniz.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Hızlı Dropdown Listesi */}
+                <div style={{ marginBottom: '10px' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, color: '#64748b', marginBottom: '3px' }}>
+                    veya Listeden Müşteri Seçin:
+                  </label>
+                  <select
+                    value={formCustomerId}
+                    onChange={(e) => {
+                      const cid = e.target.value;
+                      setFormCustomerId(cid);
+                      if (cid === 'NEW') {
+                        setFormCustomerName('');
+                      } else {
+                        const matched = customers.find(c => c.id === cid);
+                        if (matched) setFormCustomerName(matched.name);
+                      }
+                    }}
+                    style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none', backgroundColor: '#ffffff', fontSize: '0.86rem', fontWeight: 600 }}
+                  >
+                    <option value="NEW">-- Yeni / Farklı Müşteri Tanımlayacağım --</option>
+                    <option value="CUST-001">🏢 KAYSERİ ÇOK YAŞAR POSTALLI</option>
+                    {customers.filter(c => c.id !== 'CUST-001').map(c => (
+                      <option key={c.id} value={c.id}>👤 {c.name} ({c.type} - {c.phone})</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Doğrudan İsim Girişi & Düzenleme */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 800, color: '#0f172a', marginBottom: '4px' }}>
+                    Müşteri Ad Soyad / Şirket Ünvanı * (İstediğiniz gibi yazabilir veya değiştirebilirsiniz)
+                  </label>
+                  <input 
+                    type="text"
+                    required
+                    value={formCustomerName}
+                    onChange={(e) => setFormCustomerName(e.target.value)}
+                    placeholder="Örn: EZEL GİYİM LTD. ŞTİ. veya Mehmet Demir"
+                    style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '2px solid #2563eb', outline: 'none', fontWeight: 800, fontSize: '0.95rem', backgroundColor: '#ffffff' }}
+                  />
+                  {formCustomerName && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '5px' }}>
+                      <span style={{ fontSize: '0.76rem', color: '#059669', fontWeight: 700 }}>
+                        ✓ Bu hareket &quot;{formCustomerName}&quot; cari hesabına işlenecek.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => { setFormCustomerId('NEW'); setFormCustomerName(''); }}
+                        style={{ fontSize: '0.75rem', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, textDecoration: 'underline' }}
+                      >
+                        Temizle / Yeni Yaz
+                      </button>
+                    </div>
+                  )}
+                </div>
+
               </div>
 
               {/* Tarih, Vade Tarihi, Fiş No */}
