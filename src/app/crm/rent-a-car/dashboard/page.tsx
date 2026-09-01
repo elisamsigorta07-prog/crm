@@ -3,12 +3,32 @@
 import { useState } from 'react';
 import { CarFront, KeyRound, CheckCircle, TrendingUp, ArrowRight, Eye, Calendar, User, Target, Activity } from 'lucide-react';
 import Link from 'next/link';
-import { initialVehiclesData, initialBookingsData, RentalBooking } from '@/data/rentCrmData';
+import { initialVehiclesData, initialBookingsData, RentalBooking, RentVehicle } from '@/data/rentCrmData';
 import styles from './dashboard.module.css';
 
 export default function RentDashboard() {
-  const [vehicles] = useState(initialVehiclesData);
-  const [bookings] = useState<RentalBooking[]>(initialBookingsData);
+  const loadStoredVehicles = (): RentVehicle[] => {
+    if (typeof window === 'undefined') return initialVehiclesData;
+    try {
+      const saved = localStorage.getItem('elisam_rent_vehicles');
+      return saved ? JSON.parse(saved) : initialVehiclesData;
+    } catch {
+      return initialVehiclesData;
+    }
+  };
+
+  const loadStoredBookings = (): RentalBooking[] => {
+    if (typeof window === 'undefined') return initialBookingsData;
+    try {
+      const saved = localStorage.getItem('elisam_rent_bookings');
+      return saved ? JSON.parse(saved) : initialBookingsData;
+    } catch {
+      return initialBookingsData;
+    }
+  };
+
+  const [vehicles] = useState<RentVehicle[]>(loadStoredVehicles);
+  const [bookings] = useState<RentalBooking[]>(loadStoredBookings);
   const [selectedBooking, setSelectedBooking] = useState<RentalBooking | null>(null);
 
   const totalVehicles = vehicles.length;

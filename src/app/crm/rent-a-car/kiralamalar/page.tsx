@@ -6,13 +6,55 @@ import { RentalBooking, RentVehicle, RentCustomer, initialBookingsData, initialV
 import styles from '../layout.module.css';
 
 export default function KiralamalarPage() {
-  const [bookings, setBookings] = useState<RentalBooking[]>(initialBookingsData);
-  const [vehicles] = useState<RentVehicle[]>(initialVehiclesData);
-  const [customers] = useState<RentCustomer[]>(initialRentCustomersData);
+  const loadStoredBookings = (): RentalBooking[] => {
+    if (typeof window === 'undefined') return initialBookingsData;
+    try {
+      const saved = localStorage.getItem('elisam_rent_bookings');
+      return saved ? JSON.parse(saved) : initialBookingsData;
+    } catch {
+      return initialBookingsData;
+    }
+  };
+
+  const loadStoredVehicles = (): RentVehicle[] => {
+    if (typeof window === 'undefined') return initialVehiclesData;
+    try {
+      const saved = localStorage.getItem('elisam_rent_vehicles');
+      return saved ? JSON.parse(saved) : initialVehiclesData;
+    } catch {
+      return initialVehiclesData;
+    }
+  };
+
+  const loadStoredCustomers = (): RentCustomer[] => {
+    if (typeof window === 'undefined') return initialRentCustomersData;
+    try {
+      const saved = localStorage.getItem('elisam_rent_customers');
+      return saved ? JSON.parse(saved) : initialRentCustomersData;
+    } catch {
+      return initialRentCustomersData;
+    }
+  };
+
+  const [bookings, setBookings] = useState<RentalBooking[]>(loadStoredBookings);
+  const [vehicles, setVehicles] = useState<RentVehicle[]>(loadStoredVehicles);
+  const [customers, setCustomers] = useState<RentCustomer[]>(loadStoredCustomers);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<RentalBooking | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('elisam_rent_bookings', JSON.stringify(bookings));
+    }
+  }, [bookings]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('elisam_rent_vehicles', JSON.stringify(vehicles));
+    }
+  }, [vehicles]);
 
   // Form State
   const [selectedVehicleId, setSelectedVehicleId] = useState(vehicles[0]?.id || '');

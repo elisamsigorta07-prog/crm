@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Plus, FileCheck, X, ClipboardPaste, CheckCircle, XCircle, ArrowRight } from 'lucide-react';
 import styles from '../layout.module.css';
 
@@ -20,11 +20,27 @@ interface Quote {
 const initialQuotes: Quote[] = [];
 
 export default function TekliflerPage() {
-  const [quotes, setQuotes] = useState<Quote[]>(initialQuotes);
+  const loadStoredQuotes = (): Quote[] => {
+    if (typeof window === 'undefined') return initialQuotes;
+    try {
+      const saved = localStorage.getItem('elisam_quotes');
+      return saved ? JSON.parse(saved) : initialQuotes;
+    } catch {
+      return initialQuotes;
+    }
+  };
+
+  const [quotes, setQuotes] = useState<Quote[]>(loadStoredQuotes);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Tümü');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [addMode, setAddMode] = useState<'Manuel' | 'Otomatik'>('Manuel');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('elisam_quotes', JSON.stringify(quotes));
+    }
+  }, [quotes]);
 
   const [customer, setCustomer] = useState('');
   const [tc, setTc] = useState('');

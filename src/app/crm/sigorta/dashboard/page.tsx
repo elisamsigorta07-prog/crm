@@ -3,12 +3,32 @@
 import { useState } from 'react';
 import { Users, FileText, TrendingUp, AlertTriangle, ArrowRight, Eye, X, Calendar, CreditCard, User, Download, Target, Activity } from 'lucide-react';
 import Link from 'next/link';
-import { Policy, initialPoliciesData, initialCustomersData } from '@/data/crmData';
+import { Policy, Customer, initialPoliciesData, initialCustomersData } from '@/data/crmData';
 import styles from './dashboard.module.css';
 
 export default function SigortaDashboard() {
-  const [policies] = useState<Policy[]>(initialPoliciesData);
-  const [customers] = useState(initialCustomersData);
+  const loadStoredPolicies = (): Policy[] => {
+    if (typeof window === 'undefined') return initialPoliciesData;
+    try {
+      const saved = localStorage.getItem('elisam_policies');
+      return saved ? JSON.parse(saved) : initialPoliciesData;
+    } catch {
+      return initialPoliciesData;
+    }
+  };
+
+  const loadStoredCustomers = (): Customer[] => {
+    if (typeof window === 'undefined') return initialCustomersData;
+    try {
+      const saved = localStorage.getItem('elisam_customers');
+      return saved ? JSON.parse(saved) : initialCustomersData;
+    } catch {
+      return initialCustomersData;
+    }
+  };
+
+  const [policies] = useState<Policy[]>(loadStoredPolicies);
+  const [customers] = useState<Customer[]>(loadStoredCustomers);
   const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
 
   const expiringPolicies = policies.filter(p => p.status === 'Yaklaşıyor');

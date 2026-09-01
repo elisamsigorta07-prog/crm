@@ -88,9 +88,19 @@ export default function SigortaFinansPage() {
     }
   };
 
+  const loadStoredCustomers = (): Customer[] => {
+    if (typeof window === 'undefined') return initialCustomersData;
+    try {
+      const saved = localStorage.getItem('elisam_customers');
+      return saved ? JSON.parse(saved) : initialCustomersData;
+    } catch {
+      return initialCustomersData;
+    }
+  };
+
   const [records, setRecords] = useState<CustomerDebtRecord[]>(loadDebtRecords);
   const [cashLogs, setCashLogs] = useState<CashLog[]>(loadCashLogs);
-  const [customers] = useState<Customer[]>(initialCustomersData);
+  const [customers] = useState<Customer[]>(loadStoredCustomers);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'tumu' | 'kalan' | 'geciken' | 'odendi' | 'kasa'>('tumu');

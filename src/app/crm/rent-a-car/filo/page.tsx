@@ -1,16 +1,32 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, Plus, Filter, CarFront, Eye, X, Fuel, Gauge, ShieldCheck } from 'lucide-react';
 import { RentVehicle, initialVehiclesData, initialBookingsData } from '@/data/rentCrmData';
 import styles from '../layout.module.css';
 
 export default function FiloPage() {
-  const [vehicles, setVehicles] = useState<RentVehicle[]>(initialVehiclesData);
+  const loadStoredVehicles = (): RentVehicle[] => {
+    if (typeof window === 'undefined') return initialVehiclesData;
+    try {
+      const saved = localStorage.getItem('elisam_rent_vehicles');
+      return saved ? JSON.parse(saved) : initialVehiclesData;
+    } catch {
+      return initialVehiclesData;
+    }
+  };
+
+  const [vehicles, setVehicles] = useState<RentVehicle[]>(loadStoredVehicles);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Tümü');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<RentVehicle | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('elisam_rent_vehicles', JSON.stringify(vehicles));
+    }
+  }, [vehicles]);
 
   // Form State
   const [brand, setBrand] = useState('');
