@@ -77,7 +77,7 @@ export default function SigortaFinansPage() {
 
   // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [modalActionType, setModalActionType] = useState<'BORC' | 'TAHSILAT' | 'IADE' | 'DEVIR'>('BORC');
+  const [modalActionType, setModalActionType] = useState<'BORC' | 'TAHSILAT' | 'GIDEN_ODEME' | 'IADE' | 'DEVIR'>('BORC');
   const [editingMovement, setEditingMovement] = useState<CariMovement | null>(null);
 
   // Form States
@@ -99,7 +99,6 @@ export default function SigortaFinansPage() {
       const savedMov = localStorage.getItem('elisam_cari_movements');
       if (savedMov) {
         const parsed: CariMovement[] = JSON.parse(savedMov);
-        // Filter out any mock/sample items that were previously seeded
         const cleanMovs = parsed.filter(m => 
           !m.customerName.toUpperCase().includes('KAYSERİ ÇOK YAŞAR') && 
           !m.id.startsWith('CAR-00')
@@ -132,7 +131,7 @@ export default function SigortaFinansPage() {
   const [modalCustomerSearch, setModalCustomerSearch] = useState('');
 
   // Open Add Movement Modal
-  const handleOpenAddModal = (type: 'BORC' | 'TAHSILAT' | 'IADE' | 'DEVIR') => {
+  const handleOpenAddModal = (type: 'BORC' | 'TAHSILAT' | 'GIDEN_ODEME' | 'IADE' | 'DEVIR') => {
     setEditingMovement(null);
     setModalActionType(type);
     setModalCustomerSearch('');
@@ -157,9 +156,14 @@ export default function SigortaFinansPage() {
       setFormCreditAmount('0');
     } else if (type === 'TAHSILAT') {
       setFormMovementType('Banka Gelen Havale');
-      setFormDescription('İŞ BANKASI HAVALE / TAHSİLAT');
+      setFormDescription('GELEN HAVALE / TAHSİLAT');
       setFormDebitAmount('0');
       setFormCreditAmount('');
+    } else if (type === 'GIDEN_ODEME') {
+      setFormMovementType('Banka Giden Havale');
+      setFormDescription('ACENTEDEN GİDEN HAVALE / ÖDEME');
+      setFormDebitAmount('');
+      setFormCreditAmount('0');
     } else if (type === 'IADE') {
       setFormMovementType('Poliçe İptal / İade');
       setFormDescription('İPTAL / ZEYİL İADE BEDELİ');
@@ -495,17 +499,17 @@ export default function SigortaFinansPage() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                padding: '9px 14px',
+                padding: '9px 13px',
                 backgroundColor: '#eff6ff',
                 color: '#1d4ed8',
                 border: '1px solid #bfdbfe',
                 borderRadius: '8px',
                 fontWeight: 750,
-                fontSize: '0.85rem',
+                fontSize: '0.84rem',
                 cursor: 'pointer'
               }}
             >
-              <Plus size={16} /> ➕ Poliçe / Borç Kaydı
+              <Plus size={15} /> ➕ Poliçe / Borç Kaydı
             </button>
 
             <button
@@ -514,17 +518,36 @@ export default function SigortaFinansPage() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                padding: '9px 14px',
+                padding: '9px 13px',
                 backgroundColor: '#ecfdf5',
                 color: '#047857',
                 border: '1px solid #a7f3d0',
                 borderRadius: '8px',
                 fontWeight: 750,
-                fontSize: '0.85rem',
+                fontSize: '0.84rem',
                 cursor: 'pointer'
               }}
             >
-              <Plus size={16} /> 💳 Tahsilat / Havale Ekle
+              <Plus size={15} /> 💳 Gelen Tahsilat Ekle
+            </button>
+
+            <button
+              onClick={() => handleOpenAddModal('GIDEN_ODEME')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '9px 13px',
+                backgroundColor: '#fef3c7',
+                color: '#92400e',
+                border: '1px solid #fde68a',
+                borderRadius: '8px',
+                fontWeight: 750,
+                fontSize: '0.84rem',
+                cursor: 'pointer'
+              }}
+            >
+              <Plus size={15} /> 📤 Giden Ödeme Yap (Havale/Nakit)
             </button>
 
             <button
@@ -533,17 +556,17 @@ export default function SigortaFinansPage() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                padding: '9px 14px',
-                backgroundColor: '#fffbeb',
-                color: '#b45309',
-                border: '1px solid #fde68a',
+                padding: '9px 13px',
+                backgroundColor: '#f3e8ff',
+                color: '#6b21a8',
+                border: '1px solid #e9d5ff',
                 borderRadius: '8px',
                 fontWeight: 750,
-                fontSize: '0.85rem',
+                fontSize: '0.84rem',
                 cursor: 'pointer'
               }}
             >
-              <Plus size={16} /> ↩️ İptal / İade Girişi
+              <Plus size={15} /> ↩️ İptal / İade Girişi
             </button>
 
             <button
@@ -552,59 +575,66 @@ export default function SigortaFinansPage() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                padding: '9px 14px',
+                padding: '9px 13px',
                 backgroundColor: '#f8fafc',
                 color: '#475569',
                 border: '1px solid #cbd5e1',
                 borderRadius: '8px',
                 fontWeight: 750,
-                fontSize: '0.85rem',
+                fontSize: '0.84rem',
                 cursor: 'pointer'
               }}
             >
-              <Plus size={16} /> 📜 Devir Bakiye
+              <Plus size={15} /> 📜 Devir Bakiye
             </button>
           </div>
 
         </div>
       </div>
 
-      {/* KPI ÖZET KUTULARI (Görsel 2'deki Birebir Özet) */}
+      {/* KPI ÖZET KUTULARI (İki Yönlü Borç / Alacak Dengesi) */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '22px' }}>
         
         <div className={styles.card} style={{ borderLeft: '5px solid #1e3a8a', padding: '18px 22px' }}>
           <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Toplam Borç (Poliçeler)
+            Toplam Borç Hareketleri
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 850, color: '#1e3a8a', marginTop: '6px' }}>
             {totalDebit.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
           </div>
           <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>
-            Kesilen poliçelerin ve hizmetlerin toplamı
+            Poliçeler, faturalar ve acenteden giden ödemeler
           </div>
         </div>
 
         <div className={styles.card} style={{ borderLeft: '5px solid #16a34a', padding: '18px 22px' }}>
           <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Toplam Alınan (Tahsilat / Havale)
+            Toplam Alacak Hareketleri
           </div>
           <div style={{ fontSize: '1.75rem', fontWeight: 850, color: '#16a34a', marginTop: '6px' }}>
             {totalCredit.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
           </div>
           <div style={{ fontSize: '0.78rem', color: '#16a34a', marginTop: '4px', fontWeight: 600 }}>
-            Müşteriden yapılan tüm tahsilat & iadeler
+            Gelen tahsilatlar, havaleler ve iadeler
           </div>
         </div>
 
-        <div className={styles.card} style={{ borderLeft: '5px solid #dc2626', padding: '18px 22px' }}>
+        <div className={styles.card} style={{ borderLeft: `5px solid ${netRemainingBalance > 0 ? '#dc2626' : (netRemainingBalance < 0 ? '#2563eb' : '#16a34a')}`, padding: '18px 22px' }}>
           <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-            Kalan Net Bakiye (Müşteri Borcu)
+            Net Bakiye Durumu
           </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: 850, color: netRemainingBalance > 0 ? '#dc2626' : '#16a34a', marginTop: '6px' }}>
-            {netRemainingBalance.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+          <div style={{ fontSize: '1.75rem', fontWeight: 850, color: netRemainingBalance > 0 ? '#dc2626' : (netRemainingBalance < 0 ? '#2563eb' : '#16a34a'), marginTop: '6px' }}>
+            {Math.abs(netRemainingBalance).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+            <span style={{ fontSize: '0.9rem', marginLeft: '6px', fontWeight: 700 }}>
+              {netRemainingBalance > 0 ? '(Borçlu - B)' : (netRemainingBalance < 0 ? '(Alacaklı - A)' : '')}
+            </span>
           </div>
-          <div style={{ fontSize: '0.78rem', color: netRemainingBalance > 0 ? '#dc2626' : '#16a34a', marginTop: '4px', fontWeight: 700 }}>
-            {netRemainingBalance > 0 ? '🔴 Müşteri Borç Bakiyesi (Tahsil Edilecek)' : '🟢 Hesap Kapanmış / Alacaklı'}
+          <div style={{ fontSize: '0.78rem', color: netRemainingBalance > 0 ? '#dc2626' : (netRemainingBalance < 0 ? '#2563eb' : '#16a34a'), marginTop: '4px', fontWeight: 700 }}>
+            {netRemainingBalance > 0 
+              ? '🔴 Karşı Taraf Borçlu (Tahsil Edilecek Alacak)' 
+              : (netRemainingBalance < 0 
+                ? '🔵 Karşı Taraf Alacaklı (Acentenin Ödemesi / Avans)' 
+                : '🟢 Hesap Denk / Bakiye Sıfır')}
           </div>
         </div>
 
