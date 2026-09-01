@@ -642,3 +642,55 @@ export async function deleteRentBookingFromCloud(bookingId: string): Promise<voi
     console.error('deleteRentBookingFromCloud error:', err);
   }
 }
+
+// -------------------------------------------------------------
+// 7. TOPLU BULUT SENKRONİZASYONU (SYNC ALL LOCAL DATA TO SUPABASE)
+// -------------------------------------------------------------
+export async function syncAllLocalDataToCloud(): Promise<{ success: boolean; message: string }> {
+  if (!isSupabaseConfigured()) {
+    return { success: false, message: 'Supabase bağlantısı henüz yapılandırılmamış.' };
+  }
+
+  try {
+    // 1. Sync Customers
+    const savedCust = localStorage.getItem('elisam_customers');
+    if (savedCust) {
+      const custs: Customer[] = JSON.parse(savedCust);
+      for (const c of custs) {
+        await upsertCustomerToCloud(c);
+      }
+    }
+
+    // 2. Sync Policies
+    const savedPol = localStorage.getItem('elisam_policies');
+    if (savedPol) {
+      const pols: Policy[] = JSON.parse(savedPol);
+      for (const p of pols) {
+        await upsertPolicyToCloud(p);
+      }
+    }
+
+    // 3. Sync Cari Movements
+    const savedMov = localStorage.getItem('elisam_cari_movements');
+    if (savedMov) {
+      const movs: CariMovement[] = JSON.parse(savedMov);
+      for (const m of movs) {
+        await upsertCariMovementToCloud(m);
+      }
+    }
+
+    // 4. Sync Rent Bookings
+    const savedRent = localStorage.getItem('elisam_rent_bookings');
+    if (savedRent) {
+      const bookings: RentalBooking[] = JSON.parse(savedRent);
+      for (const b of bookings) {
+        await upsertRentBookingToCloud(b);
+      }
+    }
+
+    return { success: true, message: 'Tüm yerel veriler Supabase bulut veritabanına başarıyla aktarıldı!' };
+  } catch (err: any) {
+    return { success: false, message: `Senkronizasyon hatası: ${err.message}` };
+  }
+}
+
