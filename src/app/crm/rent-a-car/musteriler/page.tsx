@@ -6,27 +6,28 @@ import { RentCustomer, initialRentCustomersData, initialBookingsData } from '@/d
 import styles from '../layout.module.css';
 
 export default function RentMusterilerPage() {
-  const loadStoredCustomers = (): RentCustomer[] => {
-    if (typeof window === 'undefined') return initialRentCustomersData;
-    try {
-      const saved = localStorage.getItem('elisam_rent_customers');
-      return saved ? JSON.parse(saved) : initialRentCustomersData;
-    } catch {
-      return initialRentCustomersData;
-    }
-  };
-
-  const [customers, setCustomers] = useState<RentCustomer[]>(loadStoredCustomers);
+  const [customers, setCustomers] = useState<RentCustomer[]>(initialRentCustomersData);
+  const [isMounted, setIsMounted] = useState(false);
   const [bookings] = useState(initialBookingsData);
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<RentCustomer | null>(null);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    setIsMounted(true);
+    try {
+      const saved = localStorage.getItem('elisam_rent_customers');
+      if (saved) setCustomers(JSON.parse(saved));
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isMounted) {
       localStorage.setItem('elisam_rent_customers', JSON.stringify(customers));
     }
-  }, [customers]);
+  }, [customers, isMounted]);
 
   // Form state
   const [name, setName] = useState('');

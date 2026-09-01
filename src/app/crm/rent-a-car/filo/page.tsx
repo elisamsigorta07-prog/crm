@@ -6,27 +6,28 @@ import { RentVehicle, initialVehiclesData, initialBookingsData } from '@/data/re
 import styles from '../layout.module.css';
 
 export default function FiloPage() {
-  const loadStoredVehicles = (): RentVehicle[] => {
-    if (typeof window === 'undefined') return initialVehiclesData;
-    try {
-      const saved = localStorage.getItem('elisam_rent_vehicles');
-      return saved ? JSON.parse(saved) : initialVehiclesData;
-    } catch {
-      return initialVehiclesData;
-    }
-  };
-
-  const [vehicles, setVehicles] = useState<RentVehicle[]>(loadStoredVehicles);
+  const [vehicles, setVehicles] = useState<RentVehicle[]>(initialVehiclesData);
+  const [isMounted, setIsMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Tümü');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState<RentVehicle | null>(null);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    setIsMounted(true);
+    try {
+      const saved = localStorage.getItem('elisam_rent_vehicles');
+      if (saved) setVehicles(JSON.parse(saved));
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isMounted) {
       localStorage.setItem('elisam_rent_vehicles', JSON.stringify(vehicles));
     }
-  }, [vehicles]);
+  }, [vehicles, isMounted]);
 
   // Form State
   const [brand, setBrand] = useState('');

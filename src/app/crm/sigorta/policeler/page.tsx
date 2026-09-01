@@ -39,29 +39,10 @@ import {
 import styles from '../layout.module.css';
 
 export default function PolicelerPage() {
-  // Load persisted state or fallback
-  const loadStoredPolicies = (): Policy[] => {
-    if (typeof window === 'undefined') return initialPoliciesData;
-    try {
-      const saved = localStorage.getItem('elisam_policies');
-      return saved ? JSON.parse(saved) : initialPoliciesData;
-    } catch {
-      return initialPoliciesData;
-    }
-  };
+  const [policies, setPolicies] = useState<Policy[]>(initialPoliciesData);
+  const [customers, setCustomers] = useState<Customer[]>(initialCustomersData);
+  const [isMounted, setIsMounted] = useState(false);
 
-  const loadStoredCustomers = (): Customer[] => {
-    if (typeof window === 'undefined') return initialCustomersData;
-    try {
-      const saved = localStorage.getItem('elisam_customers');
-      return saved ? JSON.parse(saved) : initialCustomersData;
-    } catch {
-      return initialCustomersData;
-    }
-  };
-
-  const [policies, setPolicies] = useState<Policy[]>(loadStoredPolicies);
-  const [customers, setCustomers] = useState<Customer[]>(loadStoredCustomers);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'Tümü' | 'Aktifler' | 'Yaklaşanlar' | 'Bitenler' | 'Borcu Kalanlar'>('Tümü');
   
@@ -113,18 +94,32 @@ export default function PolicelerPage() {
   // Dynamic note adding inside detail modal
   const [newDetailNote, setNewDetailNote] = useState('');
 
-  // Persist policies & customers to localStorage
+  // Hydration-safe initial load from localStorage
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    setIsMounted(true);
+    try {
+      const savedPol = localStorage.getItem('elisam_policies');
+      if (savedPol) setPolicies(JSON.parse(savedPol));
+
+      const savedCust = localStorage.getItem('elisam_customers');
+      if (savedCust) setCustomers(JSON.parse(savedCust));
+    } catch (err) {
+      console.error('LocalStorage load error:', err);
+    }
+  }, []);
+
+  // Persist policies & customers to localStorage after mount
+  useEffect(() => {
+    if (isMounted) {
       localStorage.setItem('elisam_policies', JSON.stringify(policies));
     }
-  }, [policies]);
+  }, [policies, isMounted]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    if (isMounted) {
       localStorage.setItem('elisam_customers', JSON.stringify(customers));
     }
-  }, [customers]);
+  }, [customers, isMounted]);
 
   // Reset form helper
   const resetForm = () => {

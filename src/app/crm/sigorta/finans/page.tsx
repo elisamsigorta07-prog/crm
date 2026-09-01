@@ -197,29 +197,9 @@ const initialCariMovements: CariMovement[] = [
 ];
 
 export default function SigortaFinansPage() {
-  // Load persisted movements & customers
-  const loadStoredMovements = (): CariMovement[] => {
-    if (typeof window === 'undefined') return initialCariMovements;
-    try {
-      const saved = localStorage.getItem('elisam_cari_movements');
-      return saved ? JSON.parse(saved) : initialCariMovements;
-    } catch {
-      return initialCariMovements;
-    }
-  };
-
-  const loadStoredCustomers = (): Customer[] => {
-    if (typeof window === 'undefined') return initialCustomersData;
-    try {
-      const saved = localStorage.getItem('elisam_customers');
-      return saved ? JSON.parse(saved) : initialCustomersData;
-    } catch {
-      return initialCustomersData;
-    }
-  };
-
-  const [movements, setMovements] = useState<CariMovement[]>(loadStoredMovements);
-  const [customers, setCustomers] = useState<Customer[]>(loadStoredCustomers);
+  const [movements, setMovements] = useState<CariMovement[]>(initialCariMovements);
+  const [customers, setCustomers] = useState<Customer[]>(initialCustomersData);
+  const [isMounted, setIsMounted] = useState(false);
   
   // Selected Customer Filter (Default: ALL or specific customer)
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('ALL');
@@ -244,12 +224,26 @@ export default function SigortaFinansPage() {
   const [formCreditAmount, setFormCreditAmount] = useState('');
   const [formNotes, setFormNotes] = useState('');
 
-  // Persist movements to localStorage
+  // Hydration-safe initial load from localStorage
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    setIsMounted(true);
+    try {
+      const savedMov = localStorage.getItem('elisam_cari_movements');
+      if (savedMov) setMovements(JSON.parse(savedMov));
+
+      const savedCust = localStorage.getItem('elisam_customers');
+      if (savedCust) setCustomers(JSON.parse(savedCust));
+    } catch (err) {
+      console.error('LocalStorage load error:', err);
+    }
+  }, []);
+
+  // Persist movements to localStorage after mount
+  useEffect(() => {
+    if (isMounted) {
       localStorage.setItem('elisam_cari_movements', JSON.stringify(movements));
     }
-  }, [movements]);
+  }, [movements, isMounted]);
 
   // Open Add Movement Modal
   const handleOpenAddModal = (type: 'BORC' | 'TAHSILAT' | 'IADE' | 'DEVIR') => {

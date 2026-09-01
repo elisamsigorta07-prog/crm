@@ -1,35 +1,27 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CarFront, KeyRound, CheckCircle, TrendingUp, ArrowRight, Eye, Calendar, User, Target, Activity } from 'lucide-react';
 import Link from 'next/link';
 import { initialVehiclesData, initialBookingsData, RentalBooking, RentVehicle } from '@/data/rentCrmData';
 import styles from './dashboard.module.css';
 
 export default function RentDashboard() {
-  const loadStoredVehicles = (): RentVehicle[] => {
-    if (typeof window === 'undefined') return initialVehiclesData;
-    try {
-      const saved = localStorage.getItem('elisam_rent_vehicles');
-      return saved ? JSON.parse(saved) : initialVehiclesData;
-    } catch {
-      return initialVehiclesData;
-    }
-  };
-
-  const loadStoredBookings = (): RentalBooking[] => {
-    if (typeof window === 'undefined') return initialBookingsData;
-    try {
-      const saved = localStorage.getItem('elisam_rent_bookings');
-      return saved ? JSON.parse(saved) : initialBookingsData;
-    } catch {
-      return initialBookingsData;
-    }
-  };
-
-  const [vehicles] = useState<RentVehicle[]>(loadStoredVehicles);
-  const [bookings] = useState<RentalBooking[]>(loadStoredBookings);
+  const [vehicles, setVehicles] = useState<RentVehicle[]>(initialVehiclesData);
+  const [bookings, setBookings] = useState<RentalBooking[]>(initialBookingsData);
   const [selectedBooking, setSelectedBooking] = useState<RentalBooking | null>(null);
+
+  useEffect(() => {
+    try {
+      const savedVehicles = localStorage.getItem('elisam_rent_vehicles');
+      if (savedVehicles) setVehicles(JSON.parse(savedVehicles));
+
+      const savedBookings = localStorage.getItem('elisam_rent_bookings');
+      if (savedBookings) setBookings(JSON.parse(savedBookings));
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
 
   const totalVehicles = vehicles.length;
   const rentedVehicles = vehicles.filter(v => v.status === 'Kirada').length;

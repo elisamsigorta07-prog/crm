@@ -20,27 +20,28 @@ interface Quote {
 const initialQuotes: Quote[] = [];
 
 export default function TekliflerPage() {
-  const loadStoredQuotes = (): Quote[] => {
-    if (typeof window === 'undefined') return initialQuotes;
-    try {
-      const saved = localStorage.getItem('elisam_quotes');
-      return saved ? JSON.parse(saved) : initialQuotes;
-    } catch {
-      return initialQuotes;
-    }
-  };
-
-  const [quotes, setQuotes] = useState<Quote[]>(loadStoredQuotes);
+  const [quotes, setQuotes] = useState<Quote[]>(initialQuotes);
+  const [isMounted, setIsMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Tümü');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [addMode, setAddMode] = useState<'Manuel' | 'Otomatik'>('Manuel');
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+    setIsMounted(true);
+    try {
+      const saved = localStorage.getItem('elisam_quotes');
+      if (saved) setQuotes(JSON.parse(saved));
+    } catch (err) {
+      console.error(err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isMounted) {
       localStorage.setItem('elisam_quotes', JSON.stringify(quotes));
     }
-  }, [quotes]);
+  }, [quotes, isMounted]);
 
   const [customer, setCustomer] = useState('');
   const [tc, setTc] = useState('');
