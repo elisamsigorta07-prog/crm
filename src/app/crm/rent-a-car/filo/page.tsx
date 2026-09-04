@@ -35,24 +35,24 @@ export default function FiloPage() {
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
   const [plate, setPlate] = useState('');
-  const [year, setYear] = useState('2023');
-  const [dailyPrice, setDailyPrice] = useState('');
+  const [year, setYear] = useState('2024');
+  const [currentKm, setCurrentKm] = useState('10000');
   const [fuelType, setFuelType] = useState<RentVehicle['fuelType']>('Benzin');
   const [transmission, setTransmission] = useState<RentVehicle['transmission']>('Otomatik');
   const [category, setCategory] = useState<RentVehicle['category']>('Ekonomik');
 
   const handleAddVehicle = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!brand || !model || !plate || !dailyPrice) return;
+    if (!brand || !model || !plate) return;
 
     const newVehicle: RentVehicle = {
       id: `VEH-${Math.floor(100 + Math.random() * 900)}`,
       brand,
       model,
-      plate,
-      year: Number(year),
-      dailyPrice: Number(dailyPrice),
-      currentKm: 1000,
+      plate: plate.toUpperCase().trim(),
+      year: Number(year) || 2024,
+      dailyPrice: 0,
+      currentKm: Number(currentKm) || 0,
       fuelType,
       transmission,
       status: 'Müsait',
@@ -68,7 +68,7 @@ export default function FiloPage() {
     setBrand('');
     setModel('');
     setPlate('');
-    setDailyPrice('');
+    setCurrentKm('10000');
   };
 
   const filteredVehicles = vehicles.filter((v) => {
@@ -168,8 +168,8 @@ export default function FiloPage() {
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '12px', borderTop: '1px solid #edf2f7' }}>
                     <div>
-                      <span style={{ fontSize: '0.75rem', color: '#718096' }}>Günlük Kira</span>
-                      <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#e67e22' }}>₺{v.dailyPrice.toLocaleString('tr-TR')}</div>
+                      <span style={{ fontSize: '0.75rem', color: '#718096' }}>Kilometre</span>
+                      <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#334155' }}>{v.currentKm ? `${v.currentKm.toLocaleString('tr-TR')} km` : '0 km'}</div>
                     </div>
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <button 
@@ -184,7 +184,7 @@ export default function FiloPage() {
                           setModel(v.model);
                           setPlate(v.plate);
                           setYear(v.year.toString());
-                          setDailyPrice(v.dailyPrice.toString());
+                          setCurrentKm(v.currentKm ? v.currentKm.toString() : '0');
                           setFuelType(v.fuelType);
                           setTransmission(v.transmission);
                           setCategory(v.category);
@@ -196,7 +196,12 @@ export default function FiloPage() {
                         ✏️ Düzenle
                       </button>
                       <button 
-                        onClick={() => setVehicles(vehicles.filter(item => item.id !== v.id))}
+                        onClick={() => {
+                          if (confirm(`"${v.plate} - ${v.brand} ${v.model}" aracını filodan silmek istediğinize emin misiniz?`)) {
+                            setVehicles(vehicles.filter(item => item.id !== v.id));
+                            deleteRentVehicleFromCloud(v.id);
+                          }
+                        }}
                         style={{ padding: '8px 10px', backgroundColor: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer' }}
                       >
                         🗑️ Sil
@@ -246,9 +251,9 @@ export default function FiloPage() {
                 <div style={{ fontWeight: 600, color: '#2d3748', fontSize: '1rem' }}>{selectedVehicle.currentKm.toLocaleString('tr-TR')} km</div>
               </div>
 
-              <div style={{ backgroundColor: '#fffaf0', padding: '14px', borderRadius: '10px', border: '1px solid #feebc8' }}>
-                <div style={{ fontSize: '0.8rem', color: '#dd6b20' }}>Günlük Kira Fiyatı</div>
-                <div style={{ fontWeight: 700, color: '#dd6b20', fontSize: '1.2rem' }}>{selectedVehicle.dailyPrice.toLocaleString('tr-TR')} ₺ / gün</div>
+              <div style={{ backgroundColor: '#f8fafc', padding: '14px', borderRadius: '10px', border: '1px solid #edf2f7' }}>
+                <div style={{ fontSize: '0.8rem', color: '#718096' }}>Segment / Kategori</div>
+                <div style={{ fontWeight: 700, color: '#0f172a', fontSize: '1.1rem' }}>{selectedVehicle.category || 'Ekonomik'}</div>
               </div>
             </div>
 
@@ -258,9 +263,9 @@ export default function FiloPage() {
                 <ShieldCheck size={16} /> Hasar & Periyodik Bakım Geçmişi:
               </div>
               <ul style={{ paddingLeft: '18px', margin: 0, fontSize: '0.85rem', color: '#4a5568' }}>
-                <li>15.000 KM periyodik yağ ve filtre bakımı yetkili serviste yapıldı.</li>
-                <li>Sağ arka tamponda hafif sürtme izi (Boyasız göçük düzeltme yapıldı).</li>
-                <li>Yazlık lastikler yenilendi (Michelin Primacy 4).</li>
+                <li>Periyodik yağ ve filtre bakımı yetkili serviste yapıldı.</li>
+                <li>Mevsimlik lastikleri yenilendi ve rot-balans ayarı yapıldı.</li>
+                <li>İç ve dış detaylı kuaför temizliği yapıldı.</li>
               </ul>
             </div>
 
@@ -300,8 +305,26 @@ export default function FiloPage() {
                   <input type="text" required value={plate} onChange={(e) => setPlate(e.target.value)} placeholder="07 AAA 007" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none', fontFamily: 'monospace', fontWeight: 700 }} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Günlük Ücret (₺) *</label>
-                  <input type="number" required value={dailyPrice} onChange={(e) => setDailyPrice(e.target.value)} placeholder="1800" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }} />
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Model Yılı *</label>
+                  <input type="number" required value={year} onChange={(e) => setYear(e.target.value)} placeholder="2024" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }} />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Güncel Kilometre (KM)</label>
+                  <input type="number" value={currentKm} onChange={(e) => setCurrentKm(e.target.value)} placeholder="10000" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }} />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#4a5568', marginBottom: '6px' }}>Segment / Kategori</label>
+                  <select value={category} onChange={(e) => setCategory(e.target.value as any)} style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }}>
+                    <option value="Ekonomik">Ekonomik</option>
+                    <option value="Konfor">Konfor</option>
+                    <option value="SUV">SUV</option>
+                    <option value="Lüks">Lüks</option>
+                    <option value="Ticari / Minibüs">Ticari / Minibüs</option>
+                  </select>
                 </div>
               </div>
 

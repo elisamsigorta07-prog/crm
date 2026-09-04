@@ -38,8 +38,7 @@ export default function RentCrmLayout({
   const navItems = [
     { name: 'Dashboard', href: '/crm/rent-a-car/dashboard', icon: LayoutDashboard },
     { name: 'Araç Filosu', href: '/crm/rent-a-car/filo', icon: CarFront },
-    { name: 'Kiralamalar', href: '/crm/rent-a-car/kiralamalar', icon: KeyRound },
-    { name: 'Müşteriler', href: '/crm/rent-a-car/musteriler', icon: Users },
+    { name: 'Kiralamalar & Sözleşmeler', href: '/crm/rent-a-car/kiralamalar', icon: KeyRound },
     { name: 'Finans & Cari', href: '/crm/rent-a-car/finans', icon: Receipt },
     { name: 'Raporlar', href: '/crm/rent-a-car/raporlar', icon: BarChart3 },
     { name: 'Ayarlar', href: '/crm/rent-a-car/ayarlar', icon: Settings },
