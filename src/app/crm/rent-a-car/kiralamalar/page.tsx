@@ -9,7 +9,9 @@ import {
   fetchRentVehiclesFromCloud,
   upsertRentBookingToCloud,
   upsertRentVehicleToCloud,
-  deleteRentBookingFromCloud
+  deleteRentBookingFromCloud,
+  upsertRentCariMovementToCloud,
+  deleteRentCariMovementFromCloud
 } from '@/lib/supabaseService';
 import styles from '../layout.module.css';
 
@@ -119,6 +121,100 @@ export default function KiralamalarPage() {
 
     setBookings([newBooking, ...bookings]);
     upsertRentBookingToCloud(newBooking);
+
+    // 3. AUTO-SYNC WITH RENT FINANS & CARİ HESAP EKSTRESİ (elisam_rent_cari_movements)
+    try {
+      const savedMovs = JSON.parse(localStorage.getItem('elisam_rent_cari_movements') || '[]');
+      
+      const getNextReceiptNo = (currentMovements: any[]): string => {
+        if (!currentMovements || currentMovements.length === 0) return 'R000001';
+        const numbers = currentMovements
+          .map(m => {
+            const match = m.receiptNo?.match(/^R(\d+)$/i);
+            return match ? parseInt(match[1], 10) : 0;
+          })
+          .filter(n => !isNaN(n) && n > 0);
+        const maxNum = numbers.length > 0 ? Math.max(...numbers) : currentMovements.length;
+        return `R${String(maxNum + 1).padStart(6, '0')}`;
+      };
+
+      let updatedMovs = [...savedMovs];
+      const formattedStartDate = pickupDate ? pickupDate.split('-').reverse().join('.') : new Date().toLocaleDateString('tr-TR');
+      const formattedEndDate = returnDate ? returnDate.split('-').reverse().join('.') : undefined;
+
+      // 1. Borç Kaydı: Kiralama Bedeli Tahakkuku
+      const receiptNoDebt = getNextReceiptNo(updatedMovs);
+      const debtMovement = {
+        id: `RCAR-${Math.floor(1000 + Math.random() * 9000)}`,
+        date: formattedStartDate,
+        dueDate: formattedEndDate,
+        receiptNo: receiptNoDebt,
+        customerId: selectedCustomerId,
+        customerName: matchedCustomer?.name || 'Müşteri',
+        vehicleId: selectedVehicleId,
+        vehiclePlate: matchedVehicle?.plate,
+        vehicleName: matchedVehicle ? `${matchedVehicle.brand} ${matchedVehicle.model}` : undefined,
+        description: `${newBooking.id} nolu Sözleşme - ${matchedVehicle?.plate || ''} ${calculatedDays} Günlük Kiralama Bedeli`,
+        movementType: 'Kiralama Bedeli Tahakkuku' as const,
+        debitAmount: calculatedTotal,
+        creditAmount: 0,
+        notes: notes || 'Kiralama sözleşmesi ile otomatik oluşturuldu.'
+      };
+      updatedMovs = [debtMovement, ...updatedMovs];
+      upsertRentCariMovementToCloud(debtMovement);
+
+      // 2. Tahsilat Kaydı (Kiralama peşin ödendiyse)
+      if (calculatedTotal > 0) {
+        const receiptNoPaid = getNextReceiptNo(updatedMovs);
+        const paidMovement = {
+          id: `RCAR-${Math.floor(1000 + Math.random() * 9000)}`,
+          date: formattedStartDate,
+          dueDate: undefined,
+          receiptNo: receiptNoPaid,
+          customerId: selectedCustomerId,
+          customerName: matchedCustomer?.name || 'Müşteri',
+          vehicleId: selectedVehicleId,
+          vehiclePlate: matchedVehicle?.plate,
+          vehicleName: matchedVehicle ? `${matchedVehicle.brand} ${matchedVehicle.model}` : undefined,
+          description: `${newBooking.id} nolu Sözleşme Kira Tahsilatı (${paymentMethod})`,
+          movementType: (paymentMethod === 'Kredi Kartı' ? 'Kira Tahsilatı (Kredi Kartı)' : (paymentMethod === 'Nakit' ? 'Kira Tahsilatı (Nakit)' : 'Kira Tahsilatı (Banka Havale/EFT)')) as any,
+          debitAmount: 0,
+          creditAmount: calculatedTotal,
+          notes: 'Kiralama başlangıcında tahsil edildi.'
+        };
+        updatedMovs = [paidMovement, ...updatedMovs];
+        upsertRentCariMovementToCloud(paidMovement);
+      }
+
+      // 3. Depozito Kaydı (Depozito alındıysa)
+      const depAmt = Number(depositAmount) || 0;
+      if (depAmt > 0) {
+        const receiptNoDep = getNextReceiptNo(updatedMovs);
+        const depMovement = {
+          id: `RCAR-${Math.floor(1000 + Math.random() * 9000)}`,
+          date: formattedStartDate,
+          dueDate: formattedEndDate,
+          receiptNo: receiptNoDep,
+          customerId: selectedCustomerId,
+          customerName: matchedCustomer?.name || 'Müşteri',
+          vehicleId: selectedVehicleId,
+          vehiclePlate: matchedVehicle?.plate,
+          vehicleName: matchedVehicle ? `${matchedVehicle.brand} ${matchedVehicle.model}` : undefined,
+          description: `${newBooking.id} nolu Sözleşme - ${matchedVehicle?.plate || ''} Kiralama Güvence Depozitosu`,
+          movementType: 'Depozito / Provizyon Tahsilatı' as const,
+          debitAmount: 0,
+          creditAmount: depAmt,
+          notes: 'Sözleşme başlangıcında depozito/provizyon alındı.'
+        };
+        updatedMovs = [depMovement, ...updatedMovs];
+        upsertRentCariMovementToCloud(depMovement);
+      }
+
+      localStorage.setItem('elisam_rent_cari_movements', JSON.stringify(updatedMovs));
+    } catch (err) {
+      console.error('Rent cari sync error:', err);
+    }
+
     setIsAddModalOpen(false);
 
     // Reset

@@ -644,7 +644,154 @@ export async function deleteRentBookingFromCloud(bookingId: string): Promise<voi
 }
 
 // -------------------------------------------------------------
-// 7. TOPLU BULUT SENKRONİZASYONU (SYNC ALL LOCAL DATA TO SUPABASE)
+// 7. RENT A CAR CARİ & FİNANS HAREKETLERİ (RENT CARI MOVEMENTS)
+// -------------------------------------------------------------
+export interface RentCariMovement {
+  id: string;
+  date: string;               // Tarih (DD.MM.YYYY)
+  dueDate?: string;           // Vade Tarihi / İade Tarihi
+  receiptNo?: string;         // Fiş / Sözleşme No (örn: R000001)
+  customerId: string;         // Sürücü / Müşteri ID
+  customerName: string;       // Sürücü Ad Soyad
+  vehicleId?: string;         // Araç ID
+  vehiclePlate?: string;      // Araç Plakası (örn: 07 ELS 07)
+  vehicleName?: string;       // Araç Modeli
+  description: string;        // Açıklama
+  movementType: 
+    | 'Kiralama Bedeli Tahakkuku'
+    | 'Kira Tahsilatı (Nakit)'
+    | 'Kira Tahsilatı (Kredi Kartı)'
+    | 'Kira Tahsilatı (Banka Havale/EFT)'
+    | 'Kira Tahsilatı (Döviz EUR/USD)'
+    | 'Depozito / Provizyon Tahsilatı'
+    | 'Depozito İadesi'
+    | 'Ekstra Km / Yakıt / Temizlik Farkı'
+    | 'Trafik Cezası / HGS Geçişi'
+    | 'Hasar / Onarım Bedeli Tahakkuku'
+    | 'Araç Bakım & Servis Gideri'
+    | 'Kasko / Muayene / Sigorta Gideri'
+    | 'Cari Mahsup Çıkışı'
+    | 'Tarih Öncesi Devir Bakiye';
+  debitAmount: number;        // Borç (TL)
+  creditAmount: number;       // Alacak (TL)
+  notes?: string;
+}
+
+export async function fetchRentCariMovementsFromCloud(): Promise<RentCariMovement[]> {
+  try {
+    if (!isSupabaseConfigured()) {
+      const saved = localStorage.getItem('elisam_rent_cari_movements');
+      return saved ? JSON.parse(saved) : [];
+    }
+
+    const { data, error } = await supabase
+      .from('rent_cari_movements')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.warn('Supabase rent_cari_movements fetch error, fallback to local:', error.message);
+      const saved = localStorage.getItem('elisam_rent_cari_movements');
+      return saved ? JSON.parse(saved) : [];
+    }
+
+    if (data) {
+      const mapped: RentCariMovement[] = data.map((m: any) => ({
+        id: m.id,
+        date: m.date,
+        dueDate: m.due_date || undefined,
+        receiptNo: m.receipt_no || '-',
+        customerId: m.customer_id,
+        customerName: m.customer_name,
+        vehicleId: m.vehicle_id || undefined,
+        vehiclePlate: m.vehicle_plate || undefined,
+        vehicleName: m.vehicle_name || undefined,
+        description: m.description || '',
+        movementType: m.movement_type,
+        debitAmount: Number(m.debit_amount) || 0,
+        creditAmount: Number(m.credit_amount) || 0,
+        notes: m.notes || undefined
+      }));
+      localStorage.setItem('elisam_rent_cari_movements', JSON.stringify(mapped));
+      return mapped;
+    }
+  } catch (err) {
+    console.error('fetchRentCariMovementsFromCloud error:', err);
+  }
+  const saved = localStorage.getItem('elisam_rent_cari_movements');
+  return saved ? JSON.parse(saved) : [];
+}
+
+export async function upsertRentCariMovementToCloud(mov: RentCariMovement): Promise<void> {
+  try {
+    const saved = localStorage.getItem('elisam_rent_cari_movements');
+    const list: RentCariMovement[] = saved ? JSON.parse(saved) : [];
+    const updated = [mov, ...list.filter(m => m.id !== mov.id)];
+    localStorage.setItem('elisam_rent_cari_movements', JSON.stringify(updated));
+  } catch (err) {
+    console.error(err);
+  }
+
+  if (!isSupabaseConfigured()) return;
+  try {
+    const row = {
+      id: mov.id,
+      date: mov.date,
+      due_date: mov.dueDate || null,
+      receipt_no: mov.receiptNo || null,
+      customer_id: mov.customerId,
+      customer_name: mov.customerName,
+      vehicle_id: mov.vehicleId || null,
+      vehicle_plate: mov.vehiclePlate || null,
+      vehicle_name: mov.vehicleName || null,
+      description: mov.description,
+      movement_type: mov.movementType,
+      debit_amount: mov.debitAmount,
+      credit_amount: mov.creditAmount,
+      notes: mov.notes || null
+    };
+    await supabase.from('rent_cari_movements').upsert(row);
+  } catch (err) {
+    console.error('upsertRentCariMovementToCloud error:', err);
+  }
+}
+
+export async function deleteRentCariMovementFromCloud(movementId: string): Promise<void> {
+  try {
+    const saved = localStorage.getItem('elisam_rent_cari_movements');
+    if (saved) {
+      const list: RentCariMovement[] = JSON.parse(saved);
+      localStorage.setItem('elisam_rent_cari_movements', JSON.stringify(list.filter(m => m.id !== movementId)));
+    }
+  } catch (err) {
+    console.error(err);
+  }
+
+  if (!isSupabaseConfigured()) return;
+  try {
+    await supabase.from('rent_cari_movements').delete().eq('id', movementId);
+  } catch (err) {
+    console.error('deleteRentCariMovementFromCloud error:', err);
+  }
+}
+
+export async function clearRentCariMovementsFromCloud(): Promise<void> {
+  try {
+    localStorage.removeItem('elisam_rent_cari_movements');
+  } catch (err) {
+    console.error(err);
+  }
+
+  if (!isSupabaseConfigured()) return;
+  try {
+    await supabase.from('rent_cari_movements').delete().neq('id', 'CLEAN_ALL');
+  } catch (err) {
+    console.error('clearRentCariMovementsFromCloud error:', err);
+  }
+}
+
+// -------------------------------------------------------------
+// 8. TOPLU BULUT SENKRONİZASYONU (SYNC ALL LOCAL DATA TO SUPABASE)
 // -------------------------------------------------------------
 export async function syncAllLocalDataToCloud(): Promise<{ success: boolean; message: string }> {
   if (!isSupabaseConfigured()) {
@@ -679,7 +826,25 @@ export async function syncAllLocalDataToCloud(): Promise<{ success: boolean; mes
       }
     }
 
-    // 4. Sync Rent Bookings
+    // 4. Sync Rent Vehicles
+    const savedVeh = localStorage.getItem('elisam_rent_vehicles');
+    if (savedVeh) {
+      const vehs: RentVehicle[] = JSON.parse(savedVeh);
+      for (const v of vehs) {
+        await upsertRentVehicleToCloud(v);
+      }
+    }
+
+    // 5. Sync Rent Customers
+    const savedRentCust = localStorage.getItem('elisam_rent_customers');
+    if (savedRentCust) {
+      const rentCusts: RentCustomer[] = JSON.parse(savedRentCust);
+      for (const rc of rentCusts) {
+        await upsertRentCustomerToCloud(rc);
+      }
+    }
+
+    // 6. Sync Rent Bookings
     const savedRent = localStorage.getItem('elisam_rent_bookings');
     if (savedRent) {
       const bookings: RentalBooking[] = JSON.parse(savedRent);
@@ -688,7 +853,16 @@ export async function syncAllLocalDataToCloud(): Promise<{ success: boolean; mes
       }
     }
 
-    return { success: true, message: 'Tüm yerel veriler Supabase bulut veritabanına başarıyla aktarıldı!' };
+    // 7. Sync Rent Cari Movements
+    const savedRentMov = localStorage.getItem('elisam_rent_cari_movements');
+    if (savedRentMov) {
+      const rentMovs: RentCariMovement[] = JSON.parse(savedRentMov);
+      for (const rm of rentMovs) {
+        await upsertRentCariMovementToCloud(rm);
+      }
+    }
+
+    return { success: true, message: 'Tüm Sigorta ve Rent A Car verileri Supabase bulut veritabanına başarıyla aktarıldı!' };
   } catch (err: any) {
     return { success: false, message: `Senkronizasyon hatası: ${err.message}` };
   }

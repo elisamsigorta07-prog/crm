@@ -11,6 +11,7 @@ import {
   LogOut, 
   Settings, 
   BarChart3,
+  Receipt,
   Menu,
   X
 } from 'lucide-react';
@@ -39,6 +40,7 @@ export default function RentCrmLayout({
     { name: 'Araç Filosu', href: '/crm/rent-a-car/filo', icon: CarFront },
     { name: 'Kiralamalar', href: '/crm/rent-a-car/kiralamalar', icon: KeyRound },
     { name: 'Müşteriler', href: '/crm/rent-a-car/musteriler', icon: Users },
+    { name: 'Finans & Cari', href: '/crm/rent-a-car/finans', icon: Receipt },
     { name: 'Raporlar', href: '/crm/rent-a-car/raporlar', icon: BarChart3 },
     { name: 'Ayarlar', href: '/crm/rent-a-car/ayarlar', icon: Settings },
   ];
