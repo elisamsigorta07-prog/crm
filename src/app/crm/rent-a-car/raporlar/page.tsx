@@ -92,6 +92,12 @@ export default function RentRaporlarPage() {
     setEndDate(now.toISOString().split('T')[0]);
   };
 
+  const formatExcelCurrency = (val: number | string | undefined | null): string => {
+    const num = typeof val === 'number' ? val : Number(val);
+    if (isNaN(num)) return '0,00';
+    return num.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
   const downloadCSV = (filename: string, contentString: string) => {
     const bom = '\uFEFF';
     const blob = new Blob([bom + contentString], { type: 'text/csv;charset=utf-8;' });
@@ -104,9 +110,9 @@ export default function RentRaporlarPage() {
   const handleDownloadMonthlyExcelBackup = () => {
     const periodName = getPeriodLabel(backupPeriod);
     const dateStamp = new Date().toLocaleDateString('tr-TR');
-    let csv = `ELİSAM RENT A CAR - AYLIK TAM SİSTEM YEDEĞİ & FAALİYET DÖKÜMÜ\nDönem:;${periodName}\nYedek Alma Tarihi:;${dateStamp}\n\n=== 1. DÖNEM ÖZETİ ===\nToplam Kiralama Sözleşmesi;${monthlyBookings.length} Adet\nToplam Kiralanan Gün Sayısı;${monthlyTotalDays} Gün\nToplam Kiralama Geliri;${monthlyTotalRevenue.toFixed(2)} TL\n\n=== 2. KİRALAMA SÖZLEŞMELERİ (${monthlyBookings.length} ADET) ===\nSözleşme No;Araç Modeli;Plaka;Müşteri / Sürücü;Teslim Tarihi;İade Tarihi;Gün;Tutar (TL);Ödeme Yöntemi;Durum\n`;
+    let csv = `ELİSAM RENT A CAR - AYLIK TAM SİSTEM YEDEĞİ & FAALİYET DÖKÜMÜ\nDönem:;${periodName}\nYedek Alma Tarihi:;${dateStamp}\n\n=== 1. DÖNEM ÖZETİ ===\nToplam Kiralama Sözleşmesi;${monthlyBookings.length} Adet\nToplam Kiralanan Gün Sayısı;${monthlyTotalDays} Gün\nToplam Kiralama Geliri;${formatExcelCurrency(monthlyTotalRevenue)} TL\n\n=== 2. KİRALAMA SÖZLEŞMELERİ (${monthlyBookings.length} ADET) ===\nSözleşme No;Araç Modeli;Plaka;Müşteri / Sürücü;Teslim Tarihi;İade Tarihi;Gün;Tutar (TL);Ödeme Yöntemi;Durum\n`;
     if (monthlyBookings.length > 0) {
-      monthlyBookings.forEach(b => { csv += `"${b.id}";"${b.vehicleName}";"${b.vehiclePlate}";"${b.customerName}";"${b.pickupDate}";"${b.returnDate}";"${b.days}";"${b.totalAmount}";"${b.paymentMethod}";"${b.status}"\n`; });
+      monthlyBookings.forEach(b => { csv += `"${b.id}";"${b.vehicleName}";"${b.vehiclePlate}";"${b.customerName}";"${b.pickupDate}";"${b.returnDate}";"${b.days}";"${formatExcelCurrency(b.totalAmount)}";"${b.paymentMethod}";"${b.status}"\n`; });
     } else { csv += `"(Bu dönemde kiralama kaydı bulunmamaktadır)";"";"";"";"";"";"";"";"";""\n`; }
     csv += `\n=== 3. SÜRÜCÜ & MÜŞTERİ PORTFÖYÜ (${customers.length} KİŞİ) ===\nMüşteri No;Ad Soyad;Ülke;TCKN / Pasaport;Telefon;E-Posta\n`;
     customers.forEach(c => { csv += `"${c.id}";"${c.name}";"${c.country}";"${c.identityOrPassport}";"${c.phone}";"${c.email}"\n`; });
@@ -148,22 +154,22 @@ export default function RentRaporlarPage() {
   const handleDownloadCSV = (type: RentReportType) => {
     const today = new Date().toLocaleDateString('tr-TR');
     if (type === 'kiralamalar') {
-      const rows = [['Sözleşme No', 'Araç', 'Plaka', 'Müşteri', 'Teslim Tarihi', 'İade Tarihi', 'Gün', 'Toplam Tutar (TL)', 'Ödeme Yöntemi', 'Durum'], ...bookings.map(b => [b.id, b.vehicleName, b.vehiclePlate, b.customerName, b.pickupDate, b.returnDate, String(b.days), String(b.totalAmount), b.paymentMethod, b.status])];
-      downloadCSV(`elisam-rent-kiralamalar-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n'));
+      const rows = [['Sözleşme No', 'Araç', 'Plaka', 'Müşteri', 'Teslim Tarihi', 'İade Tarihi', 'Gün', 'Toplam Tutar (TL)', 'Ödeme Yöntemi', 'Durum'], ...bookings.map(b => [b.id, b.vehicleName, b.vehiclePlate, b.customerName, b.pickupDate, b.returnDate, String(b.days), formatExcelCurrency(b.totalAmount), b.paymentMethod, b.status])];
+      downloadCSV(`elisam-rent-kiralamalar-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(';')).join('\n'));
     } else if (type === 'arac_kullanim') {
       const map: Record<string, any> = {};
       bookings.forEach(b => { if (!map[b.vehicleId]) map[b.vehicleId] = { name: b.vehicleName, plate: b.vehiclePlate, bookings: 0, totalDays: 0, totalRevenue: 0 }; map[b.vehicleId].bookings++; map[b.vehicleId].totalDays += b.days; map[b.vehicleId].totalRevenue += b.totalAmount; });
-      const rows = [['Araç Modeli', 'Plaka', 'Kiralama Adedi', 'Toplam Kiralanan Gün', 'Toplam Gelir (TL)'], ...Object.values(map).map((v: any) => [v.name, v.plate, String(v.bookings), String(v.totalDays), String(v.totalRevenue)])];
-      downloadCSV(`elisam-rent-arac-kullanim-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n'));
+      const rows = [['Araç Modeli', 'Plaka', 'Kiralama Adedi', 'Toplam Kiralanan Gün', 'Toplam Gelir (TL)'], ...Object.values(map).map((v: any) => [v.name, v.plate, String(v.bookings), String(v.totalDays), formatExcelCurrency(v.totalRevenue)])];
+      downloadCSV(`elisam-rent-arac-kullanim-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(';')).join('\n'));
     } else if (type === 'musteriler') {
       const rows = [['Müşteri ID', 'Ad Soyad', 'Ülke', 'Kimlik / Pasaport', 'Telefon', 'E-Posta', 'Toplam Kiralama'], ...customers.map(c => [c.id, c.name, c.country, c.identityOrPassport, c.phone, c.email, String(c.totalRentals)])];
-      downloadCSV(`elisam-rent-musteri-listesi-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n'));
+      downloadCSV(`elisam-rent-musteri-listesi-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(';')).join('\n'));
     } else if (type === 'gelir_ozeti') {
       const totalRevenue = bookings.reduce((s, b) => s + b.totalAmount, 0);
       const byPayment: Record<string, number> = {};
       bookings.forEach(b => { byPayment[b.paymentMethod] = (byPayment[b.paymentMethod] || 0) + b.totalAmount; });
-      const rows = [['Ödeme Yöntemi', 'Toplam Gelir (TL)', 'İşlem Adedi'], ...Object.entries(byPayment).map(([k, v]) => [k, String(v), String(bookings.filter(b => b.paymentMethod === k).length)]), ['GENEL TOPLAM', String(totalRevenue), String(bookings.length)]];
-      downloadCSV(`elisam-rent-gelir-ozeti-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n'));
+      const rows = [['Ödeme Yöntemi', 'Toplam Gelir (TL)', 'İşlem Adedi'], ...Object.entries(byPayment).map(([k, v]) => [k, formatExcelCurrency(v), String(bookings.filter(b => b.paymentMethod === k).length)]), ['GENEL TOPLAM', formatExcelCurrency(totalRevenue), String(bookings.length)]];
+      downloadCSV(`elisam-rent-gelir-ozeti-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(';')).join('\n'));
     }
   };
 

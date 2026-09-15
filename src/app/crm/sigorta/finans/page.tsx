@@ -400,6 +400,12 @@ export default function SigortaFinansPage() {
     });
   };
 
+  const formatExcelCurrency = (val: number | string | undefined | null): string => {
+    const num = typeof val === 'number' ? val : Number(val);
+    if (isNaN(num)) return '0,00';
+    return num.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
   // Export to CSV / Excel
   const handleExportCSV = () => {
     const headers = ['Tarih', 'Vade Tarihi', 'Fiş No', 'Müşteri', 'Açıklama', 'Hareket Türü', 'Borç (TL)', 'Alacak / Alınan (TL)', 'Kalan Bakiye (TL)'];
@@ -410,9 +416,9 @@ export default function SigortaFinansPage() {
       `"${m.customerName}"`,
       `"${m.description.replace(/"/g, '""')}"`,
       `"${m.movementType}"`,
-      `"${m.debitAmount.toFixed(2)}"`,
-      `"${m.creditAmount.toFixed(2)}"`,
-      `"${m.currentBalance.toFixed(2)}"`
+      `"${formatExcelCurrency(m.debitAmount)}"`,
+      `"${formatExcelCurrency(m.creditAmount)}"`,
+      `"${formatExcelCurrency(m.currentBalance)}"`
     ]);
 
     const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');

@@ -429,13 +429,19 @@ export default function RentFinansPage() {
     });
   };
 
+  const formatExcelCurrency = (val: number | string | undefined | null): string => {
+    const num = typeof val === 'number' ? val : Number(val);
+    if (isNaN(num)) return '0,00';
+    return num.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
   // Export to Excel CSV
   const handleExportCSV = () => {
     let csv = '\uFEFF';
     csv += 'Tarih;Vade Tarihi;Fiş No;Sürücü / Müşteri;Araç Plakası;Araç Modeli;Hareket Türü;Açıklama;Borç (TL);Alacak / Tahsilat (TL);Yürüyen Bakiye (TL);Notlar\n';
     
     movementsWithBalance.forEach(m => {
-      csv += `"${m.date}";"${m.dueDate || ''}";"${m.receiptNo || ''}";"${m.customerName}";"${m.vehiclePlate || ''}";"${m.vehicleName || ''}";"${m.movementType}";"${m.description}";"${m.debitAmount}";"${m.creditAmount}";"${(m as any).currentBalance}";"${m.notes || ''}"\n`;
+      csv += `"${m.date}";"${m.dueDate || ''}";"${m.receiptNo || ''}";"${m.customerName}";"${m.vehiclePlate || ''}";"${m.vehicleName || ''}";"${m.movementType}";"${m.description}";"${formatExcelCurrency(m.debitAmount)}";"${formatExcelCurrency(m.creditAmount)}";"${formatExcelCurrency((m as any).currentBalance)}";"${m.notes || ''}"\n`;
     });
 
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

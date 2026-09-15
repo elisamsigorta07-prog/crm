@@ -114,6 +114,12 @@ export default function SigortaRaporlarPage() {
     setEndDate(now.toISOString().split('T')[0]);
   };
 
+  const formatExcelCurrency = (val: number | string | undefined | null): string => {
+    const num = typeof val === 'number' ? val : Number(val);
+    if (isNaN(num)) return '0,00';
+    return num.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
   const downloadCSV = (filename: string, contentString: string) => {
     const bom = '\uFEFF';
     const blob = new Blob([bom + contentString], { type: 'text/csv;charset=utf-8;' });
@@ -140,17 +146,17 @@ export default function SigortaRaporlarPage() {
     csv += `=== 1. DÖNEM ÖZETİ VE FİNANSAL METRİKLER ===\n`;
     csv += `Metrik;Değer\n`;
     csv += `Toplam Kesilen Poliçe Adedi;${monthlyPolicies.length} Adet\n`;
-    csv += `Toplam Üretilen Brüt Prim;${monthlyTotalPremium.toFixed(2)} TL\n`;
-    csv += `Toplam Borç Hareketleri (Poliçe/Gider);${monthlyDebitTotal.toFixed(2)} TL\n`;
-    csv += `Toplam Alınan (Tahsilat / Gelen Havale);${monthlyCreditTotal.toFixed(2)} TL\n`;
-    csv += `Net Cari Bakiye;${monthlyNetBalance.toFixed(2)} TL (${monthlyNetBalance > 0 ? 'Borçlu' : 'Alacaklı'})\n\n`;
+    csv += `Toplam Üretilen Brüt Prim;${formatExcelCurrency(monthlyTotalPremium)} TL\n`;
+    csv += `Toplam Borç Hareketleri (Poliçe/Gider);${formatExcelCurrency(monthlyDebitTotal)} TL\n`;
+    csv += `Toplam Alınan (Tahsilat / Gelen Havale);${formatExcelCurrency(monthlyCreditTotal)} TL\n`;
+    csv += `Net Cari Bakiye;${formatExcelCurrency(monthlyNetBalance)} TL (${monthlyNetBalance > 0 ? 'Borçlu' : 'Alacaklı'})\n\n`;
 
     // BÖLÜM 2: SEÇİLİ AYIN POLİÇELERİ
     csv += `=== 2. POLİÇE ÜRETİM KAYITLARI (${monthlyPolicies.length} ADET) ===\n`;
     csv += `Poliçe No;Müşteri Adı;Poliçe Türü;Sigorta Şirketi;Başlangıç Tarihi;Bitiş Tarihi;Brüt Prim (TL);Durum;Plaka\n`;
     if (monthlyPolicies.length > 0) {
       monthlyPolicies.forEach(p => {
-        csv += `"${p.policyNo || p.id}";"${p.customerName}";"${p.type}";"${p.company}";"${p.startDate}";"${p.endDate}";"${p.premium}";"${p.status}";"${p.plate || '-'}"\n`;
+        csv += `"${p.policyNo || p.id}";"${p.customerName}";"${p.type}";"${p.company}";"${p.startDate}";"${p.endDate}";"${formatExcelCurrency(p.premium)}";"${p.status}";"${p.plate || '-'}"\n`;
       });
     } else {
       csv += `"(Bu dönemde kesilen poliçe bulunmamaktadır)";"";"";"";"";"";"";"";""\n`;
@@ -162,7 +168,7 @@ export default function SigortaRaporlarPage() {
     csv += `Tarih;Vade Tarihi;Fiş No;Müşteri / Cari Adı;Açıklama;İşlem Türü;Borç (TL);Alacak (TL)\n`;
     if (monthlyMovements.length > 0) {
       monthlyMovements.forEach(m => {
-        csv += `"${m.date}";"${m.dueDate || '-'}";"${m.receiptNo || '-'}";"${m.customerName}";"${m.description.replace(/"/g, '""')}";"${m.movementType}";"${m.debitAmount.toFixed(2)}";"${m.creditAmount.toFixed(2)}"\n`;
+        csv += `"${m.date}";"${m.dueDate || '-'}";"${m.receiptNo || '-'}";"${m.customerName}";"${m.description.replace(/"/g, '""')}";"${m.movementType}";"${formatExcelCurrency(m.debitAmount)}";"${formatExcelCurrency(m.creditAmount)}"\n`;
       });
     } else {
       csv += `"(Bu dönemde kaydedilmiş cari hareket bulunmamaktadır)";"";"";"";"";"";"";""\n`;
@@ -277,14 +283,14 @@ export default function SigortaRaporlarPage() {
         ...customers.map(c => [c.id, c.name, c.type, c.identityNo, c.phone, c.email, c.createdAt])
       ];
       if (rows.length === 1) rows.push(['(Kayıtlı müşteri bulunamadı)', '', '', '', '', '', '']);
-      downloadCSV(`elisam-musteri-listesi-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n'));
+      downloadCSV(`elisam-musteri-listesi-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(';')).join('\n'));
     } else if (type === 'aktif_policeler') {
       const rows = [
         ['Poliçe No', 'Müşteri Adı', 'Poliçe Türü', 'Sigorta Şirketi', 'Başlangıç', 'Bitiş', 'Brüt Prim (TL)', 'Durum'],
-        ...policies.map(p => [p.policyNo || p.id, p.customerName, p.type, p.company, p.startDate, p.endDate, String(p.premium), p.status])
+        ...policies.map(p => [p.policyNo || p.id, p.customerName, p.type, p.company, p.startDate, p.endDate, formatExcelCurrency(p.premium), p.status])
       ];
       if (rows.length === 1) rows.push(['(Kayıtlı poliçe bulunamadı)', '', '', '', '', '', '', '']);
-      downloadCSV(`elisam-aktif-policeler-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n'));
+      downloadCSV(`elisam-aktif-policeler-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(';')).join('\n'));
     } else if (type === 'yaklasan_policeler') {
       const upcoming = policies.filter(p => p.status === 'Yaklaşıyor' || p.status === 'Biten');
       const rows = [
@@ -292,7 +298,7 @@ export default function SigortaRaporlarPage() {
         ...upcoming.map(p => [p.policyNo || p.id, p.customerName, p.type, p.endDate, p.status])
       ];
       if (rows.length === 1) rows.push(['(Yaklaşan poliçe bulunamadı)', '', '', '', '']);
-      downloadCSV(`elisam-yaklasan-policeler-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n'));
+      downloadCSV(`elisam-yaklasan-policeler-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(';')).join('\n'));
     } else if (type === 'sirket_bazli') {
       const map: Record<string, { count: number; total: number }> = {};
       policies.forEach(p => {
@@ -302,17 +308,17 @@ export default function SigortaRaporlarPage() {
       });
       const rows = [
         ['Sigorta Şirketi', 'Poliçe Adedi', 'Toplam Prim (TL)'],
-        ...Object.entries(map).map(([k, v]) => [k, String(v.count), String(v.total)])
+        ...Object.entries(map).map(([k, v]) => [k, String(v.count), formatExcelCurrency(v.total)])
       ];
       if (rows.length === 1) rows.push(['(Veri yok)', '', '']);
-      downloadCSV(`elisam-sirket-bazli-uretim-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n'));
+      downloadCSV(`elisam-sirket-bazli-uretim-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(';')).join('\n'));
     } else if (type === 'finans_taksit') {
       const rows = [
         ['Tarih', 'Fiş No', 'Müşteri Adı', 'Açıklama', 'Hareket Türü', 'Borç (TL)', 'Alacak (TL)'],
-        ...movements.map(m => [m.date, m.receiptNo || '-', m.customerName, m.description, m.movementType, String(m.debitAmount), String(m.creditAmount)])
+        ...movements.map(m => [m.date, m.receiptNo || '-', m.customerName, m.description, m.movementType, formatExcelCurrency(m.debitAmount), formatExcelCurrency(m.creditAmount)])
       ];
       if (rows.length === 1) rows.push(['(Kayıtlı cari hareket bulunamadı)', '', '', '', '', '', '']);
-      downloadCSV(`elisam-cari-finans-raporu-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(',')).join('\n'));
+      downloadCSV(`elisam-cari-finans-raporu-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(';')).join('\n'));
     }
   };
 
