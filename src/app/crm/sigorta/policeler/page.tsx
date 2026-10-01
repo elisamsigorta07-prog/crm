@@ -179,15 +179,16 @@ export default function PolicelerPage() {
       setCustomerEmail(matchedCust.email === '-' ? '' : matchedCust.email);
       setCustomerBirthDate(matchedCust.birthDate || '');
       setCustomerAddress(matchedCust.address || '');
-      setPlate(matchedCust.plate || '');
-      setDocumentSerial(matchedCust.documentSerial || '');
-      setVehicleUsage(matchedCust.vehicleUsage || '');
-      setVehicleBrand(matchedCust.vehicleBrand || '');
-      setVehicleType(matchedCust.vehicleType || '');
-      setVehicleModelYear(matchedCust.vehicleModelYear || '');
-      setVehicleRegistrationDate(matchedCust.vehicleRegistrationDate || '');
-      setVehicleValue(matchedCust.vehicleValue || '');
     }
+
+    setPlate(pol.plate || matchedCust?.plate || '');
+    setDocumentSerial(pol.documentSerial || matchedCust?.documentSerial || '');
+    setVehicleUsage(pol.vehicleUsage || matchedCust?.vehicleUsage || '');
+    setVehicleBrand(pol.vehicleBrand || matchedCust?.vehicleBrand || '');
+    setVehicleType(pol.vehicleType || matchedCust?.vehicleType || '');
+    setVehicleModelYear(pol.vehicleModelYear || matchedCust?.vehicleModelYear || '');
+    setVehicleRegistrationDate(pol.vehicleRegistrationDate || matchedCust?.vehicleRegistrationDate || '');
+    setVehicleValue(pol.vehicleValue || matchedCust?.vehicleValue || '');
 
     setType(pol.type);
     setCompany(pol.company);
@@ -225,6 +226,7 @@ export default function PolicelerPage() {
       setCustomerAddress(found.address || '');
       if (found.plate) setPlate(found.plate);
       if (found.documentSerial) setDocumentSerial(found.documentSerial);
+      if (found.vehicleUsage) setVehicleUsage(found.vehicleUsage);
       if (found.vehicleBrand) setVehicleBrand(found.vehicleBrand);
       if (found.vehicleType) setVehicleType(found.vehicleType);
       if (found.vehicleModelYear) setVehicleModelYear(found.vehicleModelYear);
@@ -243,7 +245,7 @@ export default function PolicelerPage() {
     };
 
     // 1. Müşteri Ad Soyad & Şirket Algılama
-    const parsedName = extract(/Ad \/ Soy Ad:\s*(.*)/i);
+    const parsedName = extract(/(?:Ad\s*\/\s*Soy\s*Ad|Ad\s*Soyad|Adı\s*Soyadı|Müşteri(?:\s*Adı)?):\s*(.*)/i);
     if (parsedName) {
       setCustomerName(parsedName);
       if (/(?:ŞİRKETİ|LİMİTED|LTD|A\.Ş|SANAYİ|TİCARET|AŞ|HOLDİNG|ORTAKLIĞI|KOOPERATİF)/i.test(parsedName)) {
@@ -251,8 +253,8 @@ export default function PolicelerPage() {
       }
     }
 
-    // 2. Doğum Tarihi (DD.MM.YYYY -> YYYY-MM-DD)
-    const parsedBirth = extract(/(?:Do[ğg\u011f\u011e]um|Dogum)\s*Tarihi:\s*(.*)/i);
+    // 2. Doğum Tarihi (DD.MM.YYYY veya DD/MM/YYYY -> YYYY-MM-DD)
+    const parsedBirth = extract(/(?:Do[ğg\u011f\u011e]um\s*Tarihi|D\.Tarihi|Dogum\s*Tarihi):\s*(.*)/i);
     if (parsedBirth) {
       if (parsedBirth.includes('.')) {
         const parts = parsedBirth.split('.');
@@ -280,20 +282,20 @@ export default function PolicelerPage() {
     }
 
     // 3. TCKN / VKN
-    const parsedTckn = extract(/Tckn\/Vergi No:\s*(.*)/i);
+    const parsedTckn = extract(/(?:Tckn\/Vergi\s*No|TCKN|TC\s*Kimlik\s*No|Vergi\s*No|VKN):\s*(.*)/i);
     if (parsedTckn) setCustomerTc(parsedTckn);
 
     // 4. Telefon
-    const parsedPhone = extract(/(?:Telefon|Tel|Gsm):\s*(.*)/i);
+    const parsedPhone = extract(/(?:Telefon|Tel|Gsm|Cep):\s*(.*)/i);
     if (parsedPhone) setCustomerPhone(parsedPhone);
     else if (!customerPhone) setCustomerPhone('05-- --- -- --');
 
     // 5. Poliçe Numarası
-    const parsedPolicyNo = extract(/Poliçe (?:No|Numarası):\s*(.*)/i);
+    const parsedPolicyNo = extract(/(?:Poliçe\s*(?:No|Numarası)):\s*(.*)/i);
     if (parsedPolicyNo) setPolicyNo(parsedPolicyNo);
 
     // 6. Başlangıç - Bitiş Tarihleri
-    const dates = extract(/Başlangıç-Bitiş Tarihi:\s*(.*)/i);
+    const dates = extract(/(?:Başlangıç-Bitiş\s*Tarihi|Poliçe\s*Tarihleri|Vade\s*Tarihleri):\s*(.*)/i);
     if (dates) {
       const parts = dates.split('/');
       if (parts.length === 2) {
@@ -308,41 +310,40 @@ export default function PolicelerPage() {
     }
 
     // 7. Plaka & Belge Seri
-    const parsedPlate = extract(/Plaka:\s*(.*)/i);
-    if (parsedPlate) setPlate(parsedPlate);
+    const parsedPlate = extract(/(?:Plaka|Araç\s*Plakası):\s*(.*)/i);
+    if (parsedPlate) setPlate(parsedPlate.toUpperCase().replace(/\s+/g, ' '));
 
-    const parsedBelge = extract(/Belge Seri:\s*(.*)/i);
+    const parsedBelge = extract(/(?:Belge\s*Seri(?:\s*No)?|Ruhsat\s*Seri(?:\s*No)?|Seri\s*No):\s*(.*)/i);
     if (parsedBelge) setDocumentSerial(parsedBelge);
 
     // 8. Araç Bilgileri
-    const parsedUsage = extract(/Araç Kullanım Tarzı:\s*(.*)/i);
+    const parsedUsage = extract(/(?:Araç\s*Kullanım\s*Tarzı|Kullanım\s*Tarzı|Kullanım\s*Şekli):\s*(.*)/i);
     if (parsedUsage) setVehicleUsage(parsedUsage);
 
-    const parsedBrand = extract(/Marka:\s*(.*)/i);
+    const parsedBrand = extract(/(?:Marka|Araç\s*Markası):\s*(.*)/i);
     if (parsedBrand) setVehicleBrand(parsedBrand);
 
-    const parsedTip = extract(/Tip:\s*(.*)/i);
+    const parsedTip = extract(/(?:Tip|Model\s*Tipi|Araç\s*Tipi|Model\s*\/\s*Tip):\s*(.*)/i);
     if (parsedTip) setVehicleType(parsedTip);
 
-    const parsedYear = extract(/Model Yılı:\s*(.*)/i);
+    const parsedYear = extract(/(?:Model\s*Yılı|Yıl|Üretim\s*Yılı):\s*(.*)/i);
     if (parsedYear) setVehicleModelYear(parsedYear);
 
-    const parsedReg = extract(/Tescil Tarihi:\s*(.*)/i);
+    const parsedReg = extract(/(?:Tescil\s*Tarihi|İlk\s*Tescil\s*Tarihi|Ruhsat\s*Tescil):\s*(.*)/i);
     if (parsedReg) setVehicleRegistrationDate(parsedReg);
 
-    const parsedVal = extract(/Araç Kasko Değeri:\s*(.*)/i);
+    const parsedVal = extract(/(?:Araç\s*Kasko\s*Değeri|Kasko\s*Değeri|Rayiç\s*Bedel|Araç\s*Bedeli):\s*([0-9.,]+)/i);
     if (parsedVal) setVehicleValue(parsedVal);
 
     // 9. Prim / Tutar
-    const parsedPrice = extract(/(?:Prim|Tutar|Fiyat|Teklif):\s*([0-9.,]+)/i);
+    const parsedPrice = extract(/(?:Prim|Brüt\s*Prim|Tutar|Fiyat|Teklif(?:\s*Tutarı)?):\s*([0-9.,]+)/i);
     if (parsedPrice) {
       setPremium(parsedPrice.replace(/\./g, '').replace(',', '.'));
     }
 
-    // 10. Meslek
-    const parsedProfession = extract(/Meslek:\s*(.*)/i);
-    if (parsedProfession && !notes) {
-      setNotes(`Meslek: ${parsedProfession}`);
+    // 10. Otomatik Yapıştırılan Tüm Metni Notlar Alanına Aktar (Eksiksiz Kayıt)
+    if (text.trim()) {
+      setNotes(text.trim());
     }
   };
 
@@ -475,6 +476,13 @@ export default function PolicelerPage() {
       paymentStatus: remaining === 0 ? 'Ödendi' : (paid > 0 ? 'Kısmi Ödendi' : 'Bekliyor'),
       status: 'Aktif',
       plate: plate || undefined,
+      documentSerial: documentSerial || undefined,
+      vehicleUsage: vehicleUsage || undefined,
+      vehicleBrand: vehicleBrand || undefined,
+      vehicleType: vehicleType || undefined,
+      vehicleModelYear: vehicleModelYear || undefined,
+      vehicleRegistrationDate: vehicleRegistrationDate || undefined,
+      vehicleValue: vehicleValue || undefined,
       notes: notes || 'Yeni poliçe kaydı.'
     };
 
@@ -1374,43 +1382,54 @@ export default function PolicelerPage() {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '12px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>Plaka</label>
-                    <input type="text" value={plate} onChange={(e) => setPlate(e.target.value)} placeholder="Örn: 38AHD233" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fcd34d', outline: 'none', fontWeight: 700 }} />
+                    <input type="text" value={plate} onChange={(e) => setPlate(e.target.value)} placeholder="Örn: 38VH244" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fcd34d', outline: 'none', fontWeight: 700 }} />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>Belge Seri No</label>
-                    <input type="text" value={documentSerial} onChange={(e) => setDocumentSerial(e.target.value)} placeholder="Örn: HI 378069" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fcd34d', outline: 'none' }} />
+                    <input type="text" value={documentSerial} onChange={(e) => setDocumentSerial(e.target.value)} placeholder="Örn: CU 637314" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fcd34d', outline: 'none' }} />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>Kullanım Tarzı</label>
-                    <input type="text" value={vehicleUsage} onChange={(e) => setVehicleUsage(e.target.value)} placeholder="Örn: HUSUSİ OTO / KAMYONET" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fcd34d', outline: 'none' }} />
+                    <input type="text" value={vehicleUsage} onChange={(e) => setVehicleUsage(e.target.value)} placeholder="Örn: KAMYONET / HUSUSİ OTO" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fcd34d', outline: 'none' }} />
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr 1fr', gap: '12px', marginBottom: '12px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>Marka</label>
-                    <input type="text" value={vehicleBrand} onChange={(e) => setVehicleBrand(e.target.value)} placeholder="VOLKSWAGEN" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fcd34d', outline: 'none' }} />
+                    <input type="text" value={vehicleBrand} onChange={(e) => setVehicleBrand(e.target.value)} placeholder="Örn: 445 - DACIA" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fcd34d', outline: 'none' }} />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>Model / Tip</label>
-                    <input type="text" value={vehicleType} onChange={(e) => setVehicleType(e.target.value)} placeholder="TRANSPORTER 5+1" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fcd34d', outline: 'none' }} />
+                    <input type="text" value={vehicleType} onChange={(e) => setVehicleType(e.target.value)} placeholder="Örn: 1030 - DOKKER COMBI" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fcd34d', outline: 'none' }} />
                   </div>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>Kasko Değeri (₺)</label>
-                    <input type="text" value={vehicleValue} onChange={(e) => setVehicleValue(e.target.value)} placeholder="1639396" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fcd34d', outline: 'none', fontWeight: 700 }} />
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>Model Yılı</label>
+                    <input type="text" value={vehicleModelYear} onChange={(e) => setVehicleModelYear(e.target.value)} placeholder="Örn: 2016" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fcd34d', outline: 'none' }} />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>Tescil Tarihi</label>
+                    <input type="text" value={vehicleRegistrationDate} onChange={(e) => setVehicleRegistrationDate(e.target.value)} placeholder="Örn: 03.10.2016" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fcd34d', outline: 'none' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>Araç Kasko Değeri (₺)</label>
+                    <input type="text" value={vehicleValue} onChange={(e) => setVehicleValue(e.target.value)} placeholder="Örn: 515497" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fcd34d', outline: 'none', fontWeight: 700 }} />
                   </div>
                 </div>
               </div>
 
               {/* KART 4: NOTLAR */}
               <div style={{ marginBottom: '22px' }}>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Özel Not & Açıklama</label>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Poliçe & Müşteri Notları (Teklif / Araç Dökümü)</label>
                 <textarea 
                   value={notes} 
                   onChange={(e) => setNotes(e.target.value)} 
-                  placeholder="Müşteri ve poliçeye dair özel açıklamalar..." 
-                  rows={2} 
-                  style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }}
+                  placeholder="Teklif, araç detayları veya poliçeye dair özel açıklamalar..." 
+                  rows={5} 
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.86rem', lineHeight: 1.5, fontFamily: 'inherit' }}
                 />
               </div>
 
@@ -1494,10 +1513,44 @@ export default function PolicelerPage() {
 
             </div>
 
+            {/* Araç & Ruhsat Bilgileri (Varsa) */}
+            {(() => {
+              const matchedCustomer = customers.find(c => c.id === selectedPolicy.customerId || c.name === selectedPolicy.customerName);
+              const pPlate = selectedPolicy.plate || matchedCustomer?.plate;
+              const pSerial = selectedPolicy.documentSerial || matchedCustomer?.documentSerial;
+              const pUsage = selectedPolicy.vehicleUsage || matchedCustomer?.vehicleUsage;
+              const pBrand = selectedPolicy.vehicleBrand || matchedCustomer?.vehicleBrand;
+              const pType = selectedPolicy.vehicleType || matchedCustomer?.vehicleType;
+              const pYear = selectedPolicy.vehicleModelYear || matchedCustomer?.vehicleModelYear;
+              const pRegDate = selectedPolicy.vehicleRegistrationDate || matchedCustomer?.vehicleRegistrationDate;
+              const pVal = selectedPolicy.vehicleValue || matchedCustomer?.vehicleValue;
+
+              if (pPlate || pSerial || pBrand || pType || pUsage || pYear || pRegDate || pVal) {
+                return (
+                  <div style={{ padding: '14px', backgroundColor: '#fffbeb', borderRadius: '10px', border: '1px solid #fde68a', marginBottom: '18px' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: '#92400e', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                      <Car size={16} color="#d97706" /> ARAÇ & RUHSAT BİLGİLERİ
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', fontSize: '0.83rem' }}>
+                      {pPlate && <div><span style={{ color: '#78350f', fontWeight: 600 }}>Plaka:</span> <span style={{ fontWeight: 800, color: '#0f172a' }}>{pPlate}</span></div>}
+                      {pSerial && <div><span style={{ color: '#78350f', fontWeight: 600 }}>Belge Seri:</span> <span style={{ fontWeight: 700, color: '#0f172a' }}>{pSerial}</span></div>}
+                      {pUsage && <div><span style={{ color: '#78350f', fontWeight: 600 }}>Kullanım:</span> <span style={{ fontWeight: 700, color: '#0f172a' }}>{pUsage}</span></div>}
+                      {pBrand && <div><span style={{ color: '#78350f', fontWeight: 600 }}>Marka:</span> <span style={{ fontWeight: 700, color: '#0f172a' }}>{pBrand}</span></div>}
+                      {pType && <div><span style={{ color: '#78350f', fontWeight: 600 }}>Model/Tip:</span> <span style={{ fontWeight: 700, color: '#0f172a' }}>{pType}</span></div>}
+                      {pYear && <div><span style={{ color: '#78350f', fontWeight: 600 }}>Model Yılı:</span> <span style={{ fontWeight: 700, color: '#0f172a' }}>{pYear}</span></div>}
+                      {pRegDate && <div><span style={{ color: '#78350f', fontWeight: 600 }}>Tescil Tarihi:</span> <span style={{ fontWeight: 700, color: '#0f172a' }}>{pRegDate}</span></div>}
+                      {pVal && <div><span style={{ color: '#78350f', fontWeight: 600 }}>Kasko Değeri:</span> <span style={{ fontWeight: 800, color: '#0f172a' }}>{pVal} ₺</span></div>}
+                    </div>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
             {/* Not Geçmişi & Not Ekleme */}
             <div style={{ padding: '14px', backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
               <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#334155', marginBottom: '8px' }}>Poliçe & Müşteri Notları:</div>
-              <div style={{ fontSize: '0.85rem', color: '#475569', whiteSpace: 'pre-wrap', backgroundColor: '#f8fafc', padding: '10px', borderRadius: '8px', minHeight: '60px', maxHeight: '140px', overflowY: 'auto' }}>
+              <div style={{ fontSize: '0.86rem', color: '#1e293b', whiteSpace: 'pre-wrap', backgroundColor: '#f8fafc', padding: '14px', borderRadius: '8px', minHeight: '80px', maxHeight: '350px', overflowY: 'auto', border: '1px solid #e2e8f0', lineHeight: '1.6', fontFamily: 'inherit' }}>
                 {selectedPolicy.notes || 'Kayıtlı özel not bulunmuyor.'}
               </div>
 

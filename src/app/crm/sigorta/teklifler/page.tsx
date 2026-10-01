@@ -65,11 +65,11 @@ export default function TekliflerPage() {
       const match = text.match(regex);
       return match ? match[1].trim() : '';
     };
-    const parsedName = extract(/Ad \/ Soy Ad:\s*(.*)/i);
+    const parsedName = extract(/(?:Ad\s*\/\s*Soy\s*Ad|Ad\s*Soyad|Adı\s*Soyadı|Müşteri(?:\s*Adı)?):\s*(.*)/i);
     if (parsedName) setCustomer(parsedName);
-    const parsedTckn = extract(/Tckn\/Vergi No:\s*(.*)/i);
+    const parsedTckn = extract(/(?:Tckn\/Vergi\s*No|TCKN|TC\s*Kimlik\s*No|Vergi\s*No|VKN):\s*(.*)/i);
     if (parsedTckn) setTc(parsedTckn);
-    const parsedPhone = extract(/Telefon:\s*(.*)/i);
+    const parsedPhone = extract(/(?:Telefon|Tel|Gsm|Cep):\s*(.*)/i);
     if (parsedPhone) setPhone(parsedPhone);
     const parsedBirth = extract(/(?:Do[ğg\u011f\u011e]um|Dogum)\s*Tarihi:\s*(.*)/i);
     if (parsedBirth) {
@@ -87,9 +87,9 @@ export default function TekliflerPage() {
         setBirthDate(parsedBirth);
       }
     }
-    const parsedPlate = extract(/Plaka:\s*(.*)/i);
-    if (parsedPlate) setPlate(parsedPlate);
-    const parsedPrice = extract(/(?:Prim|Tutar|Teklif):\s*([0-9.,]+)/i);
+    const parsedPlate = extract(/(?:Plaka|Araç\s*Plakası):\s*(.*)/i);
+    if (parsedPlate) setPlate(parsedPlate.toUpperCase().replace(/\s+/g, ' '));
+    const parsedPrice = extract(/(?:Prim|Brüt\s*Prim|Tutar|Fiyat|Teklif(?:\s*Tutarı)?):\s*([0-9.,]+)/i);
     if (parsedPrice) setOfferedPrice(parsedPrice.replace(/\./g, '').replace(',', '.'));
   };
 

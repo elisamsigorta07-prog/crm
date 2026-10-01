@@ -53,6 +53,13 @@ export interface Policy {
   paymentStatus: 'Ödendi' | 'Bekliyor' | 'Taksitli' | 'Kısmi Ödendi' | 'Gecikmede';
   status: 'Aktif' | 'Yaklaşıyor' | 'Biten';
   plate?: string;
+  documentSerial?: string;
+  vehicleUsage?: string;
+  vehicleBrand?: string;
+  vehicleType?: string;
+  vehicleModelYear?: string;
+  vehicleRegistrationDate?: string;
+  vehicleValue?: string;
   notes?: string;
 }
 
