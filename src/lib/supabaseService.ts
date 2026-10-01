@@ -179,6 +179,9 @@ export async function fetchPoliciesFromCloud(): Promise<Policy[]> {
     if (data) {
       const mapped: Policy[] = data.map((p: any) => {
         const prem = normalizeMoney(p.premium);
+        const netPrem = (p.net_premium !== undefined && p.net_premium !== null) 
+          ? normalizeMoney(p.net_premium) 
+          : (p.netPremium !== undefined && p.netPremium !== null ? normalizeMoney(p.netPremium) : undefined);
         const paid = normalizeMoney(p.paid_amount);
         const rem = Math.max(0, prem - paid);
         return {
@@ -193,6 +196,7 @@ export async function fetchPoliciesFromCloud(): Promise<Policy[]> {
           startDate: p.start_date,
           endDate: p.end_date,
           premium: prem,
+          netPremium: netPrem,
           paidAmount: paid,
           remainingAmount: rem,
           paymentType: p.payment_type || 'Peşin / Tek Çekim',
@@ -214,7 +218,13 @@ export async function fetchPoliciesFromCloud(): Promise<Policy[]> {
   if (saved) {
     try {
       const list: Policy[] = JSON.parse(saved);
-      return list.map(p => ({ ...p, premium: normalizeMoney(p.premium), paidAmount: normalizeMoney(p.paidAmount), remainingAmount: Math.max(0, normalizeMoney(p.premium) - normalizeMoney(p.paidAmount)) }));
+      return list.map(p => ({ 
+        ...p, 
+        premium: normalizeMoney(p.premium), 
+        netPremium: p.netPremium ? normalizeMoney(p.netPremium) : undefined,
+        paidAmount: normalizeMoney(p.paidAmount), 
+        remainingAmount: Math.max(0, normalizeMoney(p.premium) - normalizeMoney(p.paidAmount)) 
+      }));
     } catch (e) {}
   }
   return [];
@@ -224,6 +234,7 @@ export async function upsertPolicyToCloud(policy: Policy): Promise<void> {
   const sanitizedPolicy: Policy = {
     ...policy,
     premium: normalizeMoney(policy.premium),
+    netPremium: policy.netPremium ? normalizeMoney(policy.netPremium) : undefined,
     paidAmount: normalizeMoney(policy.paidAmount),
     remainingAmount: Math.max(0, normalizeMoney(policy.premium) - normalizeMoney(policy.paidAmount))
   };
@@ -239,7 +250,7 @@ export async function upsertPolicyToCloud(policy: Policy): Promise<void> {
 
   if (!isSupabaseConfigured()) return;
   try {
-    const row = {
+    const row: any = {
       id: sanitizedPolicy.id,
       policy_no: sanitizedPolicy.policyNo || sanitizedPolicy.id,
       customer_id: sanitizedPolicy.customerId,
@@ -261,6 +272,16 @@ export async function upsertPolicyToCloud(policy: Policy): Promise<void> {
       plate: sanitizedPolicy.plate || null,
       notes: sanitizedPolicy.notes || null
     };
+    
+    // Try to upsert; if net_premium column exists in DB, it will be saved
+    if (sanitizedPolicy.netPremium !== undefined) {
+      try {
+        const rowWithNet = { ...row, net_premium: sanitizedPolicy.netPremium };
+        const { error } = await supabase.from('policies').upsert(rowWithNet);
+        if (!error) return;
+      } catch (e) {}
+    }
+    
     await supabase.from('policies').upsert(row);
   } catch (err) {
     console.error('upsertPolicyToCloud error:', err);

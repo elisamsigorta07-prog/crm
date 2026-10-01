@@ -85,6 +85,7 @@ export default function PolicelerPage() {
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0]);
   const [premium, setPremium] = useState('');
+  const [netPremium, setNetPremium] = useState('');
   const [paidAmount, setPaidAmount] = useState('');
   const [paymentType, setPaymentType] = useState<'Peşin / Tek Çekim' | 'Taksitli'>('Peşin / Tek Çekim');
   const [installmentCount, setInstallmentCount] = useState<number>(3);
@@ -116,10 +117,12 @@ export default function PolicelerPage() {
         if (cloudPols) {
           const sanitizedPols = cloudPols.map(p => {
             const prem = normalizeMoney(p.premium);
+            const netPrem = p.netPremium ? normalizeMoney(p.netPremium) : undefined;
             const paid = normalizeMoney(p.paidAmount);
             return {
               ...p,
               premium: prem,
+              netPremium: netPrem,
               paidAmount: paid,
               remainingAmount: Math.max(0, prem - paid)
             };
@@ -159,6 +162,7 @@ export default function PolicelerPage() {
     setStartDate(new Date().toISOString().split('T')[0]);
     setEndDate(new Date(Date.now() + 365*24*60*60*1000).toISOString().split('T')[0]);
     setPremium('');
+    setNetPremium('');
     setPaidAmount('');
     setPaymentType('Peşin / Tek Çekim');
     setInstallmentCount(3);
@@ -212,6 +216,7 @@ export default function PolicelerPage() {
     setType(pol.type);
     setCompany(pol.company);
     setPremium(String(pol.premium));
+    setNetPremium(pol.netPremium ? String(pol.netPremium) : '');
     setPaidAmount(String(pol.paidAmount || ''));
     setPaymentType(pol.paymentType || 'Peşin / Tek Çekim');
     setInstallmentCount(pol.installmentCount || 3);
@@ -354,10 +359,14 @@ export default function PolicelerPage() {
     const parsedVal = extract(/(?:Araç\s*Kasko\s*Değeri|Kasko\s*Değeri|Rayiç\s*Bedel|Araç\s*Bedeli):\s*([0-9.,]+)/i);
     if (parsedVal) setVehicleValue(parsedVal);
 
-    // 9. Prim / Tutar
-    const parsedPrice = extract(/(?:Prim|Brüt\s*Prim|Tutar|Fiyat|Teklif(?:\s*Tutarı)?):\s*([0-9.,]+)/i);
-    if (parsedPrice) {
-      setPremium(String(normalizeMoney(parsedPrice)));
+    // 9. Prim / Tutar (Brüt & Net)
+    const parsedGross = extract(/(?:Brüt\s*Prim|Brüt\s*Tutar|Brüt|Teklif(?:\s*Tutarı)?|Tutar|Prim|Fiyat):\s*([0-9.,]+)/i);
+    if (parsedGross) {
+      setPremium(String(normalizeMoney(parsedGross)));
+    }
+    const parsedNet = extract(/(?:Net\s*Prim|Net\s*Tutar|Net):\s*([0-9.,]+)/i);
+    if (parsedNet) {
+      setNetPremium(String(normalizeMoney(parsedNet)));
     }
 
     // 10. Otomatik Yapıştırılan Tüm Metni Notlar Alanına Aktar (Eksiksiz Kayıt)
@@ -410,6 +419,7 @@ export default function PolicelerPage() {
     const finalCompany = company === 'DIGER' ? (customCompany.trim() || 'Diğer Sigorta') : company;
     const finalPolicyNo = policyNo.trim() || `POL-${Math.floor(100000 + Math.random() * 900000)}`;
     const prem = normalizeMoney(premium);
+    const netPrem = netPremium ? normalizeMoney(netPremium) : undefined;
     const paid = paidAmount ? normalizeMoney(paidAmount) : (paymentType === 'Peşin / Tek Çekim' ? prem : 0);
     const remaining = Math.max(0, prem - paid);
     const instCount = paymentType === 'Taksitli' ? installmentCount : 1;
@@ -487,6 +497,7 @@ export default function PolicelerPage() {
       startDate: startDate ? new Date(startDate).toLocaleDateString('tr-TR') : new Date().toLocaleDateString('tr-TR'),
       endDate: endDate ? new Date(endDate).toLocaleDateString('tr-TR') : new Date(Date.now() + 365*24*60*60*1000).toLocaleDateString('tr-TR'),
       premium: prem,
+      netPremium: netPrem,
       paidAmount: paid,
       remainingAmount: remaining,
       paymentType,
@@ -667,7 +678,8 @@ export default function PolicelerPage() {
     return matchesSearch;
   });
 
-  const totalPremiumAll = policies.reduce((s, p) => s + normalizeMoney(p.premium), 0);
+  const totalGrossPremium = policies.reduce((s, p) => s + normalizeMoney(p.premium), 0);
+  const totalNetPremium = policies.reduce((s, p) => s + (p.netPremium && p.netPremium > 0 ? normalizeMoney(p.netPremium) : normalizeMoney(p.premium)), 0);
   const totalActive = policies.filter(p => p.status === 'Aktif').length;
   const totalExpiring = policies.filter(p => p.status === 'Yaklaşıyor').length;
   const totalWithDebt = policies.filter(p => p.remainingAmount && p.remainingAmount > 0).length;
@@ -695,30 +707,36 @@ export default function PolicelerPage() {
       </div>
 
       {/* KPI Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '16px', marginBottom: '25px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '16px', marginBottom: '25px' }}>
         
         <div className={styles.card} style={{ borderLeft: '4px solid #2563eb', padding: '16px 20px' }}>
-          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Toplam Poliçe Adedi</div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 850, color: '#0f172a', marginTop: '4px' }}>{policies.length} Adet</div>
-          <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '3px' }}>{customers.length} kayıtlı müşteri portföyü</div>
+          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Toplam Poliçe</div>
+          <div style={{ fontSize: '1.55rem', fontWeight: 850, color: '#0f172a', marginTop: '4px' }}>{policies.length} Adet</div>
+          <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '3px' }}>{customers.length} kayıtlı müşteri</div>
         </div>
 
         <div className={styles.card} style={{ borderLeft: '4px solid #16a34a', padding: '16px 20px' }}>
-          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Toplam Prim Hacmi</div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 850, color: '#16a34a', marginTop: '4px' }}>{totalPremiumAll.toLocaleString('tr-TR')} ₺</div>
+          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase' }}>Toplam Brüt Prim</div>
+          <div style={{ fontSize: '1.55rem', fontWeight: 850, color: '#16a34a', marginTop: '4px' }}>{totalGrossPremium.toLocaleString('tr-TR')} ₺</div>
           <div style={{ fontSize: '0.78rem', color: '#16a34a', marginTop: '3px', fontWeight: 600 }}>✓ Toplam brüt üretim</div>
         </div>
 
+        <div className={styles.card} style={{ borderLeft: '4px solid #0d9488', padding: '16px 20px' }}>
+          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0d9488', textTransform: 'uppercase' }}>Toplam Net Prim</div>
+          <div style={{ fontSize: '1.55rem', fontWeight: 850, color: '#0d9488', marginTop: '4px' }}>{totalNetPremium.toLocaleString('tr-TR')} ₺</div>
+          <div style={{ fontSize: '0.78rem', color: '#0d9488', marginTop: '3px', fontWeight: 600 }}>✓ Vergisiz net portföy</div>
+        </div>
+
         <div className={styles.card} style={{ borderLeft: '4px solid #f59e0b', padding: '16px 20px' }}>
-          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Yaklaşan Yenilemeler</div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 850, color: '#d97706', marginTop: '4px' }}>{totalExpiring} Poliçe</div>
-          <div style={{ fontSize: '0.78rem', color: '#d97706', marginTop: '3px' }}>Yenileme hatırlatması bekliyor</div>
+          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Yaklaşan Yenilemeler</div>
+          <div style={{ fontSize: '1.55rem', fontWeight: 850, color: '#d97706', marginTop: '4px' }}>{totalExpiring} Poliçe</div>
+          <div style={{ fontSize: '0.78rem', color: '#d97706', marginTop: '3px' }}>Yenileme hatırlatması</div>
         </div>
 
         <div className={styles.card} style={{ borderLeft: '4px solid #ef4444', padding: '16px 20px' }}>
-          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Taksitli / Açık Borçlar</div>
-          <div style={{ fontSize: '1.6rem', fontWeight: 850, color: '#dc2626', marginTop: '4px' }}>{totalWithDebt} Poliçe</div>
-          <div style={{ fontSize: '0.78rem', color: '#dc2626', marginTop: '3px', fontWeight: 600 }}>Ödemesi devam edenler</div>
+          <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Taksitli / Açık Borç</div>
+          <div style={{ fontSize: '1.55rem', fontWeight: 850, color: '#dc2626', marginTop: '4px' }}>{totalWithDebt} Poliçe</div>
+          <div style={{ fontSize: '0.78rem', color: '#dc2626', marginTop: '3px', fontWeight: 600 }}>Ödemesi bekleyenler</div>
         </div>
 
       </div>
@@ -777,7 +795,7 @@ export default function PolicelerPage() {
                 <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Poliçe Numarası</th>
                 <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Müşteri Bilgisi</th>
                 <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Sigorta Türü / Şirket</th>
-                <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Toplam Prim</th>
+                <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Prim (Brüt / Net)</th>
                 <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Ödeme Durumu</th>
                 <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Bitiş Tarihi</th>
                 <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Durum</th>
@@ -824,8 +842,15 @@ export default function PolicelerPage() {
                       </td>
 
                       {/* Prim */}
-                      <td style={{ padding: '14px 16px', fontWeight: 750, color: '#0f172a', fontSize: '0.95rem' }}>
-                        {pol.premium.toLocaleString('tr-TR')} ₺
+                      <td style={{ padding: '14px 16px' }}>
+                        <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>
+                          {pol.premium.toLocaleString('tr-TR')} ₺ <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Brüt</span>
+                        </div>
+                        {pol.netPremium && pol.netPremium > 0 && (
+                          <div style={{ fontSize: '0.78rem', color: '#0d9488', fontWeight: 700, marginTop: '2px' }}>
+                            Net: {pol.netPremium.toLocaleString('tr-TR')} ₺
+                          </div>
+                        )}
                       </td>
 
                       {/* Ödeme Durumu */}
@@ -1315,7 +1340,7 @@ export default function PolicelerPage() {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr 1fr', gap: '12px', marginBottom: '12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '12px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Başlangıç Tarihi</label>
                     <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} style={{ width: '100%', padding: '9px', borderRadius: '8px', border: '1px solid #86efac', outline: 'none' }} />
@@ -1325,13 +1350,23 @@ export default function PolicelerPage() {
                     <input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} style={{ width: '100%', padding: '9px', borderRadius: '8px', border: '1px solid #86efac', outline: 'none' }} />
                   </div>
                   <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 750, color: '#0d9488', marginBottom: '4px' }}>Net Prim (₺)</label>
+                    <input 
+                      type="number" 
+                      value={netPremium} 
+                      onChange={(e) => setNetPremium(e.target.value)} 
+                      placeholder="Örn: 10500" 
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #99f6e4', outline: 'none', fontWeight: 750, fontSize: '0.95rem', color: '#0f766e', backgroundColor: '#f0fdfa' }} 
+                    />
+                  </div>
+                  <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 750, color: '#166534', marginBottom: '4px' }}>Toplam Brüt Prim (₺) *</label>
                     <input 
                       type="number" 
                       required 
                       value={premium} 
                       onChange={(e) => setPremium(e.target.value)} 
-                      placeholder="Örn: 15000" 
+                      placeholder="Örn: 12386" 
                       style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #86efac', outline: 'none', fontWeight: 800, fontSize: '1rem', color: '#166534' }} 
                     />
                   </div>
@@ -1521,9 +1556,14 @@ export default function PolicelerPage() {
 
               <div style={{ padding: '14px', backgroundColor: '#f0f9ff', borderRadius: '10px', border: '1px solid #bae6fd' }}>
                 <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0369a1', textTransform: 'uppercase', marginBottom: '6px' }}>Finans & Prim Bilgisi</div>
-                <div style={{ fontWeight: 850, color: '#0369a1', fontSize: '1.2rem' }}>{selectedPolicy.premium.toLocaleString('tr-TR')} ₺</div>
+                <div style={{ fontWeight: 850, color: '#0369a1', fontSize: '1.2rem', display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
+                  <span>{selectedPolicy.premium.toLocaleString('tr-TR')} ₺ <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#0284c7' }}>Brüt</span></span>
+                  {selectedPolicy.netPremium && selectedPolicy.netPremium > 0 && (
+                    <span style={{ fontSize: '0.95rem', color: '#0d9488', fontWeight: 750 }}>• {selectedPolicy.netPremium.toLocaleString('tr-TR')} ₺ Net</span>
+                  )}
+                </div>
                 <div style={{ fontSize: '0.82rem', color: '#0284c7', marginTop: '4px' }}>
-                  Ödeme: {selectedPolicy.paymentType || 'Peşin'} {selectedPolicy.remainingAmount && selectedPolicy.remainingAmount > 0 ? `(Kalan: ${selectedPolicy.remainingAmount.toLocaleString('tr-TR')} ₺)` : '(Tamamı Ödendi)'}
+                  Ödeme: {selectedPolicy.paymentType || 'Peşin'} {selectedPolicy.remainingAmount && selectedPolicy.remainingAmount > 0 ? `(Kalan Borç: ${selectedPolicy.remainingAmount.toLocaleString('tr-TR')} ₺)` : '(Tamamı Ödendi)'}
                 </div>
                 <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '2px' }}>
                   Vade: {selectedPolicy.startDate} - {selectedPolicy.endDate}

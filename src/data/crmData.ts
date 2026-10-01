@@ -44,6 +44,7 @@ export interface Policy {
   startDate: string;
   endDate: string;
   premium: number; // Toplam Brüt Prim (TL)
+  netPremium?: number; // Net Prim (TL)
   paidAmount: number; // Şimdiye kadar tahsil edilen (TL)
   remainingAmount: number; // Kalan bakiye / borç (TL)
   commissionRate: number; // örn %15
