@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Users, FileText, TrendingUp, AlertTriangle, ArrowRight, Eye, X, Calendar, CreditCard, User, Download, Target, Activity } from 'lucide-react';
 import Link from 'next/link';
 import { Policy, Customer, initialPoliciesData, initialCustomersData } from '@/data/crmData';
+import { fetchPoliciesFromCloud, fetchCustomersFromCloud, normalizeMoney } from '@/lib/supabaseService';
 import styles from './dashboard.module.css';
 
 export default function SigortaDashboard() {
@@ -12,20 +13,30 @@ export default function SigortaDashboard() {
   const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
 
   useEffect(() => {
-    try {
-      const savedPolicies = localStorage.getItem('elisam_policies');
-      if (savedPolicies) setPolicies(JSON.parse(savedPolicies));
-
-      const savedCustomers = localStorage.getItem('elisam_customers');
-      if (savedCustomers) setCustomers(JSON.parse(savedCustomers));
-    } catch (err) {
-      console.error(err);
+    async function loadData() {
+      try {
+        const [cloudPols, cloudCusts] = await Promise.all([
+          fetchPoliciesFromCloud(),
+          fetchCustomersFromCloud()
+        ]);
+        if (cloudPols) {
+          setPolicies(cloudPols.map(p => ({
+            ...p,
+            premium: normalizeMoney(p.premium),
+            paidAmount: normalizeMoney(p.paidAmount)
+          })));
+        }
+        if (cloudCusts) setCustomers(cloudCusts);
+      } catch (err) {
+        console.error(err);
+      }
     }
+    loadData();
   }, []);
 
   const expiringPolicies = policies.filter(p => p.status === 'Yaklaşıyor');
-  const totalPremium = policies.reduce((sum, p) => sum + p.premium, 0);
-  const totalCommission = policies.reduce((sum, p) => sum + (p.premium * p.commissionRate) / 100, 0);
+  const totalPremium = policies.reduce((sum, p) => sum + normalizeMoney(p.premium), 0);
+  const totalCommission = policies.reduce((sum, p) => sum + (normalizeMoney(p.premium) * (p.commissionRate || 15)) / 100, 0);
 
   // Target metrics
   const monthlyGoal = 100000;

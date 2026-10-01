@@ -120,13 +120,45 @@ export async function deleteCustomerFromCloud(customerId: string): Promise<void>
 }
 
 // -------------------------------------------------------------
+// HELPER: Para Birimi & Sayı Formatlama / Düzeltme
+// -------------------------------------------------------------
+export function normalizeMoney(val: any): number {
+  if (val === undefined || val === null || val === '') return 0;
+  let num = typeof val === 'number' ? val : Number(val);
+  if (isNaN(num)) {
+    const clean = String(val).replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
+    num = Number(clean) || 0;
+  }
+  // Noktalı binlik ayracı olarak girilen sayıları (örn. 12.386 -> 12386) düzelt
+  if (num > 0 && num < 1000) {
+    const str = String(val);
+    if (str.includes('.')) {
+      const parts = str.split('.');
+      if (parts[1] && parts[1].length === 3) {
+        num = num * 1000;
+      }
+    } else {
+      const mult = Math.round(num * 1000);
+      if (Math.abs(num * 1000 - mult) < 0.001 && num < 100) {
+        num = mult;
+      }
+    }
+  }
+  return Math.round(num * 100) / 100;
+}
+
+// -------------------------------------------------------------
 // 2. POLİÇELER (POLICIES)
 // -------------------------------------------------------------
 export async function fetchPoliciesFromCloud(): Promise<Policy[]> {
   try {
     if (!isSupabaseConfigured()) {
       const saved = localStorage.getItem('elisam_policies');
-      return saved ? JSON.parse(saved) : [];
+      if (saved) {
+        const list: Policy[] = JSON.parse(saved);
+        return list.map(p => ({ ...p, premium: normalizeMoney(p.premium), paidAmount: normalizeMoney(p.paidAmount), remainingAmount: Math.max(0, normalizeMoney(p.premium) - normalizeMoney(p.paidAmount)) }));
+      }
+      return [];
     }
 
     const { data, error } = await supabase
@@ -137,32 +169,41 @@ export async function fetchPoliciesFromCloud(): Promise<Policy[]> {
     if (error) {
       console.warn('Supabase policies fetch error, fallback to local:', error.message);
       const saved = localStorage.getItem('elisam_policies');
-      return saved ? JSON.parse(saved) : [];
+      if (saved) {
+        const list: Policy[] = JSON.parse(saved);
+        return list.map(p => ({ ...p, premium: normalizeMoney(p.premium), paidAmount: normalizeMoney(p.paidAmount), remainingAmount: Math.max(0, normalizeMoney(p.premium) - normalizeMoney(p.paidAmount)) }));
+      }
+      return [];
     }
 
     if (data) {
-      const mapped: Policy[] = data.map((p: any) => ({
-        id: p.id,
-        policyNo: p.policy_no || p.id,
-        customerId: p.customer_id,
-        customerName: p.customer_name,
-        customerPhone: p.customer_phone,
-        customerTc: p.customer_tc,
-        type: p.type,
-        company: p.company,
-        startDate: p.start_date,
-        endDate: p.end_date,
-        premium: Number(p.premium) || 0,
-        paidAmount: Number(p.paid_amount) || 0,
-        remainingAmount: Number(p.remaining_amount) || 0,
-        paymentType: p.payment_type || 'Peşin / Tek Çekim',
-        installmentCount: p.installment_count || 1,
-        commissionRate: Number(p.commission_rate) || 15,
-        paymentStatus: p.payment_status || 'Bekliyor',
-        status: p.status || 'Aktif',
-        plate: p.plate || undefined,
-        notes: p.notes || undefined
-      }));
+      const mapped: Policy[] = data.map((p: any) => {
+        const prem = normalizeMoney(p.premium);
+        const paid = normalizeMoney(p.paid_amount);
+        const rem = Math.max(0, prem - paid);
+        return {
+          id: p.id,
+          policyNo: p.policy_no || p.id,
+          customerId: p.customer_id,
+          customerName: p.customer_name,
+          customerPhone: p.customer_phone,
+          customerTc: p.customer_tc,
+          type: p.type,
+          company: p.company,
+          startDate: p.start_date,
+          endDate: p.end_date,
+          premium: prem,
+          paidAmount: paid,
+          remainingAmount: rem,
+          paymentType: p.payment_type || 'Peşin / Tek Çekim',
+          installmentCount: p.installment_count || 1,
+          commissionRate: Number(p.commission_rate) || 15,
+          paymentStatus: p.payment_status || 'Bekliyor',
+          status: p.status || 'Aktif',
+          plate: p.plate || undefined,
+          notes: p.notes || undefined
+        };
+      });
       localStorage.setItem('elisam_policies', JSON.stringify(mapped));
       return mapped;
     }
@@ -170,14 +211,27 @@ export async function fetchPoliciesFromCloud(): Promise<Policy[]> {
     console.error('fetchPoliciesFromCloud error:', err);
   }
   const saved = localStorage.getItem('elisam_policies');
-  return saved ? JSON.parse(saved) : [];
+  if (saved) {
+    try {
+      const list: Policy[] = JSON.parse(saved);
+      return list.map(p => ({ ...p, premium: normalizeMoney(p.premium), paidAmount: normalizeMoney(p.paidAmount), remainingAmount: Math.max(0, normalizeMoney(p.premium) - normalizeMoney(p.paidAmount)) }));
+    } catch (e) {}
+  }
+  return [];
 }
 
 export async function upsertPolicyToCloud(policy: Policy): Promise<void> {
+  const sanitizedPolicy: Policy = {
+    ...policy,
+    premium: normalizeMoney(policy.premium),
+    paidAmount: normalizeMoney(policy.paidAmount),
+    remainingAmount: Math.max(0, normalizeMoney(policy.premium) - normalizeMoney(policy.paidAmount))
+  };
+
   try {
     const saved = localStorage.getItem('elisam_policies');
     const list: Policy[] = saved ? JSON.parse(saved) : [];
-    const updated = [policy, ...list.filter(p => p.id !== policy.id)];
+    const updated = [sanitizedPolicy, ...list.filter(p => p.id !== sanitizedPolicy.id)];
     localStorage.setItem('elisam_policies', JSON.stringify(updated));
   } catch (err) {
     console.error(err);
@@ -186,26 +240,26 @@ export async function upsertPolicyToCloud(policy: Policy): Promise<void> {
   if (!isSupabaseConfigured()) return;
   try {
     const row = {
-      id: policy.id,
-      policy_no: policy.policyNo || policy.id,
-      customer_id: policy.customerId,
-      customer_name: policy.customerName,
-      customer_phone: policy.customerPhone || null,
-      customer_tc: policy.customerTc || null,
-      type: policy.type,
-      company: policy.company,
-      start_date: policy.startDate,
-      end_date: policy.endDate,
-      premium: policy.premium,
-      paid_amount: policy.paidAmount,
-      remaining_amount: policy.remainingAmount,
-      payment_type: policy.paymentType,
-      installment_count: policy.installmentCount || 1,
-      commission_rate: policy.commissionRate || 15,
-      payment_status: policy.paymentStatus,
-      status: policy.status || 'Aktif',
-      plate: policy.plate || null,
-      notes: policy.notes || null
+      id: sanitizedPolicy.id,
+      policy_no: sanitizedPolicy.policyNo || sanitizedPolicy.id,
+      customer_id: sanitizedPolicy.customerId,
+      customer_name: sanitizedPolicy.customerName,
+      customer_phone: sanitizedPolicy.customerPhone || null,
+      customer_tc: sanitizedPolicy.customerTc || null,
+      type: sanitizedPolicy.type,
+      company: sanitizedPolicy.company,
+      start_date: sanitizedPolicy.startDate,
+      end_date: sanitizedPolicy.endDate,
+      premium: sanitizedPolicy.premium,
+      paid_amount: sanitizedPolicy.paidAmount,
+      remaining_amount: sanitizedPolicy.remainingAmount,
+      payment_type: sanitizedPolicy.paymentType,
+      installment_count: sanitizedPolicy.installmentCount || 1,
+      commission_rate: sanitizedPolicy.commissionRate || 15,
+      payment_status: sanitizedPolicy.paymentStatus,
+      status: sanitizedPolicy.status || 'Aktif',
+      plate: sanitizedPolicy.plate || null,
+      notes: sanitizedPolicy.notes || null
     };
     await supabase.from('policies').upsert(row);
   } catch (err) {

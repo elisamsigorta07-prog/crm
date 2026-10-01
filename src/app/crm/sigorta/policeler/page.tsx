@@ -43,7 +43,8 @@ import {
   upsertCustomerToCloud, 
   deletePolicyFromCloud, 
   upsertCariMovementToCloud,
-  fetchCariMovementsFromCloud
+  fetchCariMovementsFromCloud,
+  normalizeMoney
 } from '@/lib/supabaseService';
 import styles from '../layout.module.css';
 
@@ -112,7 +113,25 @@ export default function PolicelerPage() {
           fetchPoliciesFromCloud(),
           fetchCustomersFromCloud()
         ]);
-        if (cloudPols) setPolicies(cloudPols);
+        if (cloudPols) {
+          const sanitizedPols = cloudPols.map(p => {
+            const prem = normalizeMoney(p.premium);
+            const paid = normalizeMoney(p.paidAmount);
+            return {
+              ...p,
+              premium: prem,
+              paidAmount: paid,
+              remainingAmount: Math.max(0, prem - paid)
+            };
+          });
+          setPolicies(sanitizedPols);
+          sanitizedPols.forEach(p => {
+            const original = cloudPols.find(orig => orig.id === p.id);
+            if (original && original.premium !== p.premium) {
+              upsertPolicyToCloud(p);
+            }
+          });
+        }
         if (cloudCusts) setCustomers(cloudCusts);
       } catch (err) {
         console.error('Supabase initial load error:', err);
@@ -338,7 +357,7 @@ export default function PolicelerPage() {
     // 9. Prim / Tutar
     const parsedPrice = extract(/(?:Prim|Brüt\s*Prim|Tutar|Fiyat|Teklif(?:\s*Tutarı)?):\s*([0-9.,]+)/i);
     if (parsedPrice) {
-      setPremium(parsedPrice.replace(/\./g, '').replace(',', '.'));
+      setPremium(String(normalizeMoney(parsedPrice)));
     }
 
     // 10. Otomatik Yapıştırılan Tüm Metni Notlar Alanına Aktar (Eksiksiz Kayıt)
@@ -390,8 +409,8 @@ export default function PolicelerPage() {
     const finalType = type === 'DIGER' ? (customType.trim() || 'Özel Sigorta') : type;
     const finalCompany = company === 'DIGER' ? (customCompany.trim() || 'Diğer Sigorta') : company;
     const finalPolicyNo = policyNo.trim() || `POL-${Math.floor(100000 + Math.random() * 900000)}`;
-    const prem = Number(premium);
-    const paid = Number(paidAmount) || (paymentType === 'Peşin / Tek Çekim' ? prem : 0);
+    const prem = normalizeMoney(premium);
+    const paid = paidAmount ? normalizeMoney(paidAmount) : (paymentType === 'Peşin / Tek Çekim' ? prem : 0);
     const remaining = Math.max(0, prem - paid);
     const instCount = paymentType === 'Taksitli' ? installmentCount : 1;
 
@@ -648,7 +667,7 @@ export default function PolicelerPage() {
     return matchesSearch;
   });
 
-  const totalPremiumAll = policies.reduce((s, p) => s + p.premium, 0);
+  const totalPremiumAll = policies.reduce((s, p) => s + normalizeMoney(p.premium), 0);
   const totalActive = policies.filter(p => p.status === 'Aktif').length;
   const totalExpiring = policies.filter(p => p.status === 'Yaklaşıyor').length;
   const totalWithDebt = policies.filter(p => p.remainingAmount && p.remainingAmount > 0).length;
