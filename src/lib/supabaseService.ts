@@ -147,6 +147,19 @@ export function normalizeMoney(val: any): number {
   return Math.round(num * 100) / 100;
 }
 
+export function formatMoneyInput(val: any): string {
+  if (val === undefined || val === null || val === '') return '';
+  const str = String(val).trim();
+  const clean = str.replace(/\./g, '').replace(/[^\d,]/g, '');
+  if (!clean) return '';
+  const parts = clean.split(',');
+  const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  if (parts.length > 1) {
+    return `${integerPart},${parts[1].slice(0, 2)}`;
+  }
+  return integerPart;
+}
+
 // -------------------------------------------------------------
 // 2. POLİÇELER (POLICIES)
 // -------------------------------------------------------------

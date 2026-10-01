@@ -44,7 +44,8 @@ import {
   deletePolicyFromCloud, 
   upsertCariMovementToCloud,
   fetchCariMovementsFromCloud,
-  normalizeMoney
+  normalizeMoney,
+  formatMoneyInput
 } from '@/lib/supabaseService';
 import styles from '../layout.module.css';
 
@@ -211,13 +212,13 @@ export default function PolicelerPage() {
     setVehicleType(pol.vehicleType || matchedCust?.vehicleType || '');
     setVehicleModelYear(pol.vehicleModelYear || matchedCust?.vehicleModelYear || '');
     setVehicleRegistrationDate(pol.vehicleRegistrationDate || matchedCust?.vehicleRegistrationDate || '');
-    setVehicleValue(pol.vehicleValue || matchedCust?.vehicleValue || '');
+    setVehicleValue(pol.vehicleValue ? formatMoneyInput(String(pol.vehicleValue)) : (matchedCust?.vehicleValue ? formatMoneyInput(String(matchedCust.vehicleValue)) : ''));
 
     setType(pol.type);
     setCompany(pol.company);
-    setPremium(String(pol.premium));
-    setNetPremium(pol.netPremium ? String(pol.netPremium) : '');
-    setPaidAmount(String(pol.paidAmount || ''));
+    setPremium(pol.premium ? formatMoneyInput(String(pol.premium)) : '');
+    setNetPremium(pol.netPremium ? formatMoneyInput(String(pol.netPremium)) : '');
+    setPaidAmount(pol.paidAmount ? formatMoneyInput(String(pol.paidAmount)) : '');
     setPaymentType(pol.paymentType || 'Peşin / Tek Çekim');
     setInstallmentCount(pol.installmentCount || 3);
     setCommissionRate(String(pol.commissionRate || 15));
@@ -357,16 +358,16 @@ export default function PolicelerPage() {
     if (parsedReg) setVehicleRegistrationDate(parsedReg);
 
     const parsedVal = extract(/(?:Araç\s*Kasko\s*Değeri|Kasko\s*Değeri|Rayiç\s*Bedel|Araç\s*Bedeli):\s*([0-9.,]+)/i);
-    if (parsedVal) setVehicleValue(parsedVal);
+    if (parsedVal) setVehicleValue(formatMoneyInput(String(normalizeMoney(parsedVal))));
 
     // 9. Prim / Tutar (Brüt & Net)
     const parsedGross = extract(/(?:Brüt\s*Prim|Brüt\s*Tutar|Brüt|Teklif(?:\s*Tutarı)?|Tutar|Prim|Fiyat):\s*([0-9.,]+)/i);
     if (parsedGross) {
-      setPremium(String(normalizeMoney(parsedGross)));
+      setPremium(formatMoneyInput(String(normalizeMoney(parsedGross))));
     }
     const parsedNet = extract(/(?:Net\s*Prim|Net\s*Tutar|Net):\s*([0-9.,]+)/i);
     if (parsedNet) {
-      setNetPremium(String(normalizeMoney(parsedNet)));
+      setNetPremium(formatMoneyInput(String(normalizeMoney(parsedNet))));
     }
 
     // 10. Otomatik Yapıştırılan Tüm Metni Notlar Alanına Aktar (Eksiksiz Kayıt)
@@ -1352,21 +1353,23 @@ export default function PolicelerPage() {
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 750, color: '#0d9488', marginBottom: '4px' }}>Net Prim (₺)</label>
                     <input 
-                      type="number" 
+                      type="text"
+                      inputMode="numeric"
                       value={netPremium} 
-                      onChange={(e) => setNetPremium(e.target.value)} 
-                      placeholder="Örn: 10500" 
+                      onChange={(e) => setNetPremium(formatMoneyInput(e.target.value))} 
+                      placeholder="Örn: 10.500" 
                       style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #99f6e4', outline: 'none', fontWeight: 750, fontSize: '0.95rem', color: '#0f766e', backgroundColor: '#f0fdfa' }} 
                     />
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 750, color: '#166534', marginBottom: '4px' }}>Toplam Brüt Prim (₺) *</label>
                     <input 
-                      type="number" 
+                      type="text"
+                      inputMode="numeric" 
                       required 
                       value={premium} 
-                      onChange={(e) => setPremium(e.target.value)} 
-                      placeholder="Örn: 12386" 
+                      onChange={(e) => setPremium(formatMoneyInput(e.target.value))} 
+                      placeholder="Örn: 12.386" 
                       style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #86efac', outline: 'none', fontWeight: 800, fontSize: '1rem', color: '#166534' }} 
                     />
                   </div>
@@ -1409,10 +1412,11 @@ export default function PolicelerPage() {
                       <div>
                         <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#166534', marginBottom: '4px' }}>Tahsil Edilen Tutar (₺)</label>
                         <input 
-                          type="number" 
+                          type="text"
+                          inputMode="numeric" 
                           value={paidAmount} 
-                          onChange={(e) => setPaidAmount(e.target.value)} 
-                          placeholder={premium || "Örn: 15000"} 
+                          onChange={(e) => setPaidAmount(formatMoneyInput(e.target.value))} 
+                          placeholder={premium || "Örn: 12.386"} 
                           style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontWeight: 700 }} 
                         />
                       </div>
@@ -1421,7 +1425,7 @@ export default function PolicelerPage() {
 
                   {paymentType === 'Taksitli' && premium && (
                     <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#16a34a', fontWeight: 700 }}>
-                      💡 Her ay ödenecek taksit tutarı: {(Number(premium) / installmentCount).toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ₺
+                      💡 Her ay ödenecek taksit tutarı: {(normalizeMoney(premium) / installmentCount).toLocaleString('tr-TR', { maximumFractionDigits: 2 })} ₺
                     </div>
                   )}
                 </div>
@@ -1470,7 +1474,14 @@ export default function PolicelerPage() {
                   </div>
                   <div>
                     <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#92400e', marginBottom: '4px' }}>Araç Kasko Değeri (₺)</label>
-                    <input type="text" value={vehicleValue} onChange={(e) => setVehicleValue(e.target.value)} placeholder="Örn: 515497" style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fcd34d', outline: 'none', fontWeight: 700 }} />
+                    <input 
+                      type="text" 
+                      inputMode="numeric"
+                      value={vehicleValue} 
+                      onChange={(e) => setVehicleValue(formatMoneyInput(e.target.value))} 
+                      placeholder="Örn: 515.497" 
+                      style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #fcd34d', outline: 'none', fontWeight: 700 }} 
+                    />
                   </div>
                 </div>
               </div>
