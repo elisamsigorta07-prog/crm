@@ -153,13 +153,19 @@ export default function SigortaRaporlarPage() {
 
     // BÖLÜM 2: SEÇİLİ AYIN POLİÇELERİ
     csv += `=== 2. POLİÇE ÜRETİM KAYITLARI (${monthlyPolicies.length} ADET) ===\n`;
-    csv += `Poliçe No;Müşteri Adı;Poliçe Türü;Sigorta Şirketi;Başlangıç Tarihi;Bitiş Tarihi;Brüt Prim (TL);Durum;Plaka\n`;
+    csv += `Poliçe No;Müşteri Adı;TCKN / VKN;Doğum Tarihi;Telefon;Poliçe Türü;Sigorta Şirketi;Başlangıç Tarihi;Bitiş Tarihi;Plaka;Belge Seri No;Brüt Prim (TL);Durum\n`;
     if (monthlyPolicies.length > 0) {
       monthlyPolicies.forEach(p => {
-        csv += `"${p.policyNo || p.id}";"${p.customerName}";"${p.type}";"${p.company}";"${p.startDate}";"${p.endDate}";"${formatExcelCurrency(p.premium)}";"${p.status}";"${p.plate || '-'}"\n`;
+        const cust = customers.find(c => c.id === p.customerId || c.name.toLowerCase() === p.customerName.toLowerCase());
+        const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (cust?.identityNo && cust.identityNo !== '-' ? cust.identityNo : '-');
+        const phone = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (cust?.phone && cust.phone !== '-' ? cust.phone : '-');
+        const birth = cust?.birthDate || '-';
+        const plate = p.plate || cust?.plate || '-';
+        const docSerial = p.documentSerial || cust?.documentSerial || '-';
+        csv += `"${p.policyNo || p.id}";"${p.customerName}";"${tc}";"${birth}";"${phone}";"${p.type}";"${p.company}";"${p.startDate}";"${p.endDate}";"${plate}";"${docSerial}";"${formatExcelCurrency(p.premium)}";"${p.status}"\n`;
       });
     } else {
-      csv += `"(Bu dönemde kesilen poliçe bulunmamaktadır)";"";"";"";"";"";"";"";""\n`;
+      csv += `"(Bu dönemde kesilen poliçe bulunmamaktadır)";"";"";"";"";"";"";"";"";"";"";"";""\n`;
     }
     csv += `\n`;
 
@@ -177,9 +183,9 @@ export default function SigortaRaporlarPage() {
 
     // BÖLÜM 4: MÜŞTERİ PORTFÖYÜ
     csv += `=== 4. KAYITLI MÜŞTERİ LİSTESİ (${customers.length} KİŞİ/KURUM) ===\n`;
-    csv += `Müşteri No;Ad Soyad / Firma Ünvanı;Müşteri Türü;TCKN / VKN;Telefon;E-Posta;Kayıt Tarihi\n`;
+    csv += `Müşteri No;Ad Soyad / Firma Ünvanı;Müşteri Türü;TCKN / VKN;Doğum Tarihi;Telefon;E-Posta;Kayıt Tarihi\n`;
     customers.forEach(c => {
-      csv += `"${c.id}";"${c.name}";"${c.type}";"${c.identityNo || '-'}";"${c.phone}";"${c.email || '-'}";"${c.createdAt}"\n`;
+      csv += `"${c.id}";"${c.name}";"${c.type}";"${c.identityNo || '-'}";"${c.birthDate || '-'}";"${c.phone}";"${c.email || '-'}";"${c.createdAt}"\n`;
     });
 
     const filePeriodSlug = backupPeriod.replace('-', '_');
@@ -193,16 +199,26 @@ export default function SigortaRaporlarPage() {
     const periodName = getPeriodLabel(backupPeriod);
     const dateStamp = new Date().toLocaleDateString('tr-TR');
 
-    const headers = ['Tarih', 'Fiş/Poliçe No', 'Müşteri / Cari', 'Açıklama & İşlem Türü', 'Borç / Prim (₺)', 'Tahsilat (₺)'];
+    const headers = ['Tarih', 'Fiş/Poliçe No', 'Müşteri / TC / Tel', 'Sigorta & Araç Bilgisi', 'Borç / Prim (₺)', 'Tahsilat (₺)'];
     const rows: (string | number)[][] = [];
 
     // Önce o ayki poliçeleri ekle
     monthlyPolicies.forEach(p => {
+      const cust = customers.find(c => c.id === p.customerId || c.name.toLowerCase() === p.customerName.toLowerCase());
+      const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (cust?.identityNo && cust.identityNo !== '-' ? cust.identityNo : '');
+      const tel = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (cust?.phone && cust.phone !== '-' ? cust.phone : '');
+      const bDate = cust?.birthDate ? ` [D.T: ${cust.birthDate}]` : '';
+      const custInfo = `${p.customerName}${tc ? ` (TC: ${tc})` : ''}${bDate}${tel ? ` 📞${tel}` : ''}`;
+
+      const plateStr = p.plate || cust?.plate || '';
+      const serialStr = p.documentSerial || cust?.documentSerial || '';
+      const vehicleDesc = plateStr || serialStr ? ` | ${plateStr ? `Plaka: ${plateStr}` : ''}${serialStr ? ` (Seri: ${serialStr})` : ''}` : '';
+
       rows.push([
         p.startDate,
         p.policyNo || p.id,
-        p.customerName,
-        `🛡️ Poliçe: ${p.type} (${p.company})`,
+        custInfo,
+        `🛡️ Poliçe: ${p.type} (${p.company})${vehicleDesc}`,
         `${p.premium.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`,
         '-'
       ]);
@@ -286,18 +302,60 @@ export default function SigortaRaporlarPage() {
       downloadCSV(`elisam-musteri-listesi-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(';')).join('\n'));
     } else if (type === 'aktif_policeler') {
       const rows = [
-        ['Poliçe No', 'Müşteri Adı', 'Poliçe Türü', 'Sigorta Şirketi', 'Başlangıç', 'Bitiş', 'Brüt Prim (TL)', 'Durum'],
-        ...policies.map(p => [p.policyNo || p.id, p.customerName, p.type, p.company, p.startDate, p.endDate, formatExcelCurrency(p.premium), p.status])
+        ['Poliçe No', 'Müşteri Adı', 'TC Kimlik / VKN', 'Doğum Tarihi', 'Telefon', 'Poliçe Türü', 'Sigorta Şirketi', 'Başlangıç Tarihi', 'Bitiş Tarihi', 'Plaka', 'Belge Seri No', 'Brüt Prim (TL)', 'Durum'],
+        ...policies.map(p => {
+          const cust = customers.find(c => c.id === p.customerId || c.name.toLowerCase() === p.customerName.toLowerCase());
+          const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (cust?.identityNo && cust.identityNo !== '-' ? cust.identityNo : '-');
+          const phone = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (cust?.phone && cust.phone !== '-' ? cust.phone : '-');
+          const birth = cust?.birthDate || '-';
+          const plate = p.plate || cust?.plate || '-';
+          const docSerial = p.documentSerial || cust?.documentSerial || '-';
+          return [
+            p.policyNo || p.id,
+            p.customerName,
+            tc,
+            birth,
+            phone,
+            p.type,
+            p.company,
+            p.startDate,
+            p.endDate,
+            plate,
+            docSerial,
+            formatExcelCurrency(p.premium),
+            p.status
+          ];
+        })
       ];
-      if (rows.length === 1) rows.push(['(Kayıtlı poliçe bulunamadı)', '', '', '', '', '', '', '']);
+      if (rows.length === 1) rows.push(['(Kayıtlı poliçe bulunamadı)', '', '', '', '', '', '', '', '', '', '', '', '']);
       downloadCSV(`elisam-aktif-policeler-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(';')).join('\n'));
     } else if (type === 'yaklasan_policeler') {
       const upcoming = policies.filter(p => p.status === 'Yaklaşıyor' || p.status === 'Biten');
       const rows = [
-        ['Poliçe No', 'Müşteri Adı', 'Poliçe Türü', 'Bitiş Tarihi', 'Durum'],
-        ...upcoming.map(p => [p.policyNo || p.id, p.customerName, p.type, p.endDate, p.status])
+        ['Poliçe No', 'Müşteri Adı', 'TC Kimlik / VKN', 'Doğum Tarihi', 'Telefon', 'Poliçe Türü', 'Bitiş Tarihi', 'Plaka', 'Belge Seri No', 'Brüt Prim (TL)', 'Durum'],
+        ...upcoming.map(p => {
+          const cust = customers.find(c => c.id === p.customerId || c.name.toLowerCase() === p.customerName.toLowerCase());
+          const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (cust?.identityNo && cust.identityNo !== '-' ? cust.identityNo : '-');
+          const phone = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (cust?.phone && cust.phone !== '-' ? cust.phone : '-');
+          const birth = cust?.birthDate || '-';
+          const plate = p.plate || cust?.plate || '-';
+          const docSerial = p.documentSerial || cust?.documentSerial || '-';
+          return [
+            p.policyNo || p.id,
+            p.customerName,
+            tc,
+            birth,
+            phone,
+            p.type,
+            p.endDate,
+            plate,
+            docSerial,
+            formatExcelCurrency(p.premium),
+            p.status
+          ];
+        })
       ];
-      if (rows.length === 1) rows.push(['(Yaklaşan poliçe bulunamadı)', '', '', '', '']);
+      if (rows.length === 1) rows.push(['(Yaklaşan poliçe bulunamadı)', '', '', '', '', '', '', '', '', '', '']);
       downloadCSV(`elisam-yaklasan-policeler-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(';')).join('\n'));
     } else if (type === 'sirket_bazli') {
       const map: Record<string, { count: number; total: number }> = {};
@@ -336,15 +394,16 @@ export default function SigortaRaporlarPage() {
           { label: 'BİREYSEL', value: `${customers.filter(c => c.type === 'Bireysel').length}`, color: '#16a34a' },
           { label: 'KURUMSAL', value: `${customers.filter(c => c.type === 'Kurumsal').length}`, color: '#9333ea' },
         ],
-        headers: ['Müşteri No', 'Ad Soyad / Firma Ünvanı', 'Tür', 'TC / Vergi No', 'Telefon', 'Kayıt Tarihi'],
+        headers: ['Müşteri No', 'Ad Soyad / Firma Ünvanı', 'Tür', 'TC / Vergi No', 'Doğum Tarihi', 'Telefon', 'Kayıt Tarihi'],
         rows: customers.length > 0 ? customers.map(c => [
           c.id,
           c.name,
           c.type,
           c.identityNo || '-',
+          c.birthDate || '-',
           c.phone,
           c.createdAt
-        ]) : [['-', 'Kayıtlı müşteri bulunamadı', '-', '-', '-', '-']]
+        ]) : [['-', 'Kayıtlı müşteri bulunamadı', '-', '-', '-', '-', '-']]
       });
     } else if (type === 'aktif_policeler') {
       const totalPrem = policies.reduce((s, p) => s + p.premium, 0);
@@ -359,17 +418,28 @@ export default function SigortaRaporlarPage() {
           { label: 'AKTİF POLİÇELER', value: `${policies.filter(p => p.status === 'Aktif').length} Adet`, color: '#059669' },
           { label: 'YAKLAŞAN POLİÇELER', value: `${policies.filter(p => p.status === 'Yaklaşıyor').length} Adet`, color: '#d97706' },
         ],
-        headers: ['Poliçe No', 'Müşteri Adı', 'Sigorta Türü', 'Şirket', 'Başlangıç', 'Bitiş', 'Brüt Prim (₺)', 'Durum'],
-        rows: policies.length > 0 ? policies.map(p => [
-          p.policyNo || p.id,
-          p.customerName,
-          p.type,
-          p.company,
-          p.startDate,
-          p.endDate,
-          `${p.premium.toLocaleString('tr-TR')} ₺`,
-          p.status
-        ]) : [['-', 'Kayıtlı poliçe bulunamadı', '-', '-', '-', '-', '-', '-']]
+        headers: ['Poliçe No', 'Müşteri / TC / Tel', 'Sigorta & Şirket', 'Vade (Başlangıç - Bitiş)', 'Araç / Belge Seri', 'Brüt Prim (₺)', 'Durum'],
+        rows: policies.length > 0 ? policies.map(p => {
+          const cust = customers.find(c => c.id === p.customerId || c.name.toLowerCase() === p.customerName.toLowerCase());
+          const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (cust?.identityNo && cust.identityNo !== '-' ? cust.identityNo : '');
+          const tel = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (cust?.phone && cust.phone !== '-' ? cust.phone : '');
+          const bDate = cust?.birthDate ? ` (D.T: ${cust.birthDate})` : '';
+          const customerBlock = `${p.customerName}${tc ? `\nTC: ${tc}` : ''}${bDate}${tel ? `\nTel: ${tel}` : ''}`;
+
+          const plateStr = p.plate || cust?.plate || '';
+          const serialStr = p.documentSerial || cust?.documentSerial || '';
+          const vehicleBlock = plateStr || serialStr ? `${plateStr ? `Plaka: ${plateStr}` : ''}${serialStr ? `\nSeri: ${serialStr}` : ''}` : '-';
+
+          return [
+            p.policyNo || p.id,
+            customerBlock,
+            `${p.type}\n${p.company}`,
+            `${p.startDate}\n${p.endDate}`,
+            vehicleBlock,
+            `${p.premium.toLocaleString('tr-TR')} ₺`,
+            p.status
+          ];
+        }) : [['-', 'Kayıtlı poliçe bulunamadı', '-', '-', '-', '-', '-']]
       });
     } else if (type === 'yaklasan_policeler') {
       const upcoming = policies.filter(p => p.status === 'Yaklaşıyor' || p.status === 'Biten');
@@ -382,14 +452,27 @@ export default function SigortaRaporlarPage() {
           { label: 'YAKLAŞAN POLİÇELER', value: `${upcoming.length} Adet`, color: '#d97706' },
           { label: 'BİTEN POLİÇELER', value: `${policies.filter(p => p.status === 'Biten').length} Adet`, color: '#dc2626' }
         ],
-        headers: ['Poliçe No', 'Müşteri Adı', 'Sigorta Türü', 'Bitiş Tarihi', 'Durum'],
-        rows: upcoming.length > 0 ? upcoming.map(p => [
-          p.policyNo || p.id,
-          p.customerName,
-          p.type,
-          p.endDate,
-          p.status
-        ]) : [['-', 'Yaklaşan poliçe bulunamadı', '-', '-', '-']]
+        headers: ['Poliçe No', 'Müşteri / TC / Tel', 'Sigorta Türü', 'Bitiş Tarihi', 'Araç / Belge Seri', 'Durum'],
+        rows: upcoming.length > 0 ? upcoming.map(p => {
+          const cust = customers.find(c => c.id === p.customerId || c.name.toLowerCase() === p.customerName.toLowerCase());
+          const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (cust?.identityNo && cust.identityNo !== '-' ? cust.identityNo : '');
+          const tel = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (cust?.phone && cust.phone !== '-' ? cust.phone : '');
+          const bDate = cust?.birthDate ? ` (D.T: ${cust.birthDate})` : '';
+          const customerBlock = `${p.customerName}${tc ? `\nTC: ${tc}` : ''}${bDate}${tel ? `\nTel: ${tel}` : ''}`;
+
+          const plateStr = p.plate || cust?.plate || '';
+          const serialStr = p.documentSerial || cust?.documentSerial || '';
+          const vehicleBlock = plateStr || serialStr ? `${plateStr ? `Plaka: ${plateStr}` : ''}${serialStr ? `\nSeri: ${serialStr}` : ''}` : '-';
+
+          return [
+            p.policyNo || p.id,
+            customerBlock,
+            p.type,
+            p.endDate,
+            vehicleBlock,
+            p.status
+          ];
+        }) : [['-', 'Yaklaşan poliçe bulunamadı', '-', '-', '-', '-']]
       });
     } else if (type === 'sirket_bazli') {
       const map: Record<string, { count: number; total: number }> = {};
