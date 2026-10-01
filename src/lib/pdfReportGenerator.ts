@@ -235,26 +235,53 @@ export function generateModernPDF(config: PDFReportConfig) {
     }
 
     .data-table td {
-      padding: 8px 12px;
+      padding: 10px 12px;
       border-bottom: 1px solid #e2e8f0;
       color: #334155;
+      vertical-align: top;
+      font-size: 11px;
+      line-height: 1.45;
     }
 
-    .data-table tr:nth-child(even) td {
-      background-color: #f8fafc;
+    .cust-name {
+      font-weight: 800;
+      color: #0f172a;
+      font-size: 11.5px;
+      margin-bottom: 3px;
     }
-
-    .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 12px;
+    .cust-sub {
+      font-size: 10px;
+      color: #64748b;
+      display: block;
+      margin-top: 1px;
+      line-height: 1.35;
+    }
+    .cust-phone {
       font-size: 10.5px;
+      color: #0284c7;
       font-weight: 700;
+      display: block;
+      margin-top: 3px;
     }
-    .badge-success { background: #dcfce7; color: #15803d; }
-    .badge-warning { background: #fef3c7; color: #b45309; }
-    .badge-danger { background: #fee2e2; color: #dc2626; }
-    .badge-info { background: #e0f2fe; color: #0369a1; }
+    .vehicle-tag {
+      font-weight: 800;
+      color: #92400e;
+      background: #fef3c7;
+      border: 1px solid #fde68a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10.5px;
+      display: inline-block;
+      margin-bottom: 2px;
+      letter-spacing: 0.3px;
+    }
+    .serial-tag {
+      font-size: 10px;
+      color: #78350f;
+      display: block;
+      font-weight: 600;
+      margin-top: 2px;
+    }
 
     .footer-section {
       margin-top: 36px;

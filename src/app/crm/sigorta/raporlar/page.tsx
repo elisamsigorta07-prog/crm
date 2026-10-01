@@ -207,19 +207,29 @@ export default function SigortaRaporlarPage() {
       const cust = customers.find(c => c.id === p.customerId || c.name.toLowerCase() === p.customerName.toLowerCase());
       const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (cust?.identityNo && cust.identityNo !== '-' ? cust.identityNo : '');
       const tel = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (cust?.phone && cust.phone !== '-' ? cust.phone : '');
-      const bDate = cust?.birthDate ? ` [D.T: ${cust.birthDate}]` : '';
-      const custInfo = `${p.customerName}${tc ? ` (TC: ${tc})` : ''}${bDate}${tel ? ` 📞${tel}` : ''}`;
+      const bDate = cust?.birthDate ? ` • D.T: ${cust.birthDate}` : '';
+
+      let customerHTML = `<div class="cust-name">${p.customerName}</div>`;
+      if (tc || bDate) {
+        customerHTML += `<span class="cust-sub">${tc ? `TC: <strong>${tc}</strong>` : ''}${bDate}</span>`;
+      }
+      if (tel) {
+        customerHTML += `<span class="cust-phone">📞 ${tel}</span>`;
+      }
 
       const plateStr = p.plate || cust?.plate || '';
       const serialStr = p.documentSerial || cust?.documentSerial || '';
-      const vehicleDesc = plateStr || serialStr ? ` | ${plateStr ? `Plaka: ${plateStr}` : ''}${serialStr ? ` (Seri: ${serialStr})` : ''}` : '';
+      let vehicleDesc = '';
+      if (plateStr || serialStr) {
+        vehicleDesc = `<div style="margin-top: 3px;">${plateStr ? `<span class="vehicle-tag">${plateStr}</span> ` : ''}${serialStr ? `<span class="serial-tag">Seri: ${serialStr}</span>` : ''}</div>`;
+      }
 
       rows.push([
         p.startDate,
-        p.policyNo || p.id,
-        custInfo,
-        `🛡️ Poliçe: ${p.type} (${p.company})${vehicleDesc}`,
-        `${p.premium.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺`,
+        `<strong style="font-family: monospace; color: #0284c7;">${p.policyNo || p.id}</strong>`,
+        customerHTML,
+        `<div>🛡️ <strong>${p.type}</strong> <span style="color:#64748b;">(${p.company})</span></div>${vehicleDesc}`,
+        `<strong>${p.premium.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</strong>`,
         '-'
       ]);
     });
@@ -418,25 +428,40 @@ export default function SigortaRaporlarPage() {
           { label: 'AKTİF POLİÇELER', value: `${policies.filter(p => p.status === 'Aktif').length} Adet`, color: '#059669' },
           { label: 'YAKLAŞAN POLİÇELER', value: `${policies.filter(p => p.status === 'Yaklaşıyor').length} Adet`, color: '#d97706' },
         ],
-        headers: ['Poliçe No', 'Müşteri / TC / Tel', 'Sigorta & Şirket', 'Vade (Başlangıç - Bitiş)', 'Araç / Belge Seri', 'Brüt Prim (₺)', 'Durum'],
+        headers: ['Poliçe No', 'Müşteri Bilgileri', 'Sigorta & Şirket', 'Vade Tarihleri', 'Araç / Belge Seri', 'Brüt Prim', 'Durum'],
         rows: policies.length > 0 ? policies.map(p => {
           const cust = customers.find(c => c.id === p.customerId || c.name.toLowerCase() === p.customerName.toLowerCase());
           const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (cust?.identityNo && cust.identityNo !== '-' ? cust.identityNo : '');
           const tel = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (cust?.phone && cust.phone !== '-' ? cust.phone : '');
-          const bDate = cust?.birthDate ? ` (D.T: ${cust.birthDate})` : '';
-          const customerBlock = `${p.customerName}${tc ? `\nTC: ${tc}` : ''}${bDate}${tel ? `\nTel: ${tel}` : ''}`;
+          const bDate = cust?.birthDate ? ` • D.T: ${cust.birthDate}` : '';
+
+          let customerHTML = `<div class="cust-name">${p.customerName}</div>`;
+          if (tc || bDate) {
+            customerHTML += `<span class="cust-sub">${tc ? `TC: <strong>${tc}</strong>` : ''}${bDate}</span>`;
+          }
+          if (tel) {
+            customerHTML += `<span class="cust-phone">📞 ${tel}</span>`;
+          }
 
           const plateStr = p.plate || cust?.plate || '';
           const serialStr = p.documentSerial || cust?.documentSerial || '';
-          const vehicleBlock = plateStr || serialStr ? `${plateStr ? `Plaka: ${plateStr}` : ''}${serialStr ? `\nSeri: ${serialStr}` : ''}` : '-';
+          let vehicleHTML = '-';
+          if (plateStr || serialStr) {
+            vehicleHTML = '';
+            if (plateStr) vehicleHTML += `<span class="vehicle-tag">${plateStr}</span>`;
+            if (serialStr) vehicleHTML += `<span class="serial-tag">Seri: ${serialStr}</span>`;
+          }
+
+          const policyHTML = `<strong>${p.type}</strong><span class="cust-sub">${p.company}</span>`;
+          const dateHTML = `<span style="color:#0f172a; font-weight:600;">${p.startDate}</span><span class="cust-sub">Bitiş: ${p.endDate}</span>`;
 
           return [
-            p.policyNo || p.id,
-            customerBlock,
-            `${p.type}\n${p.company}`,
-            `${p.startDate}\n${p.endDate}`,
-            vehicleBlock,
-            `${p.premium.toLocaleString('tr-TR')} ₺`,
+            `<strong style="font-family: monospace; color: #0284c7;">${p.policyNo || p.id}</strong>`,
+            customerHTML,
+            policyHTML,
+            dateHTML,
+            vehicleHTML,
+            `<strong>${p.premium.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</strong>`,
             p.status
           ];
         }) : [['-', 'Kayıtlı poliçe bulunamadı', '-', '-', '-', '-', '-']]
@@ -452,24 +477,36 @@ export default function SigortaRaporlarPage() {
           { label: 'YAKLAŞAN POLİÇELER', value: `${upcoming.length} Adet`, color: '#d97706' },
           { label: 'BİTEN POLİÇELER', value: `${policies.filter(p => p.status === 'Biten').length} Adet`, color: '#dc2626' }
         ],
-        headers: ['Poliçe No', 'Müşteri / TC / Tel', 'Sigorta Türü', 'Bitiş Tarihi', 'Araç / Belge Seri', 'Durum'],
+        headers: ['Poliçe No', 'Müşteri Bilgileri', 'Sigorta & Şirket', 'Bitiş Tarihi', 'Araç / Belge Seri', 'Durum'],
         rows: upcoming.length > 0 ? upcoming.map(p => {
           const cust = customers.find(c => c.id === p.customerId || c.name.toLowerCase() === p.customerName.toLowerCase());
           const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (cust?.identityNo && cust.identityNo !== '-' ? cust.identityNo : '');
           const tel = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (cust?.phone && cust.phone !== '-' ? cust.phone : '');
-          const bDate = cust?.birthDate ? ` (D.T: ${cust.birthDate})` : '';
-          const customerBlock = `${p.customerName}${tc ? `\nTC: ${tc}` : ''}${bDate}${tel ? `\nTel: ${tel}` : ''}`;
+          const bDate = cust?.birthDate ? ` • D.T: ${cust.birthDate}` : '';
+
+          let customerHTML = `<div class="cust-name">${p.customerName}</div>`;
+          if (tc || bDate) {
+            customerHTML += `<span class="cust-sub">${tc ? `TC: <strong>${tc}</strong>` : ''}${bDate}</span>`;
+          }
+          if (tel) {
+            customerHTML += `<span class="cust-phone">📞 ${tel}</span>`;
+          }
 
           const plateStr = p.plate || cust?.plate || '';
           const serialStr = p.documentSerial || cust?.documentSerial || '';
-          const vehicleBlock = plateStr || serialStr ? `${plateStr ? `Plaka: ${plateStr}` : ''}${serialStr ? `\nSeri: ${serialStr}` : ''}` : '-';
+          let vehicleHTML = '-';
+          if (plateStr || serialStr) {
+            vehicleHTML = '';
+            if (plateStr) vehicleHTML += `<span class="vehicle-tag">${plateStr}</span>`;
+            if (serialStr) vehicleHTML += `<span class="serial-tag">Seri: ${serialStr}</span>`;
+          }
 
           return [
-            p.policyNo || p.id,
-            customerBlock,
-            p.type,
-            p.endDate,
-            vehicleBlock,
+            `<strong style="font-family: monospace; color: #0284c7;">${p.policyNo || p.id}</strong>`,
+            customerHTML,
+            `<strong>${p.type}</strong><span class="cust-sub">${p.company}</span>`,
+            `<strong style="color: #dc2626; font-size: 11.5px;">${p.endDate}</strong>`,
+            vehicleHTML,
             p.status
           ];
         }) : [['-', 'Yaklaşan poliçe bulunamadı', '-', '-', '-', '-']]
