@@ -45,7 +45,8 @@ import {
   upsertCariMovementToCloud,
   fetchCariMovementsFromCloud,
   normalizeMoney,
-  formatMoneyInput
+  formatMoneyInput,
+  formatMoneyDisplay
 } from '@/lib/supabaseService';
 import styles from '../layout.module.css';
 
@@ -630,7 +631,7 @@ export default function PolicelerPage() {
   // WhatsApp Reminder
   const sendWhatsAppReminder = (pol: Policy) => {
     const cleanPhone = (pol.customerPhone || '').replace(/\s+/g, '').replace(/^0/, '90');
-    const msg = `Sayın ${pol.customerName},\n\nElisam Sigorta acentemizden bildirilmektedir.\n${pol.policyNo || pol.id} numaralı ${pol.type} poliçenizin detayları:\n\n🛡️ Şirket: ${pol.company}\n📅 Bitiş Tarihi: ${pol.endDate}\n💰 Prim Tutarı: ${pol.premium.toLocaleString('tr-TR')} ₺\n${pol.remainingAmount && pol.remainingAmount > 0 ? `🔴 Kalan Borç: ${pol.remainingAmount.toLocaleString('tr-TR')} ₺\n` : '🟢 Ödeme Durumu: Tamamı Ödendi\n'}\nSorularınız ve yenileme talepleriniz için bize ulaşabilirsiniz:\n📞 0551 438 77 71\nElisam Sigorta • Alanya`;
+    const msg = `Sayın ${pol.customerName},\n\nElisam Sigorta acentemizden bildirilmektedir.\n${pol.policyNo || pol.id} numaralı ${pol.type} poliçenizin detayları:\n\n🛡️ Şirket: ${pol.company}\n📅 Bitiş Tarihi: ${pol.endDate}\n💰 Prim Tutarı: ${formatMoneyDisplay(pol.premium)} ₺\n${pol.remainingAmount && pol.remainingAmount > 0 ? `🔴 Kalan Borç: ${formatMoneyDisplay(pol.remainingAmount)} ₺\n` : '🟢 Ödeme Durumu: Tamamı Ödendi\n'}\nSorularınız ve yenileme talepleriniz için bize ulaşabilirsiniz:\n📞 0551 438 77 71\nElisam Sigorta • Alanya`;
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
@@ -643,7 +644,7 @@ export default function PolicelerPage() {
         return;
       }
 
-      const text = `📄 *Poliçe Bilgilendirmesi*\n\n👤 *Müşteri:* ${pol.customerName}\n📱 *Telefon:* ${pol.customerPhone || '-'}\n📄 *Poliçe No:* \`${pol.policyNo || pol.id}\`\n🛡️ *Tür / Şirket:* ${pol.type} - ${pol.company}\n📅 *Vade:* ${pol.startDate} -> ${pol.endDate}\n💰 *Toplam Prim:* ${pol.premium.toLocaleString('tr-TR')} ₺\n📊 *Durum:* ${pol.status}\n\n⏰ *Kayıt Tarihi:* ${new Date().toLocaleString('tr-TR')}`;
+      const text = `📄 *Poliçe Bilgilendirmesi*\n\n👤 *Müşteri:* ${pol.customerName}\n📱 *Telefon:* ${pol.customerPhone || '-'}\n📄 *Poliçe No:* \`${pol.policyNo || pol.id}\`\n🛡️ *Tür / Şirket:* ${pol.type} - ${pol.company}\n📅 *Vade:* ${pol.startDate} -> ${pol.endDate}\n💰 *Toplam Prim:* ${formatMoneyDisplay(pol.premium)} ₺\n📊 *Durum:* ${pol.status}\n\n⏰ *Kayıt Tarihi:* ${new Date().toLocaleString('tr-TR')}`;
 
       const res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
         method: 'POST',
@@ -718,13 +719,13 @@ export default function PolicelerPage() {
 
         <div className={styles.card} style={{ borderLeft: '4px solid #16a34a', padding: '16px 20px' }}>
           <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#16a34a', textTransform: 'uppercase' }}>Toplam Brüt Prim</div>
-          <div style={{ fontSize: '1.55rem', fontWeight: 850, color: '#16a34a', marginTop: '4px' }}>{totalGrossPremium.toLocaleString('tr-TR')} ₺</div>
+          <div style={{ fontSize: '1.55rem', fontWeight: 850, color: '#16a34a', marginTop: '4px' }}>{formatMoneyDisplay(totalGrossPremium)} ₺</div>
           <div style={{ fontSize: '0.78rem', color: '#16a34a', marginTop: '3px', fontWeight: 600 }}>✓ Toplam brüt üretim</div>
         </div>
 
         <div className={styles.card} style={{ borderLeft: '4px solid #0d9488', padding: '16px 20px' }}>
           <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0d9488', textTransform: 'uppercase' }}>Toplam Net Prim</div>
-          <div style={{ fontSize: '1.55rem', fontWeight: 850, color: '#0d9488', marginTop: '4px' }}>{totalNetPremium.toLocaleString('tr-TR')} ₺</div>
+          <div style={{ fontSize: '1.55rem', fontWeight: 850, color: '#0d9488', marginTop: '4px' }}>{formatMoneyDisplay(totalNetPremium)} ₺</div>
           <div style={{ fontSize: '0.78rem', color: '#0d9488', marginTop: '3px', fontWeight: 600 }}>✓ Vergisiz net portföy</div>
         </div>
 
@@ -845,11 +846,11 @@ export default function PolicelerPage() {
                       {/* Prim */}
                       <td style={{ padding: '14px 16px' }}>
                         <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.95rem' }}>
-                          {pol.premium.toLocaleString('tr-TR')} ₺ <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Brüt</span>
+                          {formatMoneyDisplay(pol.premium)} ₺ <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 600 }}>Brüt</span>
                         </div>
                         {pol.netPremium && pol.netPremium > 0 && (
                           <div style={{ fontSize: '0.78rem', color: '#0d9488', fontWeight: 700, marginTop: '2px' }}>
-                            Net: {pol.netPremium.toLocaleString('tr-TR')} ₺
+                            Net: {formatMoneyDisplay(pol.netPremium)} ₺
                           </div>
                         )}
                       </td>
@@ -859,7 +860,7 @@ export default function PolicelerPage() {
                         {pol.remainingAmount && pol.remainingAmount > 0 ? (
                           <div>
                             <span style={{ padding: '3px 8px', borderRadius: '6px', backgroundColor: '#fef2f2', color: '#dc2626', fontWeight: 750, fontSize: '0.82rem' }}>
-                              Borç: {pol.remainingAmount.toLocaleString('tr-TR')} ₺
+                              Borç: {formatMoneyDisplay(pol.remainingAmount)} ₺
                             </span>
                             <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '2px' }}>
                               {pol.paymentType} {pol.installmentCount && pol.installmentCount > 1 ? `(${pol.installmentCount} Taksit)` : ''}
@@ -1568,13 +1569,13 @@ export default function PolicelerPage() {
               <div style={{ padding: '14px', backgroundColor: '#f0f9ff', borderRadius: '10px', border: '1px solid #bae6fd' }}>
                 <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#0369a1', textTransform: 'uppercase', marginBottom: '6px' }}>Finans & Prim Bilgisi</div>
                 <div style={{ fontWeight: 850, color: '#0369a1', fontSize: '1.2rem', display: 'flex', alignItems: 'baseline', gap: '8px', flexWrap: 'wrap' }}>
-                  <span>{selectedPolicy.premium.toLocaleString('tr-TR')} ₺ <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#0284c7' }}>Brüt</span></span>
+                  <span>{formatMoneyDisplay(selectedPolicy.premium)} ₺ <span style={{ fontSize: '0.78rem', fontWeight: 600, color: '#0284c7' }}>Brüt</span></span>
                   {selectedPolicy.netPremium && selectedPolicy.netPremium > 0 && (
-                    <span style={{ fontSize: '0.95rem', color: '#0d9488', fontWeight: 750 }}>• {selectedPolicy.netPremium.toLocaleString('tr-TR')} ₺ Net</span>
+                    <span style={{ fontSize: '0.95rem', color: '#0d9488', fontWeight: 750 }}>• {formatMoneyDisplay(selectedPolicy.netPremium)} ₺ Net</span>
                   )}
                 </div>
                 <div style={{ fontSize: '0.82rem', color: '#0284c7', marginTop: '4px' }}>
-                  Ödeme: {selectedPolicy.paymentType || 'Peşin'} {selectedPolicy.remainingAmount && selectedPolicy.remainingAmount > 0 ? `(Kalan Borç: ${selectedPolicy.remainingAmount.toLocaleString('tr-TR')} ₺)` : '(Tamamı Ödendi)'}
+                  Ödeme: {selectedPolicy.paymentType || 'Peşin'} {selectedPolicy.remainingAmount && selectedPolicy.remainingAmount > 0 ? `(Kalan Borç: ${formatMoneyDisplay(selectedPolicy.remainingAmount)} ₺)` : '(Tamamı Ödendi)'}
                 </div>
                 <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '2px' }}>
                   Vade: {selectedPolicy.startDate} - {selectedPolicy.endDate}

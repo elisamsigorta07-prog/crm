@@ -124,40 +124,77 @@ export async function deleteCustomerFromCloud(customerId: string): Promise<void>
 // -------------------------------------------------------------
 export function normalizeMoney(val: any): number {
   if (val === undefined || val === null || val === '') return 0;
-  let num = typeof val === 'number' ? val : Number(val);
-  if (isNaN(num)) {
-    const clean = String(val).replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
-    num = Number(clean) || 0;
+  if (typeof val === 'number') return Math.round(val * 100) / 100;
+  
+  const str = String(val).trim();
+  if (!str) return 0;
+
+  // If string contains comma, it is TR formatted decimal (e.g. 12.386,50 or 55144,94)
+  if (str.includes(',')) {
+    const clean = str.replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
+    const num = Number(clean);
+    return isNaN(num) ? 0 : Math.round(num * 100) / 100;
   }
-  // Noktalı binlik ayracı olarak girilen sayıları (örn. 12.386 -> 12386) düzelt
-  if (num > 0 && num < 1000) {
-    const str = String(val);
-    if (str.includes('.')) {
-      const parts = str.split('.');
-      if (parts[1] && parts[1].length === 3) {
-        num = num * 1000;
-      }
-    } else {
-      const mult = Math.round(num * 1000);
-      if (Math.abs(num * 1000 - mult) < 0.001 && num < 100) {
-        num = mult;
-      }
+
+  // If string contains dot:
+  if (str.includes('.')) {
+    const parts = str.split('.');
+    // Multiple dots (e.g. 1.234.567) -> all thousands separators
+    if (parts.length > 2) {
+      const clean = str.replace(/\./g, '');
+      return Number(clean) || 0;
     }
+    // Single dot: if fractional part has 3 digits (e.g. 12.386), it is a thousand separator
+    if (parts[1].length === 3) {
+      const clean = str.replace(/\./g, '');
+      return Number(clean) || 0;
+    }
+    // Otherwise standard decimal dot (e.g. 12386.5 or 12386.50)
+    const num = Number(str.replace(/[^\d.]/g, ''));
+    return isNaN(num) ? 0 : Math.round(num * 100) / 100;
   }
-  return Math.round(num * 100) / 100;
+
+  const clean = str.replace(/[^\d]/g, '');
+  return Number(clean) || 0;
 }
 
 export function formatMoneyInput(val: any): string {
   if (val === undefined || val === null || val === '') return '';
   const str = String(val).trim();
-  const clean = str.replace(/\./g, '').replace(/[^\d,]/g, '');
-  if (!clean) return '';
-  const parts = clean.split(',');
-  const integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.');
-  if (parts.length > 1) {
-    return `${integerPart},${parts[1].slice(0, 2)}`;
+  if (!str) return '';
+
+  const hasComma = str.includes(',');
+  let parts: string[] = [];
+
+  if (hasComma) {
+    parts = str.split(',');
+  } else {
+    const dotParts = str.split('.');
+    if (dotParts.length === 2 && (dotParts[1].length === 1 || dotParts[1].length === 2)) {
+      parts = dotParts;
+    } else {
+      parts = [str.replace(/\./g, '')];
+    }
   }
-  return integerPart;
+
+  const rawInt = parts[0].replace(/[^\d]/g, '');
+  const formattedInt = rawInt ? rawInt.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : (hasComma ? '0' : '');
+
+  if (parts.length > 1 || hasComma) {
+    const kurus = (parts[1] || '').replace(/[^\d]/g, '').slice(0, 2);
+    return `${formattedInt},${kurus}`;
+  }
+
+  return formattedInt;
+}
+
+export function formatMoneyDisplay(val: any): string {
+  const num = normalizeMoney(val);
+  const hasKurus = Math.abs(num - Math.round(num)) > 0.001;
+  return num.toLocaleString('tr-TR', {
+    minimumFractionDigits: hasKurus ? 2 : 0,
+    maximumFractionDigits: 2
+  });
 }
 
 // -------------------------------------------------------------
