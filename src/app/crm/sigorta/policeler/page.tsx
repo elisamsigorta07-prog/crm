@@ -27,7 +27,12 @@ import {
   Building2,
   Phone,
   Mail,
-  MapPin
+  MapPin,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  CalendarRange,
+  FileSpreadsheet
 } from 'lucide-react';
 import { 
   Policy, 
@@ -48,7 +53,75 @@ import {
   formatMoneyInput,
   formatMoneyDisplay
 } from '@/lib/supabaseService';
+import { formatExcelText, formatExcelCurrency, resolvePlateAndDocSerial } from '@/lib/excelHelper';
 import styles from '../layout.module.css';
+
+export type SortField = 'startDate' | 'endDate' | 'customerName' | 'premium' | 'policyNo' | 'status';
+export type SortOrder = 'asc' | 'desc';
+
+export const parseDateToTimestamp = (dateStr?: string): number => {
+  if (!dateStr) return 0;
+  const s = dateStr.trim();
+  if (s.includes('.')) {
+    const parts = s.split('.');
+    if (parts.length === 3) {
+      return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
+    }
+  }
+  if (s.includes('/')) {
+    const parts = s.split('/');
+    if (parts.length === 3) {
+      return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
+    }
+  }
+  if (s.includes('-')) {
+    const parts = s.split('-');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)).getTime();
+      } else {
+        return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
+      }
+    }
+  }
+  const t = Date.parse(s);
+  return isNaN(t) ? 0 : t;
+};
+
+export const formatToInputDate = (d?: string): string => {
+  if (!d) return '';
+  const s = d.trim();
+  if (s.includes('.')) {
+    const parts = s.split('.');
+    if (parts.length === 3) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+  }
+  if (s.includes('/')) {
+    const parts = s.split('/');
+    if (parts.length === 3) return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+  }
+  if (s.includes('-') && s.length === 10) {
+    return s;
+  }
+  return s;
+};
+
+export const getDaysRemainingInfo = (endDateStr?: string) => {
+  if (!endDateStr) return null;
+  const endTs = parseDateToTimestamp(endDateStr);
+  if (!endTs) return null;
+  const now = new Date();
+  const todayTs = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const diffDays = Math.ceil((endTs - todayTs) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) {
+    return { text: `${Math.abs(diffDays)} gün önce bitti`, color: '#dc2626', bg: '#fef2f2' };
+  } else if (diffDays === 0) {
+    return { text: 'Bugün bitiyor!', color: '#ea580c', bg: '#fff7ed' };
+  } else if (diffDays <= 30) {
+    return { text: `${diffDays} gün kaldı`, color: '#d97706', bg: '#fef3c7' };
+  } else {
+    return { text: `${diffDays} gün var`, color: '#16a34a', bg: '#f0fdf4' };
+  }
+};
 
 export default function PolicelerPage() {
   const [policies, setPolicies] = useState<Policy[]>(initialPoliciesData);
@@ -57,6 +130,17 @@ export default function PolicelerPage() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'Tümü' | 'Aktifler' | 'Yaklaşanlar' | 'Bitenler' | 'Borcu Kalanlar'>('Tümü');
+  
+  // Sıralama (Sort) State - Varsayılan: Başlangıç Tarihine göre en yeniden eskiye
+  const [sortField, setSortField] = useState<SortField>('startDate');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+
+  // Tarih Aralığı Filtreleme State
+  const [showDateFilter, setShowDateFilter] = useState(false);
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+  const [dateFilterTarget, setDateFilterTarget] = useState<'startDate' | 'endDate'>('startDate');
+  const [dateQuickFilter, setDateQuickFilter] = useState('');
   
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -217,6 +301,8 @@ export default function PolicelerPage() {
 
     setType(pol.type);
     setCompany(pol.company);
+    setStartDate(formatToInputDate(pol.startDate) || new Date().toISOString().split('T')[0]);
+    setEndDate(formatToInputDate(pol.endDate) || '');
     setPremium(pol.premium ? formatMoneyInput(String(pol.premium)) : '');
     setNetPremium(pol.netPremium ? formatMoneyInput(String(pol.netPremium)) : '');
     setPaidAmount(pol.paidAmount ? formatMoneyInput(String(pol.paidAmount)) : '');
@@ -336,11 +422,16 @@ export default function PolicelerPage() {
     }
 
     // 7. Plaka & Belge Seri
-    const parsedPlate = extract(/(?:Plaka|Araç\s*Plakası):\s*(.*)/i);
-    if (parsedPlate) setPlate(parsedPlate.toUpperCase().replace(/\s+/g, ' '));
-
-    const parsedBelge = extract(/(?:Belge\s*Seri(?:\s*No)?|Ruhsat\s*Seri(?:\s*No)?|Seri\s*No):\s*(.*)/i);
-    if (parsedBelge) setDocumentSerial(parsedBelge);
+    const rawPlateMatch = extract(/(?:Plaka|Araç\s*Plakası):\s*([^\r\n]+)/i);
+    const rawBelgeMatch = extract(/(?:Belge\s*Seri(?:\s*No)?|Ruhsat\s*Seri(?:\s*No)?|Ruhsat\s*No|Belge\s*No|Seri\s*No|Asbis\s*No):\s*([^\r\n]+)/i);
+    
+    const resolvedVehicle = resolvePlateAndDocSerial(rawPlateMatch, rawBelgeMatch);
+    if (resolvedVehicle.plate && resolvedVehicle.plate !== '-') {
+      setPlate(resolvedVehicle.plate.toUpperCase().replace(/\s+/g, ' '));
+    }
+    if (resolvedVehicle.docSerial && resolvedVehicle.docSerial !== '-') {
+      setDocumentSerial(resolvedVehicle.docSerial.toUpperCase().trim());
+    }
 
     // 8. Araç Bilgileri
     const parsedUsage = extract(/(?:Araç\s*Kullanım\s*Tarzı|Kullanım\s*Tarzı|Kullanım\s*Şekli):\s*(.*)/i);
@@ -430,6 +521,11 @@ export default function PolicelerPage() {
     let customerId = selectedExistingCustomerId !== 'NEW' ? selectedExistingCustomerId : `CUST-${Math.floor(100 + Math.random() * 900)}`;
     let customerToSave: Customer;
     
+    // Resolve plate and documentSerial cleanly so they are never mixed up
+    const resolvedVeh = resolvePlateAndDocSerial(plate, documentSerial);
+    const cleanPlate = resolvedVeh.plate !== '-' ? resolvedVeh.plate : (plate.trim() || undefined);
+    const cleanDocSerial = resolvedVeh.docSerial !== '-' ? resolvedVeh.docSerial : (documentSerial.trim() || undefined);
+
     const existingCust = customers.find(c => c.id === customerId || c.name.toLowerCase() === customerName.toLowerCase());
     if (existingCust) {
       customerId = existingCust.id;
@@ -446,8 +542,8 @@ export default function PolicelerPage() {
         insuranceType: finalType,
         policyStartDate: startDate,
         policyEndDate: endDate,
-        plate: plate || existingCust.plate,
-        documentSerial: documentSerial || existingCust.documentSerial,
+        plate: cleanPlate || existingCust.plate,
+        documentSerial: cleanDocSerial || existingCust.documentSerial,
         vehicleUsage: vehicleUsage || existingCust.vehicleUsage,
         vehicleBrand: vehicleBrand || existingCust.vehicleBrand,
         vehicleType: vehicleType || existingCust.vehicleType,
@@ -472,8 +568,8 @@ export default function PolicelerPage() {
         insuranceType: finalType,
         policyStartDate: startDate,
         policyEndDate: endDate,
-        plate,
-        documentSerial,
+        plate: cleanPlate,
+        documentSerial: cleanDocSerial,
         vehicleUsage,
         vehicleBrand,
         vehicleType,
@@ -507,8 +603,8 @@ export default function PolicelerPage() {
       commissionRate: Number(commissionRate) || 15,
       paymentStatus: remaining === 0 ? 'Ödendi' : (paid > 0 ? 'Kısmi Ödendi' : 'Bekliyor'),
       status: 'Aktif',
-      plate: plate || undefined,
-      documentSerial: documentSerial || undefined,
+      plate: cleanPlate,
+      documentSerial: cleanDocSerial,
       vehicleUsage: vehicleUsage || undefined,
       vehicleBrand: vehicleBrand || undefined,
       vehicleType: vehicleType || undefined,
@@ -662,23 +758,174 @@ export default function PolicelerPage() {
     }
   };
 
-  // Filtered Policies
-  const filteredPolicies = policies.filter((p) => {
-    const term = searchTerm.toLowerCase();
-    const matchesSearch = 
-      (p.policyNo || p.id).toLowerCase().includes(term) ||
-      p.customerName.toLowerCase().includes(term) ||
-      (p.customerPhone && p.customerPhone.includes(term)) ||
-      (p.customerTc && p.customerTc.includes(term)) ||
-      p.company.toLowerCase().includes(term) ||
-      p.type.toLowerCase().includes(term);
-    
-    if (activeTab === 'Aktifler') return matchesSearch && p.status === 'Aktif';
-    if (activeTab === 'Yaklaşanlar') return matchesSearch && p.status === 'Yaklaşıyor';
-    if (activeTab === 'Bitenler') return matchesSearch && p.status === 'Biten';
-    if (activeTab === 'Borcu Kalanlar') return matchesSearch && p.remainingAmount && p.remainingAmount > 0;
-    return matchesSearch;
-  });
+  // Hızlı Tarih Aralığı Belirleme
+  const handleSetDateRange = (preset: 'bu_hafta' | 'bu_ay' | 'bu_yil' | 'gelecek_30' | 'gecmis') => {
+    setDateQuickFilter(preset);
+    const now = new Date();
+    const todayStr = now.toISOString().split('T')[0];
+
+    if (preset === 'bu_hafta') {
+      const start = new Date();
+      start.setDate(now.getDate() - 7);
+      setFilterStartDate(start.toISOString().split('T')[0]);
+      setFilterEndDate(todayStr);
+    } else if (preset === 'bu_ay') {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      setFilterStartDate(start.toISOString().split('T')[0]);
+      setFilterEndDate(todayStr);
+    } else if (preset === 'bu_yil') {
+      const start = new Date(now.getFullYear(), 0, 1);
+      setFilterStartDate(start.toISOString().split('T')[0]);
+      setFilterEndDate(todayStr);
+    } else if (preset === 'gelecek_30') {
+      setDateFilterTarget('endDate');
+      const future = new Date();
+      future.setDate(now.getDate() + 30);
+      setFilterStartDate(todayStr);
+      setFilterEndDate(future.toISOString().split('T')[0]);
+    } else if (preset === 'gecmis') {
+      setDateFilterTarget('endDate');
+      setFilterStartDate('');
+      setFilterEndDate(todayStr);
+    }
+  };
+
+  const handleClearDateFilter = () => {
+    setFilterStartDate('');
+    setFilterEndDate('');
+    setDateQuickFilter('');
+  };
+
+  // Sıralama (Sort) Değiştirme
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      if (field === 'startDate' || field === 'endDate' || field === 'premium') {
+        setSortOrder('desc');
+      } else {
+        setSortOrder('asc');
+      }
+    }
+  };
+
+  // Excel (CSV) İndirme (Filtrelenmiş ve Sıralanmış Poliçeler)
+  const handleExportPoliciesCSV = () => {
+    const headers = [
+      'Poliçe No',
+      'Müşteri Adı',
+      'TC / VKN',
+      'Telefon',
+      'Poliçe Türü',
+      'Sigorta Şirketi',
+      'Başlangıç Tarihi',
+      'Bitiş Tarihi',
+      'Plaka',
+      'Belge Seri No',
+      'Brüt Prim (TL)',
+      'Net Prim (TL)',
+      'Ödenen Tutar (TL)',
+      'Kalan Borç (TL)',
+      'Ödeme Durumu',
+      'Durum'
+    ];
+
+    const rows = sortedAndFilteredPolicies.map(p => {
+      const matchedCust = customers.find(c => c.id === p.customerId || c.name === p.customerName);
+      const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (matchedCust?.identityNo || '-');
+      const phone = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (matchedCust?.phone || '-');
+      const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || matchedCust?.plate, p.documentSerial || matchedCust?.documentSerial);
+
+      return [
+        formatExcelText(p.policyNo || p.id),
+        `"${p.customerName.replace(/"/g, '""')}"`,
+        formatExcelText(tc),
+        formatExcelText(phone),
+        `"${p.type}"`,
+        `"${p.company}"`,
+        `"${p.startDate}"`,
+        `"${p.endDate}"`,
+        formatExcelText(plate),
+        formatExcelText(docSerial),
+        `"${formatExcelCurrency(p.premium)}"`,
+        `"${formatExcelCurrency(p.netPremium || 0)}"`,
+        `"${formatExcelCurrency(p.paidAmount)}"`,
+        `"${formatExcelCurrency(p.remainingAmount || 0)}"`,
+        `"${p.paymentStatus || '-'}"`,
+        `"${p.status}"`
+      ];
+    });
+
+    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Elisam_Policeler_Listesi_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Filtrelenmiş ve Sıralanmış Poliçeler
+  const sortedAndFilteredPolicies = policies
+    .filter((p) => {
+      const term = searchTerm.toLowerCase();
+      const matchesSearch = 
+        (p.policyNo || p.id).toLowerCase().includes(term) ||
+        p.customerName.toLowerCase().includes(term) ||
+        (p.customerPhone && p.customerPhone.includes(term)) ||
+        (p.customerTc && p.customerTc.includes(term)) ||
+        p.company.toLowerCase().includes(term) ||
+        p.type.toLowerCase().includes(term);
+      
+      let matchesTab = true;
+      if (activeTab === 'Aktifler') matchesTab = p.status === 'Aktif';
+      else if (activeTab === 'Yaklaşanlar') matchesTab = p.status === 'Yaklaşıyor';
+      else if (activeTab === 'Bitenler') matchesTab = p.status === 'Biten';
+      else if (activeTab === 'Borcu Kalanlar') matchesTab = Boolean(p.remainingAmount && p.remainingAmount > 0);
+
+      // Tarih Aralığı Filtresi
+      let matchesDate = true;
+      if (filterStartDate || filterEndDate) {
+        const targetDateStr = dateFilterTarget === 'startDate' ? p.startDate : p.endDate;
+        const targetTimestamp = parseDateToTimestamp(targetDateStr);
+        if (filterStartDate) {
+          const startTimestamp = parseDateToTimestamp(filterStartDate);
+          if (targetTimestamp < startTimestamp) matchesDate = false;
+        }
+        if (filterEndDate && matchesDate) {
+          const endTimestamp = parseDateToTimestamp(filterEndDate) + (24 * 60 * 60 * 1000 - 1);
+          if (targetTimestamp > endTimestamp) matchesDate = false;
+        }
+      }
+
+      return matchesSearch && matchesTab && matchesDate;
+    })
+    .sort((a, b) => {
+      let comparison = 0;
+      if (sortField === 'startDate') {
+        const timeA = parseDateToTimestamp(a.startDate);
+        const timeB = parseDateToTimestamp(b.startDate);
+        comparison = timeA - timeB;
+      } else if (sortField === 'endDate') {
+        const timeA = parseDateToTimestamp(a.endDate);
+        const timeB = parseDateToTimestamp(b.endDate);
+        comparison = timeA - timeB;
+      } else if (sortField === 'premium') {
+        comparison = normalizeMoney(a.premium) - normalizeMoney(b.premium);
+      } else if (sortField === 'customerName') {
+        comparison = a.customerName.localeCompare(b.customerName, 'tr');
+      } else if (sortField === 'policyNo') {
+        const noA = a.policyNo || a.id;
+        const noB = b.policyNo || b.id;
+        comparison = noA.localeCompare(noB, 'tr');
+      } else if (sortField === 'status') {
+        comparison = a.status.localeCompare(b.status, 'tr');
+      }
+
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
 
   const totalGrossPremium = policies.reduce((s, p) => s + normalizeMoney(p.premium), 0);
   const totalNetPremium = policies.reduce((s, p) => s + (p.netPremium && p.netPremium > 0 ? normalizeMoney(p.netPremium) : normalizeMoney(p.premium)), 0);
@@ -776,7 +1023,7 @@ export default function PolicelerPage() {
         </div>
 
         {/* Search & Actions Bar */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', gap: '14px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '12px', flexWrap: 'wrap' }}>
           <div style={{ position: 'relative', flex: 1, minWidth: '280px' }}>
             <Search size={18} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
             <input 
@@ -786,28 +1033,312 @@ export default function PolicelerPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{ width: '100%', padding: '11px 12px 11px 42px', borderRadius: '10px', border: '1px solid #e2e8f0', outline: 'none', fontSize: '0.95rem' }}
             />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}
+              >
+                <X size={16} />
+              </button>
+            )}
           </div>
+
+          {/* Hızlı Sıralama Seçici */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label style={{ fontSize: '0.84rem', fontWeight: 700, color: '#475569', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <ArrowUpDown size={16} color="#2563eb" /> Sıralama:
+            </label>
+            <select
+              value={`${sortField}-${sortOrder}`}
+              onChange={(e) => {
+                const [f, o] = e.target.value.split('-');
+                setSortField(f as SortField);
+                setSortOrder(o as SortOrder);
+              }}
+              style={{
+                padding: '9px 12px',
+                borderRadius: '8px',
+                border: '1.5px solid #cbd5e1',
+                backgroundColor: '#ffffff',
+                fontSize: '0.86rem',
+                fontWeight: 700,
+                color: '#1e293b',
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="startDate-desc">📅 Başlangıç Tarihi: En Yeniden En Eskiye</option>
+              <option value="startDate-asc">📅 Başlangıç Tarihi: En Eskiden En Yeniyeye</option>
+              <option value="endDate-asc">⏳ Bitiş Tarihi: En Yakın Bitiş (Acil / Önce Biten)</option>
+              <option value="endDate-desc">⏳ Bitiş Tarihi: En İleri Tarihli</option>
+              <option value="premium-desc">💰 Prim Tutarı: En Yüksekten En Düşüğe</option>
+              <option value="premium-asc">💰 Prim Tutarı: En Düşükten En Yükseğe</option>
+              <option value="customerName-asc">👤 Müşteri Adı: A'dan Z'ye</option>
+              <option value="customerName-desc">👤 Müşteri Adı: Z'den A'ya</option>
+              <option value="policyNo-asc">🔢 Poliçe No: Artan</option>
+            </select>
+          </div>
+
+          {/* Tarih Aralığı Filtresi Aç/Kapa Butonu */}
+          <button
+            onClick={() => setShowDateFilter(!showDateFilter)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '9px 14px',
+              borderRadius: '8px',
+              border: (filterStartDate || filterEndDate) ? '1.5px solid #2563eb' : '1px solid #cbd5e1',
+              backgroundColor: (filterStartDate || filterEndDate) ? '#eff6ff' : (showDateFilter ? '#f1f5f9' : '#ffffff'),
+              color: (filterStartDate || filterEndDate) ? '#1d4ed8' : '#334155',
+              fontWeight: 700,
+              fontSize: '0.86rem',
+              cursor: 'pointer'
+            }}
+            title="Poliçeleri iki tarih arasına göre filtrele"
+          >
+            <CalendarRange size={16} color={(filterStartDate || filterEndDate) ? '#2563eb' : '#64748b'} />
+            <span>Tarih Aralığı</span>
+            {(filterStartDate || filterEndDate) && (
+              <span style={{ backgroundColor: '#2563eb', color: 'white', fontSize: '0.72rem', padding: '1px 6px', borderRadius: '10px', fontWeight: 800 }}>
+                Aktif
+              </span>
+            )}
+          </button>
+
+          {/* Excel / CSV İndir Butonu */}
+          <button
+            onClick={handleExportPoliciesCSV}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '9px 14px',
+              borderRadius: '8px',
+              border: '1px solid #cbd5e1',
+              backgroundColor: '#ffffff',
+              color: '#059669',
+              fontWeight: 700,
+              fontSize: '0.86rem',
+              cursor: 'pointer'
+            }}
+            title="Listelenen tüm poliçeleri Excel (CSV) olarak indir"
+          >
+            <Download size={16} /> Excel İndir
+          </button>
         </div>
+
+        {/* ÖZEL TARİH ARALIĞI FİLTRELEME PANELİ (Açılır Kapanır / Raporlar Modülüyle Birebir Eş) */}
+        {showDateFilter && (
+          <div style={{
+            backgroundColor: '#f8fafc',
+            border: '1.5px solid #cbd5e1',
+            borderRadius: '12px',
+            padding: '16px 18px',
+            marginBottom: '20px'
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, fontSize: '0.92rem', color: '#1e293b' }}>
+                <Calendar size={18} color="#2563eb" />
+                <span>Poliçe Tarih Aralığı Filtresi (Raporlama Filtresi ile Eş)</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: 600 }}>Tarih Kriteri:</span>
+                <button
+                  onClick={() => setDateFilterTarget('startDate')}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: dateFilterTarget === 'startDate' ? '#2563eb' : '#e2e8f0',
+                    color: dateFilterTarget === 'startDate' ? '#ffffff' : '#475569',
+                    fontSize: '0.8rem',
+                    fontWeight: 750,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Başlangıç / Tanzim Tarihi
+                </button>
+                <button
+                  onClick={() => setDateFilterTarget('endDate')}
+                  style={{
+                    padding: '5px 10px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: dateFilterTarget === 'endDate' ? '#2563eb' : '#e2e8f0',
+                    color: dateFilterTarget === 'endDate' ? '#ffffff' : '#475569',
+                    fontSize: '0.8rem',
+                    fontWeight: 750,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Vade Bitiş Tarihi
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                  Başlangıç Tarihi
+                </label>
+                <input 
+                  type="date" 
+                  value={filterStartDate} 
+                  onChange={(e) => { setFilterStartDate(e.target.value); setDateQuickFilter(''); }}
+                  style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.88rem', backgroundColor: '#fff' }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                  Bitiş Tarihi
+                </label>
+                <input 
+                  type="date" 
+                  value={filterEndDate} 
+                  onChange={(e) => { setFilterEndDate(e.target.value); setDateQuickFilter(''); }}
+                  style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.88rem', backgroundColor: '#fff' }}
+                />
+              </div>
+
+              {/* Hızlı Dönem Butonları */}
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                {[
+                  { key: 'bu_hafta', label: 'Bu Hafta' },
+                  { key: 'bu_ay', label: 'Bu Ay' },
+                  { key: 'gelecek_30', label: 'Önümüzdeki 30 Gün (Yenilemeler)' },
+                  { key: 'bu_yil', label: 'Bu Yıl' }
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => handleSetDateRange(item.key as any)}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #cbd5e1',
+                      backgroundColor: dateQuickFilter === item.key ? '#1e293b' : '#ffffff',
+                      color: dateQuickFilter === item.key ? '#ffffff' : '#334155',
+                      fontWeight: 650,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+
+                {(filterStartDate || filterEndDate) && (
+                  <button
+                    onClick={handleClearDateFilter}
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #fecaca',
+                      backgroundColor: '#fef2f2',
+                      color: '#dc2626',
+                      fontWeight: 750,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    ✕ Tarih Filtresini Temizle
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {(filterStartDate || filterEndDate) && (
+              <div style={{ marginTop: '10px', fontSize: '0.82rem', color: '#1e40af', fontWeight: 650 }}>
+                ℹ️ Seçilen tarih aralığında ({filterStartDate || 'Başlangıçtan'} &rarr; {filterEndDate || 'Bugüne'}) <strong>{sortedAndFilteredPolicies.length} poliçe</strong> listeleniyor.
+              </div>
+            )}
+          </div>
+        )}
 
         {/* POLICIES & CUSTOMERS TABLE */}
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ backgroundColor: '#f8fafc' }}>
-                <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Poliçe Numarası</th>
-                <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Müşteri Bilgisi</th>
+                <th 
+                  onClick={() => handleSort('policyNo')}
+                  style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: sortField === 'policyNo' ? '#1d4ed8' : '#64748b', borderBottom: '1px solid #e2e8f0', cursor: 'pointer', userSelect: 'none' }}
+                  title="Poliçe Numarasına Göre Sırala"
+                >
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <span>Poliçe No</span>
+                    {sortField === 'policyNo' ? (sortOrder === 'asc' ? <ArrowUp size={14} color="#2563eb" /> : <ArrowDown size={14} color="#2563eb" />) : <ArrowUpDown size={12} color="#cbd5e1" />}
+                  </div>
+                </th>
+
+                <th 
+                  onClick={() => handleSort('customerName')}
+                  style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: sortField === 'customerName' ? '#1d4ed8' : '#64748b', borderBottom: '1px solid #e2e8f0', cursor: 'pointer', userSelect: 'none' }}
+                  title="Müşteri Adına Göre Sırala"
+                >
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <span>Müşteri Bilgisi</span>
+                    {sortField === 'customerName' ? (sortOrder === 'asc' ? <ArrowUp size={14} color="#2563eb" /> : <ArrowDown size={14} color="#2563eb" />) : <ArrowUpDown size={12} color="#cbd5e1" />}
+                  </div>
+                </th>
+
                 <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Sigorta Türü / Şirket</th>
-                <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Prim (Brüt / Net)</th>
+
+                <th 
+                  onClick={() => handleSort('premium')}
+                  style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: sortField === 'premium' ? '#1d4ed8' : '#64748b', borderBottom: '1px solid #e2e8f0', cursor: 'pointer', userSelect: 'none' }}
+                  title="Prim Tutarına Göre Sırala"
+                >
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <span>Prim (Brüt / Net)</span>
+                    {sortField === 'premium' ? (sortOrder === 'asc' ? <ArrowUp size={14} color="#2563eb" /> : <ArrowDown size={14} color="#2563eb" />) : <ArrowUpDown size={12} color="#cbd5e1" />}
+                  </div>
+                </th>
+
                 <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Ödeme Durumu</th>
-                <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Bitiş Tarihi</th>
-                <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Durum</th>
+
+                <th 
+                  onClick={() => handleSort('startDate')}
+                  style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: sortField === 'startDate' ? '#1d4ed8' : '#64748b', borderBottom: '1px solid #e2e8f0', cursor: 'pointer', userSelect: 'none' }}
+                  title="Başlangıç / Tanzim Tarihine Göre Sırala"
+                >
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <span>Başlangıç</span>
+                    {sortField === 'startDate' ? (sortOrder === 'asc' ? <ArrowUp size={14} color="#2563eb" /> : <ArrowDown size={14} color="#2563eb" />) : <ArrowUpDown size={12} color="#cbd5e1" />}
+                  </div>
+                </th>
+
+                <th 
+                  onClick={() => handleSort('endDate')}
+                  style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: sortField === 'endDate' ? '#1d4ed8' : '#64748b', borderBottom: '1px solid #e2e8f0', cursor: 'pointer', userSelect: 'none' }}
+                  title="Vade Bitiş Tarihine Göre Sırala"
+                >
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <span>Bitiş Tarihi</span>
+                    {sortField === 'endDate' ? (sortOrder === 'asc' ? <ArrowUp size={14} color="#2563eb" /> : <ArrowDown size={14} color="#2563eb" />) : <ArrowUpDown size={12} color="#cbd5e1" />}
+                  </div>
+                </th>
+
+                <th 
+                  onClick={() => handleSort('status')}
+                  style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: sortField === 'status' ? '#1d4ed8' : '#64748b', borderBottom: '1px solid #e2e8f0', cursor: 'pointer', userSelect: 'none' }}
+                  title="Duruma Göre Sırala"
+                >
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <span>Durum</span>
+                    {sortField === 'status' ? (sortOrder === 'asc' ? <ArrowUp size={14} color="#2563eb" /> : <ArrowDown size={14} color="#2563eb" />) : <ArrowUpDown size={12} color="#cbd5e1" />}
+                  </div>
+                </th>
+
                 <th style={{ textAlign: 'center', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>İşlemler</th>
               </tr>
             </thead>
             <tbody>
-              {filteredPolicies.length > 0 ? (
-                filteredPolicies.map(pol => {
+              {sortedAndFilteredPolicies.length > 0 ? (
+                sortedAndFilteredPolicies.map(pol => {
                   const matchedCust = customers.find(c => c.id === pol.customerId || c.name === pol.customerName);
+                  const daysInfo = getDaysRemainingInfo(pol.endDate);
                   return (
                     <tr key={pol.id} style={{ borderBottom: '1px solid #edf2f7' }}>
                       
@@ -816,11 +1347,16 @@ export default function PolicelerPage() {
                         <div style={{ fontWeight: 750, color: '#1e40af', fontFamily: 'monospace', fontSize: '0.95rem' }}>
                           {pol.policyNo || pol.id}
                         </div>
-                        {matchedCust?.plate && (
-                          <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px', fontWeight: 600 }}>
-                            🚗 {matchedCust.plate}
-                          </div>
-                        )}
+                        {(() => {
+                          const { plate: vPlate, docSerial: vSerial } = resolvePlateAndDocSerial(pol.plate || matchedCust?.plate, pol.documentSerial || matchedCust?.documentSerial);
+                          if (vPlate === '-' && vSerial === '-') return null;
+                          return (
+                            <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px', fontWeight: 600 }}>
+                              {vPlate !== '-' && <span>🚗 {vPlate}</span>}
+                              {vSerial !== '-' && <span style={{ marginLeft: '6px', color: '#b45309' }}>• Seri: {vSerial}</span>}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Müşteri Bilgisi */}
@@ -873,9 +1409,30 @@ export default function PolicelerPage() {
                         )}
                       </td>
 
+                      {/* Başlangıç Tarihi */}
+                      <td style={{ padding: '14px 16px', fontSize: '0.88rem', color: '#334155', fontWeight: 650 }}>
+                        {pol.startDate || '-'}
+                      </td>
+
                       {/* Bitiş Tarihi */}
-                      <td style={{ padding: '14px 16px', fontSize: '0.88rem', color: '#334155', fontWeight: 600 }}>
-                        {pol.endDate}
+                      <td style={{ padding: '14px 16px' }}>
+                        <div style={{ fontWeight: 750, color: '#0f172a', fontSize: '0.9rem' }}>
+                          {pol.endDate}
+                        </div>
+                        {daysInfo && (
+                          <div style={{ 
+                            fontSize: '0.72rem', 
+                            fontWeight: 750, 
+                            color: daysInfo.color, 
+                            backgroundColor: daysInfo.bg,
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            display: 'inline-block',
+                            marginTop: '3px'
+                          }}>
+                            {daysInfo.text}
+                          </div>
+                        )}
                       </td>
 
                       {/* Durum Rozeti */}
@@ -969,8 +1526,8 @@ export default function PolicelerPage() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
-                    Kayıtlı poliçe bulunamadı. &ldquo;Yeni Poliçe Kes (Müşteri & Poliçe)&rdquo; butonundan hem müşterinizi kaydedip hem poliçenizi kesebilirsiniz.
+                  <td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                    Kayıtlı veya filtreye uyan poliçe bulunamadı. &ldquo;Yeni Poliçe Kes (Müşteri & Poliçe)&rdquo; butonundan hem müşterinizi kaydedip hem poliçenizi kesebilirsiniz.
                   </td>
                 </tr>
               )}
@@ -1587,8 +2144,9 @@ export default function PolicelerPage() {
             {/* Araç & Ruhsat Bilgileri (Varsa) */}
             {(() => {
               const matchedCustomer = customers.find(c => c.id === selectedPolicy.customerId || c.name === selectedPolicy.customerName);
-              const pPlate = selectedPolicy.plate || matchedCustomer?.plate;
-              const pSerial = selectedPolicy.documentSerial || matchedCustomer?.documentSerial;
+              const { plate: rPlate, docSerial: rSerial } = resolvePlateAndDocSerial(selectedPolicy.plate || matchedCustomer?.plate, selectedPolicy.documentSerial || matchedCustomer?.documentSerial);
+              const pPlate = rPlate !== '-' ? rPlate : undefined;
+              const pSerial = rSerial !== '-' ? rSerial : undefined;
               const pUsage = selectedPolicy.vehicleUsage || matchedCustomer?.vehicleUsage;
               const pBrand = selectedPolicy.vehicleBrand || matchedCustomer?.vehicleBrand;
               const pType = selectedPolicy.vehicleType || matchedCustomer?.vehicleType;

@@ -14,7 +14,8 @@ import {
   BarChart3, 
   Wallet,
   Menu,
-  X
+  X,
+  Bell
 } from 'lucide-react';
 import styles from './layout.module.css';
 import GlobalCrmSearch from '@/components/common/GlobalCrmSearch';
@@ -32,6 +33,35 @@ export default function SigortaCrmLayout({
     setIsMobileNavOpen(false);
   }, [pathname]);
 
+  // Live count of expiring policies for notification badge
+  const [dueCount, setDueCount] = useState<number>(0);
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('elisam_policies');
+      if (saved) {
+        const list = JSON.parse(saved);
+        const now = new Date();
+        const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        let c = 0;
+        list.forEach((p: any) => {
+          if (p.endDate) {
+            const parts = p.endDate.includes('.') ? p.endDate.split('.') : (p.endDate.includes('-') ? p.endDate.split('-') : []);
+            let endTs = 0;
+            if (parts.length === 3) {
+              if (p.endDate.includes('.')) endTs = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0])).getTime();
+              else endTs = new Date(p.endDate).getTime();
+            }
+            if (endTs) {
+              const diffDays = Math.ceil((endTs - todayMidnight) / (1000 * 60 * 60 * 24));
+              if (diffDays <= 30) c++;
+            }
+          }
+        });
+        setDueCount(c);
+      }
+    } catch (e) {}
+  }, [pathname]);
+
   // If we are on the login page, don't show the sidebar/layout
   if (pathname === '/crm/sigorta/login') {
     return <>{children}</>;
@@ -40,6 +70,7 @@ export default function SigortaCrmLayout({
   const navItems = [
     { name: 'Dashboard', href: '/crm/sigorta/dashboard', icon: LayoutDashboard },
     { name: 'Poliçeler', href: '/crm/sigorta/policeler', icon: ShieldAlert },
+    { name: 'Hatırlatıcı & Bildirim', href: '/crm/sigorta/bildirimler', icon: Bell, badge: dueCount },
     { name: 'Teklifler', href: '/crm/sigorta/teklifler', icon: FileText },
     { name: 'Finans', href: '/crm/sigorta/finans', icon: Wallet },
     { name: 'Raporlar', href: '/crm/sigorta/raporlar', icon: BarChart3 },
@@ -78,9 +109,25 @@ export default function SigortaCrmLayout({
                 href={item.href} 
                 className={`${styles.navItem} ${isActive ? styles.navItemActive : ''}`}
                 onClick={() => setIsMobileNavOpen(false)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
               >
-                <item.icon size={20} />
-                {item.name}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <item.icon size={20} />
+                  <span>{item.name}</span>
+                </div>
+                {item.badge !== undefined && item.badge > 0 && (
+                  <span style={{ 
+                    fontSize: '0.72rem', 
+                    fontWeight: 800, 
+                    backgroundColor: '#ef4444', 
+                    color: 'white', 
+                    padding: '2px 7px', 
+                    borderRadius: '10px',
+                    lineHeight: 1
+                  }}>
+                    {item.badge}
+                  </span>
+                )}
               </Link>
             );
           })}

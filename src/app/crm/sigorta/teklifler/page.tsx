@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { Search, Plus, FileCheck, X, ClipboardPaste, CheckCircle, XCircle, ArrowRight } from 'lucide-react';
+import { Search, Plus, FileCheck, X, ClipboardPaste, CheckCircle, XCircle, ArrowRight, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import styles from '../layout.module.css';
 
 interface Quote {
@@ -24,8 +24,41 @@ export default function TekliflerPage() {
   const [isMounted, setIsMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Tümü');
+  const [sortField, setSortField] = useState<'date' | 'customer' | 'offeredPrice' | 'id'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [addMode, setAddMode] = useState<'Manuel' | 'Otomatik'>('Manuel');
+
+  const parseDateToTimestamp = (dateStr?: string): number => {
+    if (!dateStr) return 0;
+    const s = dateStr.trim();
+    if (s.includes('.')) {
+      const parts = s.split('.');
+      if (parts.length === 3) return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
+    }
+    if (s.includes('/')) {
+      const parts = s.split('/');
+      if (parts.length === 3) return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
+    }
+    if (s.includes('-')) {
+      const parts = s.split('-');
+      if (parts.length === 3) {
+        if (parts[0].length === 4) return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)).getTime();
+        return new Date(parseInt(parts[2], 10), parseInt(parts[1], 10) - 1, parseInt(parts[0], 10)).getTime();
+      }
+    }
+    const t = Date.parse(s);
+    return isNaN(t) ? 0 : t;
+  };
+
+  const handleSort = (field: 'date' | 'customer' | 'offeredPrice' | 'id') => {
+    if (sortField === field) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortOrder(field === 'date' || field === 'offeredPrice' ? 'desc' : 'asc');
+    }
+  };
 
   useEffect(() => {
     setIsMounted(true);
@@ -117,16 +150,32 @@ export default function TekliflerPage() {
     alert('Teklif ' + q.id + ' onaylandı! Müşteri: ' + q.customer + (q.tc ? ' | TC: ' + q.tc : '') + (q.plate ? ' | Plaka: ' + q.plate : '') + '\nTutar: ' + q.offeredPrice + '\n\nPoliçeler sayfasına yönlendirilerek tek adımda poliçesini kesebilir ve müşteriyi kaydedebilirsiniz.');
   };
 
-  const filteredQuotes = quotes.filter((q) => {
-    const matchesSearch =
-      q.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (q.tc || '').includes(searchTerm) ||
-      (q.plate || '').toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === 'Tümü' || q.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const sortedAndFilteredQuotes = quotes
+    .filter((q) => {
+      const matchesSearch =
+        q.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        q.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        q.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (q.tc || '').includes(searchTerm) ||
+        (q.plate || '').toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === 'Tümü' || q.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      let comparison = 0;
+      if (sortField === 'date') {
+        comparison = parseDateToTimestamp(a.date) - parseDateToTimestamp(b.date);
+      } else if (sortField === 'customer') {
+        comparison = a.customer.localeCompare(b.customer, 'tr');
+      } else if (sortField === 'offeredPrice') {
+        const valA = parseFloat(a.offeredPrice.replace(/[^0-9.]/g, '')) || 0;
+        const valB = parseFloat(b.offeredPrice.replace(/[^0-9.]/g, '')) || 0;
+        comparison = valA - valB;
+      } else if (sortField === 'id') {
+        comparison = a.id.localeCompare(b.id, 'tr');
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
 
   const statusColors: Record<string, { bg: string; color: string }> = {
     'Onaylandı': { bg: '#dcfce7', color: '#15803d' },
@@ -137,14 +186,14 @@ export default function TekliflerPage() {
   return (
     <div>
       <div className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>Fiyat Teklifleri ({filteredQuotes.length})</h1>
+        <h1 className={styles.pageTitle}>Fiyat Teklifleri ({sortedAndFilteredQuotes.length})</h1>
         <button className={styles.btnCrm} onClick={() => { resetForm(); setIsModalOpen(true); }}>
           <Plus size={18} /> Yeni Teklif Oluştur
         </button>
       </div>
 
       <div className={styles.card}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', gap: '15px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', gap: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ position: 'relative', flex: 1, minWidth: '260px' }}>
             <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#a0aec0' }} />
             <input
@@ -155,6 +204,28 @@ export default function TekliflerPage() {
               style={{ width: '100%', padding: '10px 10px 10px 38px', borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '0.95rem', outline: 'none' }}
             />
           </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <label style={{ fontSize: '0.82rem', fontWeight: 700, color: '#475569', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <ArrowUpDown size={15} color="#2563eb" /> Sırala:
+            </label>
+            <select
+              value={`${sortField}-${sortOrder}`}
+              onChange={(e) => {
+                const [f, o] = e.target.value.split('-');
+                setSortField(f as any);
+                setSortOrder(o as any);
+              }}
+              style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '0.84rem', fontWeight: 700, outline: 'none', cursor: 'pointer', backgroundColor: '#fff' }}
+            >
+              <option value="date-desc">📅 Tarih: En Yeni Teklif</option>
+              <option value="date-asc">📅 Tarih: En Eski Teklif</option>
+              <option value="offeredPrice-desc">💰 Fiyat: En Yüksek</option>
+              <option value="offeredPrice-asc">💰 Fiyat: En Düşük</option>
+              <option value="customer-asc">👤 Müşteri: A-Z</option>
+            </select>
+          </div>
+
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {['Tümü', 'Beklemede', 'Onaylandı', 'Reddedildi'].map((s) => (
               <button key={s} onClick={() => setStatusFilter(s)} style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid #e2e8f0', backgroundColor: statusFilter === s ? '#031924' : '#edf2f7', color: statusFilter === s ? 'white' : '#4a5568', fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer' }}>
@@ -168,14 +239,32 @@ export default function TekliflerPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '800px' }}>
             <thead>
               <tr>
-                {['Teklif Kod', 'Müşteri / İletişim', 'Ürün / Plaka', 'Teklif Tutarı', 'Tarih', 'Durum', 'Aksiyon'].map(h => (
-                  <th key={h} style={{ textAlign: h === 'Durum' || h === 'Aksiyon' ? 'center' : 'left', padding: '12px 16px', fontSize: '0.85rem', fontWeight: 600, color: '#718096', borderBottom: '1px solid #edf2f7' }}>{h}</th>
-                ))}
+                <th onClick={() => handleSort('id')} style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.85rem', fontWeight: 600, color: sortField === 'id' ? '#2563eb' : '#718096', borderBottom: '1px solid #edf2f7', cursor: 'pointer', userSelect: 'none' }}>
+                  Teklif Kod {sortField === 'id' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                </th>
+                <th onClick={() => handleSort('customer')} style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.85rem', fontWeight: 600, color: sortField === 'customer' ? '#2563eb' : '#718096', borderBottom: '1px solid #edf2f7', cursor: 'pointer', userSelect: 'none' }}>
+                  Müşteri / İletişim {sortField === 'customer' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                </th>
+                <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.85rem', fontWeight: 600, color: '#718096', borderBottom: '1px solid #edf2f7' }}>
+                  Ürün / Plaka
+                </th>
+                <th onClick={() => handleSort('offeredPrice')} style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.85rem', fontWeight: 600, color: sortField === 'offeredPrice' ? '#2563eb' : '#718096', borderBottom: '1px solid #edf2f7', cursor: 'pointer', userSelect: 'none' }}>
+                  Teklif Tutarı {sortField === 'offeredPrice' ? (sortOrder === 'asc' ? '▲' : '▼') : ''}
+                </th>
+                <th onClick={() => handleSort('date')} style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.85rem', fontWeight: 700, color: sortField === 'date' ? '#2563eb' : '#718096', borderBottom: '1px solid #edf2f7', cursor: 'pointer', userSelect: 'none' }}>
+                  📅 Tarih {sortField === 'date' ? (sortOrder === 'asc' ? '▲' : '▼') : '↕'}
+                </th>
+                <th style={{ textAlign: 'center', padding: '12px 16px', fontSize: '0.85rem', fontWeight: 600, color: '#718096', borderBottom: '1px solid #edf2f7' }}>
+                  Durum
+                </th>
+                <th style={{ textAlign: 'center', padding: '12px 16px', fontSize: '0.85rem', fontWeight: 600, color: '#718096', borderBottom: '1px solid #edf2f7' }}>
+                  Aksiyon
+                </th>
               </tr>
             </thead>
             <tbody>
-              {filteredQuotes.length > 0 ? (
-                filteredQuotes.map((q) => (
+              {sortedAndFilteredQuotes.length > 0 ? (
+                sortedAndFilteredQuotes.map((q) => (
                   <tr key={q.id} onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f7fafc'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
                     <td style={{ padding: '14px 16px', borderBottom: '1px solid #edf2f7', fontSize: '0.9rem', color: '#3182ce', fontWeight: 600, fontFamily: 'monospace' }}>{q.id}</td>
                     <td style={{ padding: '14px 16px', borderBottom: '1px solid #edf2f7' }}>

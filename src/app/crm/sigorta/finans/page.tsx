@@ -45,6 +45,7 @@ import {
   deleteCustomerFromCloud
 } from '@/lib/supabaseService';
 import { generateModernPDF } from '@/lib/pdfReportGenerator';
+import { formatExcelText } from '@/lib/excelHelper';
 import styles from '../layout.module.css';
 
 export default function SigortaFinansPage() {
@@ -412,8 +413,8 @@ export default function SigortaFinansPage() {
     const rows = movementsWithBalance.map(m => [
       `"${m.date}"`,
       `"${m.dueDate || '-'}"`,
-      `"${m.receiptNo || '-'}"`,
-      `"${m.customerName}"`,
+      formatExcelText(m.receiptNo),
+      `"${m.customerName.replace(/"/g, '""')}"`,
       `"${m.description.replace(/"/g, '""')}"`,
       `"${m.movementType}"`,
       `"${formatExcelCurrency(m.debitAmount)}"`,

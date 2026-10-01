@@ -18,6 +18,7 @@ import {
   fetchRentVehiclesFromCloud 
 } from '@/lib/supabaseService';
 import { generateModernPDF } from '@/lib/pdfReportGenerator';
+import { formatExcelText } from '@/lib/excelHelper';
 import styles from '../layout.module.css';
 
 type RentReportType = 'kiralamalar' | 'arac_kullanim' | 'musteriler' | 'gelir_ozeti';
@@ -154,16 +155,47 @@ export default function RentRaporlarPage() {
   const handleDownloadCSV = (type: RentReportType) => {
     const today = new Date().toLocaleDateString('tr-TR');
     if (type === 'kiralamalar') {
-      const rows = [['Sözleşme No', 'Araç', 'Plaka', 'Müşteri', 'Teslim Tarihi', 'İade Tarihi', 'Gün', 'Toplam Tutar (TL)', 'Ödeme Yöntemi', 'Durum'], ...bookings.map(b => [b.id, b.vehicleName, b.vehiclePlate, b.customerName, b.pickupDate, b.returnDate, String(b.days), formatExcelCurrency(b.totalAmount), b.paymentMethod, b.status])];
-      downloadCSV(`elisam-rent-kiralamalar-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(';')).join('\n'));
+      const headers = ['Sözleşme No', 'Araç', 'Plaka', 'Müşteri', 'Teslim Tarihi', 'İade Tarihi', 'Gün', 'Toplam Tutar (TL)', 'Ödeme Yöntemi', 'Durum'];
+      const rows = bookings.map(b => [
+        formatExcelText(b.id),
+        `"${b.vehicleName.replace(/"/g, '""')}"`,
+        formatExcelText(b.vehiclePlate),
+        `"${b.customerName.replace(/"/g, '""')}"`,
+        `"${b.pickupDate}"`,
+        `"${b.returnDate}"`,
+        `"${b.days}"`,
+        `"${formatExcelCurrency(b.totalAmount)}"`,
+        `"${b.paymentMethod}"`,
+        `"${b.status}"`
+      ]);
+      const content = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+      downloadCSV(`elisam-rent-kiralamalar-${today}.csv`, content);
     } else if (type === 'arac_kullanim') {
       const map: Record<string, any> = {};
       bookings.forEach(b => { if (!map[b.vehicleId]) map[b.vehicleId] = { name: b.vehicleName, plate: b.vehiclePlate, bookings: 0, totalDays: 0, totalRevenue: 0 }; map[b.vehicleId].bookings++; map[b.vehicleId].totalDays += b.days; map[b.vehicleId].totalRevenue += b.totalAmount; });
-      const rows = [['Araç Modeli', 'Plaka', 'Kiralama Adedi', 'Toplam Kiralanan Gün', 'Toplam Gelir (TL)'], ...Object.values(map).map((v: any) => [v.name, v.plate, String(v.bookings), String(v.totalDays), formatExcelCurrency(v.totalRevenue)])];
-      downloadCSV(`elisam-rent-arac-kullanim-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(';')).join('\n'));
+      const headers = ['Araç Modeli', 'Plaka', 'Kiralama Adedi', 'Toplam Kiralanan Gün', 'Toplam Gelir (TL)'];
+      const rows = Object.values(map).map((v: any) => [
+        `"${v.name.replace(/"/g, '""')}"`,
+        formatExcelText(v.plate),
+        `"${v.bookings}"`,
+        `"${v.totalDays}"`,
+        `"${formatExcelCurrency(v.totalRevenue)}"`
+      ]);
+      const content = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+      downloadCSV(`elisam-rent-arac-kullanim-${today}.csv`, content);
     } else if (type === 'musteriler') {
-      const rows = [['Müşteri ID', 'Ad Soyad', 'Ülke', 'Kimlik / Pasaport', 'Telefon', 'E-Posta', 'Toplam Kiralama'], ...customers.map(c => [c.id, c.name, c.country, c.identityOrPassport, c.phone, c.email, String(c.totalRentals)])];
-      downloadCSV(`elisam-rent-musteri-listesi-${today}.csv`, rows.map(r => r.map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(';')).join('\n'));
+      const headers = ['Müşteri ID', 'Ad Soyad', 'Ülke', 'Kimlik / Pasaport', 'Telefon', 'E-Posta', 'Toplam Kiralama'];
+      const rows = customers.map(c => [
+        formatExcelText(c.id),
+        `"${c.name.replace(/"/g, '""')}"`,
+        `"${c.country}"`,
+        formatExcelText(c.identityOrPassport),
+        formatExcelText(c.phone),
+        `"${c.email || '-'}"`,
+        `"${c.totalRentals}"`
+      ]);
+      const content = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+      downloadCSV(`elisam-rent-musteri-listesi-${today}.csv`, content);
     } else if (type === 'gelir_ozeti') {
       const totalRevenue = bookings.reduce((s, b) => s + b.totalAmount, 0);
       const byPayment: Record<string, number> = {};

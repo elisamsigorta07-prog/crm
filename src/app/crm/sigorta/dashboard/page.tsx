@@ -79,7 +79,7 @@ export default function SigortaDashboard() {
           </div>
         </div>
 
-        <div className={styles.statCard}>
+        <Link href="/crm/sigorta/bildirimler" style={{ textDecoration: 'none' }} className={styles.statCard}>
           <div className={styles.statIconWrapper} style={{ backgroundColor: '#e74c3c' }}>
             <AlertTriangle size={24} />
           </div>
@@ -87,7 +87,7 @@ export default function SigortaDashboard() {
             <div className={styles.statLabel}>Yaklaşan Yenileme</div>
             <div className={styles.statValue}>{expiringPolicies.length}</div>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Target Progress Bar Widget */}
@@ -112,8 +112,8 @@ export default function SigortaDashboard() {
         <div className={styles.sectionCard}>
           <div className={styles.sectionTitle}>
             Yaklaşan Poliçe Yenilemeleri ({expiringPolicies.length})
-            <Link href="/crm/sigorta/policeler" style={{ fontSize: '0.85rem', color: '#3498db', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              Tümünü Gör <ArrowRight size={14} />
+            <Link href="/crm/sigorta/bildirimler" style={{ fontSize: '0.85rem', color: '#3498db', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              Tümünü Gör & Bildir <ArrowRight size={14} />
             </Link>
           </div>
           <div className={styles.tableResponsive}>

@@ -47,18 +47,41 @@ export async function fetchCustomersFromCloud(): Promise<Customer[]> {
     }
 
     if (data) {
-      const mapped: Customer[] = data.map((c: any) => ({
-        id: c.id,
-        name: c.name,
-        type: c.type || 'Bireysel',
-        identityNo: c.identity_no || c.identityNo || '-',
-        phone: c.phone || '-',
-        email: c.email || '-',
-        address: c.address || 'Alanya / Antalya',
-        birthDate: c.birth_date || c.birthDate || undefined,
-        notes: c.notes || undefined,
-        createdAt: c.created_at ? new Date(c.created_at).toLocaleDateString('tr-TR') : new Date().toLocaleDateString('tr-TR')
-      }));
+      const existingLocal: Customer[] = (() => {
+        try {
+          const s = localStorage.getItem('elisam_customers');
+          return s ? JSON.parse(s) : [];
+        } catch { return []; }
+      })();
+      const localMap = new Map(existingLocal.map(lc => [lc.id, lc]));
+
+      const mapped: Customer[] = data.map((c: any) => {
+        const local = localMap.get(c.id);
+        return {
+          id: c.id,
+          name: c.name,
+          type: c.type || 'Bireysel',
+          identityNo: c.identity_no || c.identityNo || local?.identityNo || '-',
+          phone: c.phone || local?.phone || '-',
+          email: c.email || local?.email || '-',
+          address: c.address || local?.address || 'Alanya / Antalya',
+          birthDate: c.birth_date || c.birthDate || local?.birthDate || undefined,
+          notes: c.notes || local?.notes || undefined,
+          createdAt: c.created_at ? new Date(c.created_at).toLocaleDateString('tr-TR') : (local?.createdAt || new Date().toLocaleDateString('tr-TR')),
+          policyNo: c.policy_no || c.policyNo || local?.policyNo || undefined,
+          insuranceType: c.insurance_type || c.insuranceType || local?.insuranceType || undefined,
+          policyStartDate: c.policy_start_date || c.policyStartDate || local?.policyStartDate || undefined,
+          policyEndDate: c.policy_end_date || c.policyEndDate || local?.policyEndDate || undefined,
+          plate: c.plate || local?.plate || undefined,
+          documentSerial: c.document_serial || c.documentSerial || local?.documentSerial || undefined,
+          vehicleUsage: c.vehicle_usage || c.vehicleUsage || local?.vehicleUsage || undefined,
+          vehicleBrand: c.vehicle_brand || c.vehicleBrand || local?.vehicleBrand || undefined,
+          vehicleType: c.vehicle_type || c.vehicleType || local?.vehicleType || undefined,
+          vehicleModelYear: c.vehicle_model_year || c.vehicleModelYear || local?.vehicleModelYear || undefined,
+          vehicleRegistrationDate: c.vehicle_registration_date || c.vehicleRegistrationDate || local?.vehicleRegistrationDate || undefined,
+          vehicleValue: c.vehicle_value || c.vehicleValue || local?.vehicleValue || undefined
+        };
+      });
       localStorage.setItem('elisam_customers', JSON.stringify(mapped));
       return mapped;
     }
@@ -83,7 +106,7 @@ export async function upsertCustomerToCloud(customer: Customer): Promise<void> {
   // Cloud update
   if (!isSupabaseConfigured()) return;
   try {
-    const row = {
+    const baseRow: any = {
       id: customer.id,
       name: customer.name,
       type: customer.type,
@@ -94,7 +117,23 @@ export async function upsertCustomerToCloud(customer: Customer): Promise<void> {
       birth_date: customer.birthDate || null,
       notes: customer.notes || null
     };
-    await supabase.from('customers').upsert(row);
+
+    const extendedRow: any = {
+      ...baseRow,
+      ...(customer.plate ? { plate: customer.plate } : {}),
+      ...(customer.documentSerial ? { document_serial: customer.documentSerial } : {}),
+      ...(customer.policyNo ? { policy_no: customer.policyNo } : {}),
+      ...(customer.insuranceType ? { insurance_type: customer.insuranceType } : {}),
+      ...(customer.vehicleUsage ? { vehicle_usage: customer.vehicleUsage } : {}),
+      ...(customer.vehicleBrand ? { vehicle_brand: customer.vehicleBrand } : {})
+    };
+
+    try {
+      const { error } = await supabase.from('customers').upsert(extendedRow);
+      if (!error) return;
+    } catch (e) {}
+
+    await supabase.from('customers').upsert(baseRow);
   } catch (err) {
     console.error('upsertCustomerToCloud error:', err);
   }
@@ -227,20 +266,29 @@ export async function fetchPoliciesFromCloud(): Promise<Policy[]> {
     }
 
     if (data) {
+      const existingLocal: Policy[] = (() => {
+        try {
+          const s = localStorage.getItem('elisam_policies');
+          return s ? JSON.parse(s) : [];
+        } catch { return []; }
+      })();
+      const localMap = new Map(existingLocal.map(lp => [lp.id, lp]));
+
       const mapped: Policy[] = data.map((p: any) => {
-        const prem = normalizeMoney(p.premium);
+        const local = localMap.get(p.id) || (p.policy_no ? localMap.get(p.policy_no) : undefined);
+        const prem = normalizeMoney(p.premium !== undefined && p.premium !== null ? p.premium : (local?.premium || 0));
         const netPrem = (p.net_premium !== undefined && p.net_premium !== null) 
           ? normalizeMoney(p.net_premium) 
-          : (p.netPremium !== undefined && p.netPremium !== null ? normalizeMoney(p.netPremium) : undefined);
-        const paid = normalizeMoney(p.paid_amount);
+          : (p.netPremium !== undefined && p.netPremium !== null ? normalizeMoney(p.netPremium) : (local?.netPremium !== undefined ? normalizeMoney(local.netPremium) : undefined));
+        const paid = normalizeMoney(p.paid_amount !== undefined && p.paid_amount !== null ? p.paid_amount : (local?.paidAmount || 0));
         const rem = Math.max(0, prem - paid);
         return {
           id: p.id,
           policyNo: p.policy_no || p.id,
           customerId: p.customer_id,
           customerName: p.customer_name,
-          customerPhone: p.customer_phone,
-          customerTc: p.customer_tc,
+          customerPhone: p.customer_phone || local?.customerPhone,
+          customerTc: p.customer_tc || local?.customerTc,
           type: p.type,
           company: p.company,
           startDate: p.start_date,
@@ -249,13 +297,20 @@ export async function fetchPoliciesFromCloud(): Promise<Policy[]> {
           netPremium: netPrem,
           paidAmount: paid,
           remainingAmount: rem,
-          paymentType: p.payment_type || 'Peşin / Tek Çekim',
-          installmentCount: p.installment_count || 1,
-          commissionRate: Number(p.commission_rate) || 15,
-          paymentStatus: p.payment_status || 'Bekliyor',
-          status: p.status || 'Aktif',
-          plate: p.plate || undefined,
-          notes: p.notes || undefined
+          paymentType: p.payment_type || local?.paymentType || 'Peşin / Tek Çekim',
+          installmentCount: p.installment_count || local?.installmentCount || 1,
+          commissionRate: Number(p.commission_rate) || local?.commissionRate || 15,
+          paymentStatus: p.payment_status || local?.paymentStatus || 'Bekliyor',
+          status: p.status || local?.status || 'Aktif',
+          plate: p.plate || local?.plate || undefined,
+          documentSerial: p.document_serial || p.documentSerial || local?.documentSerial || undefined,
+          vehicleUsage: p.vehicle_usage || p.vehicleUsage || local?.vehicleUsage || undefined,
+          vehicleBrand: p.vehicle_brand || p.vehicleBrand || local?.vehicleBrand || undefined,
+          vehicleType: p.vehicle_type || p.vehicleType || local?.vehicleType || undefined,
+          vehicleModelYear: p.vehicle_model_year || p.vehicleModelYear || local?.vehicleModelYear || undefined,
+          vehicleRegistrationDate: p.vehicle_registration_date || p.vehicleRegistrationDate || local?.vehicleRegistrationDate || undefined,
+          vehicleValue: p.vehicle_value || p.vehicleValue || local?.vehicleValue || undefined,
+          notes: p.notes || local?.notes || undefined
         };
       });
       localStorage.setItem('elisam_policies', JSON.stringify(mapped));
@@ -300,7 +355,7 @@ export async function upsertPolicyToCloud(policy: Policy): Promise<void> {
 
   if (!isSupabaseConfigured()) return;
   try {
-    const row: any = {
+    const baseRow: any = {
       id: sanitizedPolicy.id,
       policy_no: sanitizedPolicy.policyNo || sanitizedPolicy.id,
       customer_id: sanitizedPolicy.customerId,
@@ -323,16 +378,32 @@ export async function upsertPolicyToCloud(policy: Policy): Promise<void> {
       notes: sanitizedPolicy.notes || null
     };
     
-    // Try to upsert; if net_premium column exists in DB, it will be saved
+    // Try with document_serial and vehicle columns if they exist in Supabase
+    const extendedRow: any = {
+      ...baseRow,
+      ...(sanitizedPolicy.netPremium !== undefined ? { net_premium: sanitizedPolicy.netPremium } : {}),
+      ...(sanitizedPolicy.documentSerial ? { document_serial: sanitizedPolicy.documentSerial } : {}),
+      ...(sanitizedPolicy.vehicleUsage ? { vehicle_usage: sanitizedPolicy.vehicleUsage } : {}),
+      ...(sanitizedPolicy.vehicleBrand ? { vehicle_brand: sanitizedPolicy.vehicleBrand } : {}),
+      ...(sanitizedPolicy.vehicleType ? { vehicle_type: sanitizedPolicy.vehicleType } : {}),
+      ...(sanitizedPolicy.vehicleModelYear ? { vehicle_model_year: sanitizedPolicy.vehicleModelYear } : {})
+    };
+
+    try {
+      const { error } = await supabase.from('policies').upsert(extendedRow);
+      if (!error) return;
+    } catch (e) {}
+
+    // Fallback: try with baseRow + net_premium
     if (sanitizedPolicy.netPremium !== undefined) {
       try {
-        const rowWithNet = { ...row, net_premium: sanitizedPolicy.netPremium };
+        const rowWithNet = { ...baseRow, net_premium: sanitizedPolicy.netPremium };
         const { error } = await supabase.from('policies').upsert(rowWithNet);
         if (!error) return;
       } catch (e) {}
     }
     
-    await supabase.from('policies').upsert(row);
+    await supabase.from('policies').upsert(baseRow);
   } catch (err) {
     console.error('upsertPolicyToCloud error:', err);
   }
