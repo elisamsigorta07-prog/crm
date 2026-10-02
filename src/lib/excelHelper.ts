@@ -45,51 +45,69 @@ export const formatExcelCurrency = (val: number | string | undefined | null): st
  */
 export function resolvePlateAndDocSerial(
   rawPlate?: string, 
-  rawDocSerial?: string
+  rawDocSerial?: string,
+  rawNotes?: string
 ): { plate: string; docSerial: string } {
   let plate = (rawPlate || '').trim();
   let docSerial = (rawDocSerial || '').trim();
+  const notes = (rawNotes || '').trim();
 
-  // Her ikisi de yoksa veya tire ise
-  if ((!plate || plate === '-') && (!docSerial || docSerial === '-')) {
-    return { plate: '-', docSerial: '-' };
-  }
+  if (plate === '-') plate = '';
+  if (docSerial === '-') docSerial = '';
 
   // 1. Plaka içinde açık etiket varsa (örn: "Belge Seri No: CU 637314", "Ruhsat Seri: ...")
-  const explicitBelgeRegex = /(?:Belge\s*Seri(?:\s*No)?|Ruhsat\s*Seri(?:\s*No)?|Seri\s*No|Belge\s*No|Ruhsat\s*No|Asbis\s*No)[:\s]+([A-Za-z0-9\s/-]+)/i;
-  const explicitBelgeMatch = plate.match(explicitBelgeRegex);
-  if (explicitBelgeMatch) {
-    if (!docSerial || docSerial === '-') {
-      docSerial = explicitBelgeMatch[1].trim();
+  const explicitBelgeRegex = /(?:Belge\s*Seri(?:\s*No)?|Ruhsat\s*Seri(?:\s*No)?|Seri\s*No|Belge\s*No|Ruhsat\s*No|Asbis(?:\s*No)?|Tescil(?:\s*No)?)[:\s]+([A-Za-z0-9\s/-]{3,25})/i;
+  const explicitInPlate = plate.match(explicitBelgeRegex);
+  if (explicitInPlate) {
+    if (!docSerial) {
+      docSerial = explicitInPlate[1].trim();
     }
-    plate = plate.replace(explicitBelgeMatch[0], '').trim();
+    plate = plate.replace(explicitInPlate[0], '').trim();
   }
 
-  // 2. Plaka içinde "/" veya " - " ayracı varsa (örn: "07 ABC 123 / CU 637314" veya "38VH244 - CU637314")
-  if ((!docSerial || docSerial === '-') && (plate.includes('/') || plate.includes(' - ') || plate.includes(' / '))) {
+  // 2. Belge Seri hala boşsa ve notlar (notes) alanı verilmişse, notlardan çıkart
+  if (!docSerial && notes) {
+    const explicitInNotes = notes.match(explicitBelgeRegex);
+    if (explicitInNotes) {
+      const cleanVal = explicitInNotes[1].split(/[\r\n|;]/)[0].trim();
+      if (cleanVal) docSerial = cleanVal;
+    }
+  }
+
+  // 3. Plaka boşsa ve notlar (notes) alanı verilmişse, notlardan plaka çıkart
+  if (!plate && notes) {
+    const plateInNotes = notes.match(/(?:Plaka|Araç\s*Plakası)[:\s]+([A-Za-z0-9\s]{4,15})/i);
+    if (plateInNotes) {
+      const cleanPlate = plateInNotes[1].split(/[\r\n|;]/)[0].trim();
+      if (cleanPlate) plate = cleanPlate;
+    }
+  }
+
+  // 4. Plaka içinde "/" veya " - " ayracı varsa (örn: "07 ABC 123 / CU 637314" veya "38VH244 - CU637314")
+  if (!docSerial && (plate.includes('/') || plate.includes(' - ') || plate.includes(' / '))) {
     const delimiter = plate.includes(' / ') ? ' / ' : (plate.includes('/') ? '/' : ' - ');
     const parts = plate.split(delimiter).map(p => p.trim()).filter(Boolean);
     if (parts.length === 2) {
       // Türkiye plakası genelde 2 basamaklı il kodu ile başlar (örn: 07 ABC 123, 34 A 1234)
-      const part1IsPlate = /^\d{2}\s*[A-Za-z]{1,3}\s*\d{2,4}$/i.test(parts[0]);
-      const part2IsPlate = /^\d{2}\s*[A-Za-z]{1,3}\s*\d{2,4}$/i.test(parts[1]);
+      const part1IsTrPlate = /^\d{2}\s*[A-Za-z]{1,3}\s*\d{2,4}$/i.test(parts[0]);
+      const part2IsTrPlate = /^\d{2}\s*[A-Za-z]{1,3}\s*\d{2,4}$/i.test(parts[1]);
       
       // Belge Seri genelde 1-2 harf + 4-8 rakamdır (örn: CU 637314, AS 123456)
       const part2IsSerial = /^[A-Za-z]{1,3}\s*[-/]?\s*\d{4,8}$/i.test(parts[1]);
       const part1IsSerial = /^[A-Za-z]{1,3}\s*[-/]?\s*\d{4,8}$/i.test(parts[0]);
 
-      if (part1IsPlate || part2IsSerial) {
+      if (part1IsTrPlate || part2IsSerial) {
         plate = parts[0];
         docSerial = parts[1];
-      } else if (part2IsPlate || part1IsSerial) {
+      } else if (part2IsTrPlate || part1IsSerial) {
         plate = parts[1];
         docSerial = parts[0];
       }
     }
   }
 
-  // 3. Plaka içinde boşlukla ayrılmış plaka + belge seri varsa (örn: "38VH244 CU 637314" veya "07ABC123 CU637314")
-  if ((!docSerial || docSerial === '-') && /\b\d{2}\s*[A-Za-z]{1,3}\s*\d{2,4}\b/i.test(plate)) {
+  // 5. Plaka içinde boşlukla ayrılmış plaka + belge seri varsa (örn: "38VH244 CU 637314" veya "07ABC123 CU637314")
+  if (!docSerial && /\b\d{2}\s*[A-Za-z]{1,3}\s*\d{2,4}\b/i.test(plate)) {
     const combinedMatch = plate.match(/^(\d{2}\s*[A-Za-z]{1,3}\s*\d{2,4})\s+([A-Za-z]{1,3}\s*\d{4,8})$/i);
     if (combinedMatch) {
       plate = combinedMatch[1].trim();
@@ -97,8 +115,22 @@ export function resolvePlateAndDocSerial(
     }
   }
 
-  // 4. Belge Seri zaten doluysa fakat plaka metninde de geçiyorsa plakadan temizle
-  if (docSerial && docSerial !== '-' && plate.toLowerCase().includes(docSerial.toLowerCase())) {
+  // 6. Plaka alanına yanlışlıkla Belge Seri girilmişse (örn: "CU 637314" veya "HK 052602")
+  const isTrDocSerialOnly = /^[A-Za-z]{2}\s*\d{6}$/i.test(plate);
+  if (isTrDocSerialOnly && !docSerial) {
+    docSerial = plate;
+    plate = '';
+  }
+
+  // 7. Belge Seri alanına yanlışlıkla Plaka girilmişse (örn: "07 BSL 071")
+  const isTrPlateOnly = /^\d{2}\s*[A-Za-z]{1,3}\s*\d{2,4}$/i.test(docSerial);
+  if (isTrPlateOnly && !plate) {
+    plate = docSerial;
+    docSerial = '';
+  }
+
+  // 8. Belge Seri zaten doluysa fakat plaka metninde de geçiyorsa plakadan temizle
+  if (docSerial && plate.toLowerCase().includes(docSerial.toLowerCase())) {
     plate = plate.replace(new RegExp(docSerial.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'ig'), '').trim();
   }
 
@@ -106,8 +138,13 @@ export function resolvePlateAndDocSerial(
   plate = plate.replace(/^[\/:\-,\s]+|[\/:\-,\s]+$/g, '').trim();
   docSerial = docSerial.replace(/^[\/:\-,\s]+|[\/:\-,\s]+$/g, '').trim();
 
+  // Normalize et (büyük harf ve boşluk kontrolü)
+  plate = plate ? plate.toUpperCase().replace(/\s+/g, ' ') : '-';
+  docSerial = docSerial ? docSerial.toUpperCase().replace(/\s+/g, ' ') : '-';
+
   return {
-    plate: plate || '-',
-    docSerial: docSerial || '-'
+    plate,
+    docSerial
   };
 }
+

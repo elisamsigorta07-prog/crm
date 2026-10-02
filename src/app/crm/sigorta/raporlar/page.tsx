@@ -200,7 +200,7 @@ export default function SigortaRaporlarPage() {
         const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (cust?.identityNo && cust.identityNo !== '-' ? cust.identityNo : '-');
         const phone = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (cust?.phone && cust.phone !== '-' ? cust.phone : '-');
         const birth = cust?.birthDate || '-';
-        const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial);
+        const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
         csv += `${formatExcelText(p.policyNo || p.id)};"${p.customerName.replace(/"/g, '""')}";${formatExcelText(tc)};"${birth}";${formatExcelText(phone)};"${p.type}";"${p.company}";"${p.startDate}";"${p.endDate}";${formatExcelText(plate)};${formatExcelText(docSerial)};"${formatExcelCurrency(p.premium)}";"${p.status}"\n`;
       });
     } else {
@@ -256,7 +256,7 @@ export default function SigortaRaporlarPage() {
         customerHTML += `<span class="cust-phone">📞 ${tel}</span>`;
       }
 
-      const { plate: resPlate, docSerial: resSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial);
+      const { plate: resPlate, docSerial: resSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
       const plateStr = resPlate !== '-' ? resPlate : '';
       const serialStr = resSerial !== '-' ? resSerial : '';
       let vehicleDesc = '';
@@ -384,7 +384,7 @@ export default function SigortaRaporlarPage() {
         const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (cust?.identityNo && cust.identityNo !== '-' ? cust.identityNo : '-');
         const phone = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (cust?.phone && cust.phone !== '-' ? cust.phone : '-');
         const birth = cust?.birthDate || '-';
-        const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial);
+        const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
         return [
           formatExcelText(p.policyNo || p.id),
           `"${p.customerName.replace(/"/g, '""')}"`,
@@ -411,7 +411,7 @@ export default function SigortaRaporlarPage() {
         const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (cust?.identityNo && cust.identityNo !== '-' ? cust.identityNo : '-');
         const phone = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (cust?.phone && cust.phone !== '-' ? cust.phone : '-');
         const birth = cust?.birthDate || '-';
-        const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial);
+        const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
         return [
           formatExcelText(p.policyNo || p.id),
           `"${p.customerName.replace(/"/g, '""')}"`,
@@ -535,7 +535,7 @@ export default function SigortaRaporlarPage() {
             customerHTML += `<span class="cust-phone">📞 ${tel}</span>`;
           }
 
-          const { plate: resPlate, docSerial: resSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial);
+          const { plate: resPlate, docSerial: resSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
           const plateStr = resPlate !== '-' ? resPlate : '';
           const serialStr = resSerial !== '-' ? resSerial : '';
           let vehicleHTML = '-';
@@ -584,7 +584,7 @@ export default function SigortaRaporlarPage() {
             customerHTML += `<span class="cust-phone">📞 ${tel}</span>`;
           }
 
-          const { plate: resPlate, docSerial: resSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial);
+          const { plate: resPlate, docSerial: resSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
           const plateStr = resPlate !== '-' ? resPlate : '';
           const serialStr = resSerial !== '-' ? resSerial : '';
           let vehicleHTML = '-';

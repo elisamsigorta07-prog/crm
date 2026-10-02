@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { Customer, Policy } from '@/data/crmData';
 import { RentCustomer, RentalBooking, RentVehicle } from '@/data/rentCrmData';
+import { resolvePlateAndDocSerial } from './excelHelper';
 
 export interface CariMovement {
   id: string;
@@ -57,6 +58,14 @@ export async function fetchCustomersFromCloud(): Promise<Customer[]> {
 
       const mapped: Customer[] = data.map((c: any) => {
         const local = localMap.get(c.id);
+        const rawNotes = c.notes || local?.notes || '';
+        const rawPlate = c.plate || local?.plate || undefined;
+        const rawDocSerial = c.document_serial || c.documentSerial || local?.documentSerial || undefined;
+        const resolvedVeh = resolvePlateAndDocSerial(rawPlate, rawDocSerial, rawNotes);
+
+        const cleanPlate = resolvedVeh.plate !== '-' ? resolvedVeh.plate : (rawPlate || undefined);
+        const cleanDocSerial = resolvedVeh.docSerial !== '-' ? resolvedVeh.docSerial : (rawDocSerial || undefined);
+
         return {
           id: c.id,
           name: c.name,
@@ -66,14 +75,14 @@ export async function fetchCustomersFromCloud(): Promise<Customer[]> {
           email: c.email || local?.email || '-',
           address: c.address || local?.address || 'Alanya / Antalya',
           birthDate: c.birth_date || c.birthDate || local?.birthDate || undefined,
-          notes: c.notes || local?.notes || undefined,
+          notes: rawNotes || undefined,
           createdAt: c.created_at ? new Date(c.created_at).toLocaleDateString('tr-TR') : (local?.createdAt || new Date().toLocaleDateString('tr-TR')),
           policyNo: c.policy_no || c.policyNo || local?.policyNo || undefined,
           insuranceType: c.insurance_type || c.insuranceType || local?.insuranceType || undefined,
           policyStartDate: c.policy_start_date || c.policyStartDate || local?.policyStartDate || undefined,
           policyEndDate: c.policy_end_date || c.policyEndDate || local?.policyEndDate || undefined,
-          plate: c.plate || local?.plate || undefined,
-          documentSerial: c.document_serial || c.documentSerial || local?.documentSerial || undefined,
+          plate: cleanPlate,
+          documentSerial: cleanDocSerial,
           vehicleUsage: c.vehicle_usage || c.vehicleUsage || local?.vehicleUsage || undefined,
           vehicleBrand: c.vehicle_brand || c.vehicleBrand || local?.vehicleBrand || undefined,
           vehicleType: c.vehicle_type || c.vehicleType || local?.vehicleType || undefined,
@@ -106,6 +115,14 @@ export async function upsertCustomerToCloud(customer: Customer): Promise<void> {
   // Cloud update
   if (!isSupabaseConfigured()) return;
   try {
+    let customerNotes = customer.notes || '';
+    if (customer.documentSerial && !customerNotes.toLowerCase().includes('belge seri') && !customerNotes.toLowerCase().includes('ruhsat seri')) {
+      customerNotes = (customerNotes ? customerNotes + '\n' : '') + `Belge Seri: ${customer.documentSerial}`;
+    }
+    if (customer.plate && !customerNotes.toLowerCase().includes('plaka:')) {
+      customerNotes = (customerNotes ? customerNotes + '\n' : '') + `Plaka: ${customer.plate}`;
+    }
+
     const baseRow: any = {
       id: customer.id,
       name: customer.name,
@@ -115,7 +132,7 @@ export async function upsertCustomerToCloud(customer: Customer): Promise<void> {
       email: customer.email,
       address: customer.address,
       birth_date: customer.birthDate || null,
-      notes: customer.notes || null
+      notes: customerNotes || null
     };
 
     const extendedRow: any = {
@@ -282,6 +299,28 @@ export async function fetchPoliciesFromCloud(): Promise<Policy[]> {
           : (p.netPremium !== undefined && p.netPremium !== null ? normalizeMoney(p.netPremium) : (local?.netPremium !== undefined ? normalizeMoney(local.netPremium) : undefined));
         const paid = normalizeMoney(p.paid_amount !== undefined && p.paid_amount !== null ? p.paid_amount : (local?.paidAmount || 0));
         const rem = Math.max(0, prem - paid);
+
+        const rawNotes = p.notes || local?.notes || '';
+        const rawPlate = p.plate || local?.plate || undefined;
+        const rawDocSerial = p.document_serial || p.documentSerial || local?.documentSerial || undefined;
+        const resolvedVeh = resolvePlateAndDocSerial(rawPlate, rawDocSerial, rawNotes);
+
+        const cleanPlate = resolvedVeh.plate !== '-' ? resolvedVeh.plate : (rawPlate || undefined);
+        const cleanDocSerial = resolvedVeh.docSerial !== '-' ? resolvedVeh.docSerial : (rawDocSerial || undefined);
+
+        const extractFromNotes = (regex: RegExp) => {
+          if (!rawNotes) return undefined;
+          const match = rawNotes.match(regex);
+          return match ? match[1].trim() : undefined;
+        };
+
+        const vUsage = p.vehicle_usage || p.vehicleUsage || local?.vehicleUsage || extractFromNotes(/(?:Araç\s*Kullanım\s*Tarzı|Kullanım\s*Tarzı|Kullanım\s*Şekli):\s*(.*)/i);
+        const vBrand = p.vehicle_brand || p.vehicleBrand || local?.vehicleBrand || extractFromNotes(/(?:Marka|Araç\s*Markası):\s*(.*)/i);
+        const vType = p.vehicle_type || p.vehicleType || local?.vehicleType || extractFromNotes(/(?:Tip|Model\s*Tipi|Araç\s*Tipi|Model\s*\/\s*Tip):\s*(.*)/i);
+        const vYear = p.vehicle_model_year || p.vehicleModelYear || local?.vehicleModelYear || extractFromNotes(/(?:Model\s*Yılı|Yıl|Üretim\s*Yılı):\s*(.*)/i);
+        const vReg = p.vehicle_registration_date || p.vehicleRegistrationDate || local?.vehicleRegistrationDate || extractFromNotes(/(?:Tescil\s*Tarihi|İlk\s*Tescil\s*Tarihi|Ruhsat\s*Tescil):\s*(.*)/i);
+        const vVal = p.vehicle_value || p.vehicleValue || local?.vehicleValue || extractFromNotes(/(?:Araç\s*Kasko\s*Değeri|Kasko\s*Değeri|Rayiç\s*Bedel|Araç\s*Bedeli):\s*([0-9.,]+)/i);
+
         return {
           id: p.id,
           policyNo: p.policy_no || p.id,
@@ -302,15 +341,15 @@ export async function fetchPoliciesFromCloud(): Promise<Policy[]> {
           commissionRate: Number(p.commission_rate) || local?.commissionRate || 15,
           paymentStatus: p.payment_status || local?.paymentStatus || 'Bekliyor',
           status: p.status || local?.status || 'Aktif',
-          plate: p.plate || local?.plate || undefined,
-          documentSerial: p.document_serial || p.documentSerial || local?.documentSerial || undefined,
-          vehicleUsage: p.vehicle_usage || p.vehicleUsage || local?.vehicleUsage || undefined,
-          vehicleBrand: p.vehicle_brand || p.vehicleBrand || local?.vehicleBrand || undefined,
-          vehicleType: p.vehicle_type || p.vehicleType || local?.vehicleType || undefined,
-          vehicleModelYear: p.vehicle_model_year || p.vehicleModelYear || local?.vehicleModelYear || undefined,
-          vehicleRegistrationDate: p.vehicle_registration_date || p.vehicleRegistrationDate || local?.vehicleRegistrationDate || undefined,
-          vehicleValue: p.vehicle_value || p.vehicleValue || local?.vehicleValue || undefined,
-          notes: p.notes || local?.notes || undefined
+          plate: cleanPlate,
+          documentSerial: cleanDocSerial,
+          vehicleUsage: vUsage,
+          vehicleBrand: vBrand,
+          vehicleType: vType,
+          vehicleModelYear: vYear,
+          vehicleRegistrationDate: vReg,
+          vehicleValue: vVal,
+          notes: rawNotes || undefined
         };
       });
       localStorage.setItem('elisam_policies', JSON.stringify(mapped));
@@ -355,6 +394,14 @@ export async function upsertPolicyToCloud(policy: Policy): Promise<void> {
 
   if (!isSupabaseConfigured()) return;
   try {
+    let policyNotes = sanitizedPolicy.notes || '';
+    if (sanitizedPolicy.documentSerial && !policyNotes.toLowerCase().includes('belge seri') && !policyNotes.toLowerCase().includes('ruhsat seri')) {
+      policyNotes = (policyNotes ? policyNotes + '\n' : '') + `Belge Seri: ${sanitizedPolicy.documentSerial}`;
+    }
+    if (sanitizedPolicy.plate && !policyNotes.toLowerCase().includes('plaka:')) {
+      policyNotes = (policyNotes ? policyNotes + '\n' : '') + `Plaka: ${sanitizedPolicy.plate}`;
+    }
+
     const baseRow: any = {
       id: sanitizedPolicy.id,
       policy_no: sanitizedPolicy.policyNo || sanitizedPolicy.id,
@@ -375,7 +422,7 @@ export async function upsertPolicyToCloud(policy: Policy): Promise<void> {
       payment_status: sanitizedPolicy.paymentStatus,
       status: sanitizedPolicy.status || 'Aktif',
       plate: sanitizedPolicy.plate || null,
-      notes: sanitizedPolicy.notes || null
+      notes: policyNotes || null
     };
     
     // Try with document_serial and vehicle columns if they exist in Supabase

@@ -425,7 +425,7 @@ export default function PolicelerPage() {
     const rawPlateMatch = extract(/(?:Plaka|Araç\s*Plakası):\s*([^\r\n]+)/i);
     const rawBelgeMatch = extract(/(?:Belge\s*Seri(?:\s*No)?|Ruhsat\s*Seri(?:\s*No)?|Ruhsat\s*No|Belge\s*No|Seri\s*No|Asbis\s*No):\s*([^\r\n]+)/i);
     
-    const resolvedVehicle = resolvePlateAndDocSerial(rawPlateMatch, rawBelgeMatch);
+    const resolvedVehicle = resolvePlateAndDocSerial(rawPlateMatch, rawBelgeMatch, text);
     if (resolvedVehicle.plate && resolvedVehicle.plate !== '-') {
       setPlate(resolvedVehicle.plate.toUpperCase().replace(/\s+/g, ' '));
     }
@@ -522,7 +522,7 @@ export default function PolicelerPage() {
     let customerToSave: Customer;
     
     // Resolve plate and documentSerial cleanly so they are never mixed up
-    const resolvedVeh = resolvePlateAndDocSerial(plate, documentSerial);
+    const resolvedVeh = resolvePlateAndDocSerial(plate, documentSerial, notes);
     const cleanPlate = resolvedVeh.plate !== '-' ? resolvedVeh.plate : (plate.trim() || undefined);
     const cleanDocSerial = resolvedVeh.docSerial !== '-' ? resolvedVeh.docSerial : (documentSerial.trim() || undefined);
 
@@ -835,7 +835,7 @@ export default function PolicelerPage() {
       const matchedCust = customers.find(c => c.id === p.customerId || c.name === p.customerName);
       const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (matchedCust?.identityNo || '-');
       const phone = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (matchedCust?.phone || '-');
-      const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || matchedCust?.plate, p.documentSerial || matchedCust?.documentSerial);
+      const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || matchedCust?.plate, p.documentSerial || matchedCust?.documentSerial, p.notes || matchedCust?.notes);
 
       return [
         formatExcelText(p.policyNo || p.id),
@@ -1348,7 +1348,7 @@ export default function PolicelerPage() {
                           {pol.policyNo || pol.id}
                         </div>
                         {(() => {
-                          const { plate: vPlate, docSerial: vSerial } = resolvePlateAndDocSerial(pol.plate || matchedCust?.plate, pol.documentSerial || matchedCust?.documentSerial);
+                          const { plate: vPlate, docSerial: vSerial } = resolvePlateAndDocSerial(pol.plate || matchedCust?.plate, pol.documentSerial || matchedCust?.documentSerial, pol.notes || matchedCust?.notes);
                           if (vPlate === '-' && vSerial === '-') return null;
                           return (
                             <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '2px', fontWeight: 600 }}>
@@ -2144,7 +2144,7 @@ export default function PolicelerPage() {
             {/* Araç & Ruhsat Bilgileri (Varsa) */}
             {(() => {
               const matchedCustomer = customers.find(c => c.id === selectedPolicy.customerId || c.name === selectedPolicy.customerName);
-              const { plate: rPlate, docSerial: rSerial } = resolvePlateAndDocSerial(selectedPolicy.plate || matchedCustomer?.plate, selectedPolicy.documentSerial || matchedCustomer?.documentSerial);
+              const { plate: rPlate, docSerial: rSerial } = resolvePlateAndDocSerial(selectedPolicy.plate || matchedCustomer?.plate, selectedPolicy.documentSerial || matchedCustomer?.documentSerial, selectedPolicy.notes || matchedCustomer?.notes);
               const pPlate = rPlate !== '-' ? rPlate : undefined;
               const pSerial = rSerial !== '-' ? rSerial : undefined;
               const pUsage = selectedPolicy.vehicleUsage || matchedCustomer?.vehicleUsage;

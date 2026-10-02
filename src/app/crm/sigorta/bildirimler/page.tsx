@@ -172,7 +172,7 @@ export default function SigortaBildirimlerPage() {
       else if (daysRemaining <= 15) urgency = 'twoWeeks';
       else if (daysRemaining <= 30) urgency = 'month';
 
-      const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial);
+      const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
       const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (cust?.identityNo || '-');
       const phone = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (cust?.phone || '-');
 
@@ -221,7 +221,7 @@ export default function SigortaBildirimlerPage() {
         else if (daysRemaining <= 15) urgency = 'twoWeeks';
         else if (daysRemaining <= 30) urgency = 'month';
 
-        const { plate, docSerial } = resolvePlateAndDocSerial(c.plate, c.documentSerial);
+        const { plate, docSerial } = resolvePlateAndDocSerial(c.plate, c.documentSerial, c.notes);
 
         items.push({
           id: `CUST_${c.id}`,
