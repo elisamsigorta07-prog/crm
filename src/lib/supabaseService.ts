@@ -185,6 +185,23 @@ export function normalizeMoney(val: any): number {
   const str = String(val).trim();
   if (!str) return 0;
 
+  // If string contains both comma and dot, check which one comes last (decimal separator)
+  if (str.includes(',') && str.includes('.')) {
+    const lastComma = str.lastIndexOf(',');
+    const lastDot = str.lastIndexOf('.');
+    if (lastComma > lastDot) {
+      // Turkish format: 1.234,56
+      const clean = str.replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
+      const num = Number(clean);
+      return isNaN(num) ? 0 : Math.round(num * 100) / 100;
+    } else {
+      // International / English format: 1,234.56
+      const clean = str.replace(/,/g, '').replace(/[^\d.]/g, '');
+      const num = Number(clean);
+      return isNaN(num) ? 0 : Math.round(num * 100) / 100;
+    }
+  }
+
   // If string contains comma, it is TR formatted decimal (e.g. 12.386,50 or 55144,94)
   if (str.includes(',')) {
     const clean = str.replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '');
@@ -209,6 +226,7 @@ export function normalizeMoney(val: any): number {
     const num = Number(str.replace(/[^\d.]/g, ''));
     return isNaN(num) ? 0 : Math.round(num * 100) / 100;
   }
+
 
   const clean = str.replace(/[^\d]/g, '');
   return Number(clean) || 0;
@@ -293,26 +311,40 @@ export async function fetchPoliciesFromCloud(): Promise<Policy[]> {
 
       const mapped: Policy[] = data.map((p: any) => {
         const local = localMap.get(p.id) || (p.policy_no ? localMap.get(p.policy_no) : undefined);
-        const prem = normalizeMoney(p.premium !== undefined && p.premium !== null ? p.premium : (local?.premium || 0));
-        const netPrem = (p.net_premium !== undefined && p.net_premium !== null) 
-          ? normalizeMoney(p.net_premium) 
-          : (p.netPremium !== undefined && p.netPremium !== null ? normalizeMoney(p.netPremium) : (local?.netPremium !== undefined ? normalizeMoney(local.netPremium) : undefined));
-        const paid = normalizeMoney(p.paid_amount !== undefined && p.paid_amount !== null ? p.paid_amount : (local?.paidAmount || 0));
-        const rem = Math.max(0, prem - paid);
-
         const rawNotes = p.notes || local?.notes || '';
-        const rawPlate = p.plate || local?.plate || undefined;
-        const rawDocSerial = p.document_serial || p.documentSerial || local?.documentSerial || undefined;
-        const resolvedVeh = resolvePlateAndDocSerial(rawPlate, rawDocSerial, rawNotes);
-
-        const cleanPlate = resolvedVeh.plate !== '-' ? resolvedVeh.plate : (rawPlate || undefined);
-        const cleanDocSerial = resolvedVeh.docSerial !== '-' ? resolvedVeh.docSerial : (rawDocSerial || undefined);
 
         const extractFromNotes = (regex: RegExp) => {
           if (!rawNotes) return undefined;
           const match = rawNotes.match(regex);
           return match ? match[1].trim() : undefined;
         };
+
+        const rawNetFromNotes = extractFromNotes(/(?:Net\s*Pr[iİıI]m|Net\s*Tutar|Net\s*P[iİıI]r[iİıI]m|Net)\s*[:=\s]+\s*([0-9.,]+)/i);
+        const netFromNotes = rawNetFromNotes ? normalizeMoney(rawNetFromNotes) : undefined;
+
+        const rawGrossFromNotes = extractFromNotes(/(?:Br[üuÜU]t+?\s*Pr[iİıI]m|B[üuÜU]r[üuÜU]t\s*Pr[iİıI]m|B[üuÜU]r[üuÜU]t\s*P[iİıI]r[iİıI]m|Br[üuÜU]t\s*Tutar|Br[üuÜU]t+?|B[üuÜU]r[üuÜU]t)\s*[:=\s]+\s*([0-9.,]+)/i);
+        const grossFromNotes = rawGrossFromNotes ? normalizeMoney(rawGrossFromNotes) : undefined;
+
+        const basePrem = normalizeMoney(p.premium !== undefined && p.premium !== null ? p.premium : (local?.premium || 0));
+        const prem = (grossFromNotes && grossFromNotes > 0 && Math.abs(grossFromNotes - basePrem) < 1) ? grossFromNotes : (basePrem || grossFromNotes || 0);
+
+        const netPrem = (p.net_premium !== undefined && p.net_premium !== null) 
+          ? normalizeMoney(p.net_premium) 
+          : (p.netPremium !== undefined && p.netPremium !== null 
+              ? normalizeMoney(p.netPremium) 
+              : (local?.netPremium !== undefined && local.netPremium > 0
+                  ? normalizeMoney(local.netPremium) 
+                  : netFromNotes));
+
+        const paid = normalizeMoney(p.paid_amount !== undefined && p.paid_amount !== null ? p.paid_amount : (local?.paidAmount || 0));
+        const rem = Math.max(0, prem - paid);
+
+        const rawPlate = p.plate || local?.plate || undefined;
+        const rawDocSerial = p.document_serial || p.documentSerial || local?.documentSerial || undefined;
+        const resolvedVeh = resolvePlateAndDocSerial(rawPlate, rawDocSerial, rawNotes);
+
+        const cleanPlate = resolvedVeh.plate !== '-' ? resolvedVeh.plate : (rawPlate || undefined);
+        const cleanDocSerial = resolvedVeh.docSerial !== '-' ? resolvedVeh.docSerial : (rawDocSerial || undefined);
 
         const vUsage = p.vehicle_usage || p.vehicleUsage || local?.vehicleUsage || extractFromNotes(/(?:Araç\s*Kullanım\s*Tarzı|Kullanım\s*Tarzı|Kullanım\s*Şekli):\s*(.*)/i);
         const vBrand = p.vehicle_brand || p.vehicleBrand || local?.vehicleBrand || extractFromNotes(/(?:Marka|Araç\s*Markası):\s*(.*)/i);
@@ -401,6 +433,13 @@ export async function upsertPolicyToCloud(policy: Policy): Promise<void> {
     if (sanitizedPolicy.plate && !policyNotes.toLowerCase().includes('plaka:')) {
       policyNotes = (policyNotes ? policyNotes + '\n' : '') + `Plaka: ${sanitizedPolicy.plate}`;
     }
+    if (sanitizedPolicy.netPremium && !policyNotes.toLowerCase().includes('net prim') && !policyNotes.toLowerCase().includes('net pirim')) {
+      policyNotes = (policyNotes ? policyNotes + '\n' : '') + `Net Prim: ${sanitizedPolicy.netPremium}`;
+    }
+    if (sanitizedPolicy.premium && !policyNotes.toLowerCase().includes('brüt prim') && !policyNotes.toLowerCase().includes('bürüt prim')) {
+      policyNotes = (policyNotes ? policyNotes + '\n' : '') + `Brüt Prim: ${sanitizedPolicy.premium}`;
+    }
+
 
     const baseRow: any = {
       id: sanitizedPolicy.id,

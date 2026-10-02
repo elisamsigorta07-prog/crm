@@ -474,7 +474,8 @@ export default function SigortaBildirimlerPage() {
       'Aciliyet Durumu',
       'Plaka',
       'Belge Seri No',
-      'Prim Tutarı (TL)'
+      'Net Prim (TL)',
+      'Brüt Prim (TL)'
     ];
 
     const rows = sortedItems.map(item => [
@@ -490,8 +491,10 @@ export default function SigortaBildirimlerPage() {
       `"${getUrgencyBadge(item.daysRemaining).label}"`,
       formatExcelText(item.plate),
       formatExcelText(item.documentSerial),
+      `"${item.netPremium !== undefined && item.netPremium > 0 ? formatExcelCurrency(item.netPremium) : '-'}"`,
       `"${formatExcelCurrency(item.premium)}"`
     ]);
+
 
     const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -1147,12 +1150,18 @@ export default function SigortaBildirimlerPage() {
                         </div>
                       </td>
 
-                      {/* Prim Tutarı */}
+                      {/* Prim Tutarı (Net & Brüt) */}
                       <td style={{ padding: '12px 14px' }}>
                         <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '0.88rem' }}>
                           {item.premium > 0 ? `${formatMoneyDisplay(item.premium)} ₺` : '-'}
                         </div>
+                        {item.netPremium && item.netPremium > 0 && (
+                          <div style={{ fontSize: '0.74rem', color: '#0d9488', fontWeight: 700, marginTop: '2px' }}>
+                            Net: {formatMoneyDisplay(item.netPremium)} ₺
+                          </div>
+                        )}
                       </td>
+
 
                       {/* HIZLI AKSİYONLAR (WHATSAPP, TELEGRAM, ARAMA, KOPYALA) */}
                       <td style={{ padding: '12px 14px', textAlign: 'center' }}>
