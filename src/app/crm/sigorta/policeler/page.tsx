@@ -54,6 +54,7 @@ import {
   formatMoneyDisplay
 } from '@/lib/supabaseService';
 import { formatExcelText, formatExcelCurrency, resolvePlateAndDocSerial } from '@/lib/excelHelper';
+import { downloadExcelSingleSheet } from '@/lib/excelExport';
 import styles from '../layout.module.css';
 
 export type SortField = 'startDate' | 'endDate' | 'customerName' | 'premium' | 'policyNo' | 'status';
@@ -810,25 +811,25 @@ export default function PolicelerPage() {
     }
   };
 
-  // Excel (CSV) İndirme (Filtrelenmiş ve Sıralanmış Poliçeler)
-  const handleExportPoliciesCSV = () => {
-    const headers = [
-      'Poliçe No',
-      'Müşteri Adı',
-      'TC / VKN',
-      'Telefon',
-      'Poliçe Türü',
-      'Sigorta Şirketi',
-      'Başlangıç Tarihi',
-      'Bitiş Tarihi',
-      'Plaka',
-      'Belge Seri No',
-      'Brüt Prim (TL)',
-      'Net Prim (TL)',
-      'Ödenen Tutar (TL)',
-      'Kalan Borç (TL)',
-      'Ödeme Durumu',
-      'Durum'
+  // Excel (.xlsx) İndirme (Filtrelenmiş ve Sıralanmış Poliçeler - Geniş Sütunlu)
+  const handleExportPoliciesCSV = async () => {
+    const columns = [
+      { header: 'Poliçe No', width: 20, align: 'center' as const },
+      { header: 'Müşteri Adı', width: 34 },
+      { header: 'TC / VKN', width: 18, align: 'center' as const },
+      { header: 'Telefon', width: 18, align: 'center' as const },
+      { header: 'Poliçe Türü', width: 22 },
+      { header: 'Sigorta Şirketi', width: 25 },
+      { header: 'Başlangıç Tarihi', width: 18, align: 'center' as const },
+      { header: 'Bitiş Tarihi', width: 18, align: 'center' as const },
+      { header: 'Plaka', width: 16, align: 'center' as const },
+      { header: 'Belge Seri No', width: 18, align: 'center' as const },
+      { header: 'Brüt Prim (TL)', width: 20, isCurrency: true },
+      { header: 'Net Prim (TL)', width: 20, isCurrency: true },
+      { header: 'Ödenen Tutar (TL)', width: 20, isCurrency: true },
+      { header: 'Kalan Borç (TL)', width: 20, isCurrency: true },
+      { header: 'Ödeme Durumu', width: 16, align: 'center' as const },
+      { header: 'Durum', width: 15, align: 'center' as const }
     ];
 
     const rows = sortedAndFilteredPolicies.map(p => {
@@ -838,33 +839,31 @@ export default function PolicelerPage() {
       const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || matchedCust?.plate, p.documentSerial || matchedCust?.documentSerial, p.notes || matchedCust?.notes);
 
       return [
-        formatExcelText(p.policyNo || p.id),
-        `"${p.customerName.replace(/"/g, '""')}"`,
-        formatExcelText(tc),
-        formatExcelText(phone),
-        `"${p.type}"`,
-        `"${p.company}"`,
-        `"${p.startDate}"`,
-        `"${p.endDate}"`,
-        formatExcelText(plate),
-        formatExcelText(docSerial),
-        `"${formatExcelCurrency(p.premium)}"`,
-        `"${formatExcelCurrency(p.netPremium || 0)}"`,
-        `"${formatExcelCurrency(p.paidAmount)}"`,
-        `"${formatExcelCurrency(p.remainingAmount || 0)}"`,
-        `"${p.paymentStatus || '-'}"`,
-        `"${p.status}"`
+        p.policyNo || p.id,
+        p.customerName,
+        tc,
+        phone,
+        p.type,
+        p.company,
+        p.startDate,
+        p.endDate,
+        plate,
+        docSerial,
+        p.premium,
+        p.netPremium || 0,
+        p.paidAmount,
+        p.remainingAmount || 0,
+        p.paymentStatus || '-',
+        p.status
       ];
     });
 
-    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Elisam_Policeler_Listesi_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    await downloadExcelSingleSheet({
+      filename: `Elisam_Policeler_Listesi_${new Date().toISOString().split('T')[0]}.xlsx`,
+      sheetName: 'Poliçe Listesi',
+      columns,
+      rows
+    });
   };
 
   // Filtrelenmiş ve Sıralanmış Poliçeler

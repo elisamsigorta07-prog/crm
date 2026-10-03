@@ -41,6 +41,7 @@ import {
   formatMoneyDisplay 
 } from '@/lib/supabaseService';
 import { formatExcelText, formatExcelCurrency, resolvePlateAndDocSerial } from '@/lib/excelHelper';
+import { downloadExcelSingleSheet } from '@/lib/excelExport';
 import styles from '../layout.module.css';
 
 // Hatırlatıcı Poliçe Ögesi Arayüzü
@@ -459,51 +460,48 @@ export default function SigortaBildirimlerPage() {
     }
   };
 
-  // Excel (CSV) İndir (Bilimsel gösterim engellenmiş, tertemiz format)
-  const handleExportCSV = () => {
-    const headers = [
-      'Poliçe No',
-      'Müşteri Adı',
-      'TC Kimlik / VKN',
-      'Telefon',
-      'Poliçe Türü',
-      'Sigorta Şirketi',
-      'Başlangıç Tarihi',
-      'Bitiş Tarihi',
-      'Kalan Gün',
-      'Aciliyet Durumu',
-      'Plaka',
-      'Belge Seri No',
-      'Net Prim (TL)',
-      'Brüt Prim (TL)'
+  // Excel (.xlsx) İndir (Geniş sütun aralıkları ve otomatik para formatlı)
+  const handleExportCSV = async () => {
+    const columns = [
+      { header: 'Poliçe No', width: 20, align: 'center' as const },
+      { header: 'Müşteri Adı', width: 34 },
+      { header: 'TC Kimlik / VKN', width: 18, align: 'center' as const },
+      { header: 'Telefon', width: 18, align: 'center' as const },
+      { header: 'Poliçe Türü', width: 22 },
+      { header: 'Sigorta Şirketi', width: 25 },
+      { header: 'Başlangıç Tarihi', width: 18, align: 'center' as const },
+      { header: 'Bitiş Tarihi', width: 18, align: 'center' as const },
+      { header: 'Kalan Gün', width: 20, align: 'center' as const },
+      { header: 'Aciliyet Durumu', width: 18, align: 'center' as const },
+      { header: 'Plaka', width: 16, align: 'center' as const },
+      { header: 'Belge Seri No', width: 18, align: 'center' as const },
+      { header: 'Net Prim (TL)', width: 20, isCurrency: true },
+      { header: 'Brüt Prim (TL)', width: 20, isCurrency: true }
     ];
 
     const rows = sortedItems.map(item => [
-      formatExcelText(item.policyNo),
-      `"${item.customerName.replace(/"/g, '""')}"`,
-      formatExcelText(item.customerTc),
-      formatExcelText(item.customerPhone),
-      `"${item.type}"`,
-      `"${item.company}"`,
-      `"${item.startDate || '-'}"`,
-      `"${item.endDate}"`,
-      `"${item.daysRemaining < 0 ? `Süresi Geçti (${Math.abs(item.daysRemaining)} gün)` : `${item.daysRemaining} gün`}"`,
-      `"${getUrgencyBadge(item.daysRemaining).label}"`,
-      formatExcelText(item.plate),
-      formatExcelText(item.documentSerial),
-      `"${item.netPremium !== undefined && item.netPremium > 0 ? formatExcelCurrency(item.netPremium) : '-'}"`,
-      `"${formatExcelCurrency(item.premium)}"`
+      item.policyNo,
+      item.customerName,
+      item.customerTc,
+      item.customerPhone,
+      item.type,
+      item.company,
+      item.startDate || '-',
+      item.endDate,
+      item.daysRemaining < 0 ? `Süresi Geçti (${Math.abs(item.daysRemaining)} gün)` : `${item.daysRemaining} gün`,
+      getUrgencyBadge(item.daysRemaining).label,
+      item.plate,
+      item.documentSerial,
+      item.netPremium !== undefined && item.netPremium > 0 ? item.netPremium : '-',
+      item.premium
     ]);
 
-
-    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Elisam_Hatirlatma_Ve_Yenileme_Listesi_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    await downloadExcelSingleSheet({
+      filename: `Elisam_Hatirlatma_Ve_Yenileme_Listesi_${new Date().toISOString().split('T')[0]}.xlsx`,
+      sheetName: 'Yenileme Hatırlatıcı',
+      columns,
+      rows
+    });
   };
 
   // Rozet Tasarımı

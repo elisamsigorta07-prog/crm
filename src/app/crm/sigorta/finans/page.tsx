@@ -46,6 +46,7 @@ import {
 } from '@/lib/supabaseService';
 import { generateModernPDF } from '@/lib/pdfReportGenerator';
 import { formatExcelText } from '@/lib/excelHelper';
+import { downloadExcelSingleSheet } from '@/lib/excelExport';
 import styles from '../layout.module.css';
 
 export default function SigortaFinansPage() {
@@ -407,28 +408,38 @@ export default function SigortaFinansPage() {
     return num.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
-  // Export to CSV / Excel
-  const handleExportCSV = () => {
-    const headers = ['Tarih', 'Vade Tarihi', 'Fiş No', 'Müşteri', 'Açıklama', 'Hareket Türü', 'Borç (TL)', 'Alacak / Alınan (TL)', 'Kalan Bakiye (TL)'];
+  // Export to Excel (.xlsx) with wide, generous column spacing
+  const handleExportCSV = async () => {
+    const columns = [
+      { header: 'İşlem Tarihi', width: 16, align: 'center' as const },
+      { header: 'Vade Tarihi', width: 16, align: 'center' as const },
+      { header: 'Fiş No', width: 18, align: 'center' as const },
+      { header: 'Müşteri', width: 34 },
+      { header: 'Açıklama', width: 38 },
+      { header: 'Hareket Türü', width: 20, align: 'center' as const },
+      { header: 'Borç (TL)', width: 20, isCurrency: true },
+      { header: 'Alacak / Alınan (TL)', width: 20, isCurrency: true },
+      { header: 'Kalan Bakiye (TL)', width: 20, isCurrency: true }
+    ];
+
     const rows = movementsWithBalance.map(m => [
-      `"${m.date}"`,
-      `"${m.dueDate || '-'}"`,
-      formatExcelText(m.receiptNo),
-      `"${m.customerName.replace(/"/g, '""')}"`,
-      `"${m.description.replace(/"/g, '""')}"`,
-      `"${m.movementType}"`,
-      `"${formatExcelCurrency(m.debitAmount)}"`,
-      `"${formatExcelCurrency(m.creditAmount)}"`,
-      `"${formatExcelCurrency(m.currentBalance)}"`
+      m.date,
+      m.dueDate || '-',
+      m.receiptNo || '-',
+      m.customerName,
+      m.description,
+      m.movementType,
+      m.debitAmount,
+      m.creditAmount,
+      m.currentBalance
     ]);
 
-    const csvContent = '\uFEFF' + [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Elisam_Cari_Hesap_Ekstresi_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
+    await downloadExcelSingleSheet({
+      filename: `Elisam_Cari_Hesap_Ekstresi_${new Date().toISOString().split('T')[0]}.xlsx`,
+      sheetName: 'Cari Hesap Ekstresi',
+      columns,
+      rows
+    });
   };
 
   // Clear all movements

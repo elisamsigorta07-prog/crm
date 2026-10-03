@@ -25,6 +25,7 @@ import {
 } from '@/lib/supabaseService';
 import { generateModernPDF } from '@/lib/pdfReportGenerator';
 import { formatExcelText, formatExcelCurrency, resolvePlateAndDocSerial } from '@/lib/excelHelper';
+import { downloadExcelSingleSheet, downloadExcelMultiSheet } from '@/lib/excelExport';
 import styles from '../layout.module.css';
 
 type ReportType = 'musteriler' | 'aktif_policeler' | 'yaklasan_policeler' | 'sirket_bazli' | 'finans_taksit';
@@ -177,66 +178,124 @@ export default function SigortaRaporlarPage() {
   };
 
   // ==========================================
-  // 1. AYLIK TOPLU EXCEL (CSV) YEDEĞİ İNDİR
+  // 1. AYLIK TOPLU EXCEL (.XLSX) YEDEĞİ İNDİR (GENİŞ SÜTUN VE TAM BOŞLUKLU)
   // ==========================================
-  const handleDownloadMonthlyExcelBackup = () => {
+  const handleDownloadMonthlyExcelBackup = async () => {
     const periodName = getPeriodLabel(backupPeriod);
     const dateStamp = new Date().toLocaleDateString('tr-TR');
+    const filePeriodSlug = backupPeriod.replace('-', '_');
 
-    let csv = `ELİSAM SİGORTA - AYLIK TAM SİSTEM YEDEĞİ & FAALİYET DÖKÜMÜ\n`;
-    csv += `Dönem:;${periodName}\n`;
-    csv += `Yedek Alma Tarihi:;${dateStamp}\n\n`;
+    // Sayfa 1: Dönem Finansal Özeti
+    const summaryColumns = [
+      { header: 'Dönem & Finansal Metrik', width: 38 },
+      { header: 'Değer / Tutar', width: 28, align: 'center' as const }
+    ];
+    const summaryRows = [
+      ['Rapor Dönemi', periodName],
+      ['Yedek Alma Tarihi', dateStamp],
+      ['Toplam Kesilen Poliçe Adedi', `${monthlyPolicies.length} Adet`],
+      ['Toplam Üretilen Net Prim', formatExcelCurrency(monthlyTotalNetPremium) + ' TL'],
+      ['Toplam Üretilen Brüt Prim', formatExcelCurrency(monthlyTotalPremium) + ' TL'],
+      ['Toplam Borç Hareketleri (Poliçe/Gider)', formatExcelCurrency(monthlyDebitTotal) + ' TL'],
+      ['Toplam Alınan (Tahsilat / Gelen Havale)', formatExcelCurrency(monthlyCreditTotal) + ' TL'],
+      ['Net Cari Bakiye', `${formatExcelCurrency(monthlyNetBalance)} TL (${monthlyNetBalance > 0 ? 'Borçlu' : 'Alacaklı'})`]
+    ];
 
-    // BÖLÜM 1: AYLIK ÖZET METRİKLERİ
-    csv += `=== 1. DÖNEM ÖZETİ VE FİNANSAL METRİKLER ===\n`;
-    csv += `Metrik;Değer\n`;
-    csv += `Toplam Kesilen Poliçe Adedi;${monthlyPolicies.length} Adet\n`;
-    csv += `Toplam Üretilen Net Prim;"${formatExcelCurrency(monthlyTotalNetPremium)} TL"\n`;
-    csv += `Toplam Üretilen Brüt Prim;"${formatExcelCurrency(monthlyTotalPremium)} TL"\n`;
-    csv += `Toplam Borç Hareketleri (Poliçe/Gider);"${formatExcelCurrency(monthlyDebitTotal)} TL"\n`;
-    csv += `Toplam Alınan (Tahsilat / Gelen Havale);"${formatExcelCurrency(monthlyCreditTotal)} TL"\n`;
-    csv += `Net Cari Bakiye;"${formatExcelCurrency(monthlyNetBalance)} TL (${monthlyNetBalance > 0 ? 'Borçlu' : 'Alacaklı'})"\n\n`;
-
-    // BÖLÜM 2: SEÇİLİ AYIN POLİÇELERİ
-    csv += `=== 2. POLİÇE ÜRETİM KAYITLARI (${monthlyPolicies.length} ADET) ===\n`;
-    csv += `Poliçe No;Müşteri Adı;TCKN / VKN;Doğum Tarihi;Telefon;Poliçe Türü;Sigorta Şirketi;Başlangıç Tarihi;Bitiş Tarihi;Plaka;Belge Seri No;Net Prim (TL);Brüt Prim (TL);Durum\n`;
-    if (monthlyPolicies.length > 0) {
-      monthlyPolicies.forEach(p => {
-        const cust = customers.find(c => c.id === p.customerId || c.name.toLowerCase() === p.customerName.toLowerCase());
-        const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (cust?.identityNo && cust.identityNo !== '-' ? cust.identityNo : '-');
-        const phone = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (cust?.phone && cust.phone !== '-' ? cust.phone : '-');
-        const birth = cust?.birthDate || '-';
-        const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
-        const netVal = p.netPremium !== undefined && p.netPremium > 0 ? formatExcelCurrency(p.netPremium) : '-';
-        csv += `${formatExcelText(p.policyNo || p.id)};"${p.customerName.replace(/"/g, '""')}";${formatExcelText(tc)};"${birth}";${formatExcelText(phone)};"${p.type}";"${p.company}";"${p.startDate}";"${p.endDate}";${formatExcelText(plate)};${formatExcelText(docSerial)};"${netVal}";"${formatExcelCurrency(p.premium)}";"${p.status}"\n`;
-      });
-    } else {
-      csv += `"(Bu dönemde kesilen poliçe bulunmamaktadır)";"";"";"";"";"";"";"";"";"";"";"";"";""\n`;
-    }
-
-    csv += `\n`;
-
-    // BÖLÜM 3: CARİ HESAP & FİNANS HAREKETLERİ
-    csv += `=== 3. CARİ HESAP & FİNANSAL HAREKETLER DEFTERİ (${monthlyMovements.length} İŞLEM) ===\n`;
-    csv += `Tarih;Vade Tarihi;Fiş No;Müşteri / Cari Adı;Açıklama;İşlem Türü;Borç (TL);Alacak (TL)\n`;
-    if (monthlyMovements.length > 0) {
-      monthlyMovements.forEach(m => {
-        csv += `"${m.date}";"${m.dueDate || '-'}";${formatExcelText(m.receiptNo)};"${m.customerName.replace(/"/g, '""')}";"${m.description.replace(/"/g, '""')}";"${m.movementType}";"${formatExcelCurrency(m.debitAmount)}";"${formatExcelCurrency(m.creditAmount)}"\n`;
-      });
-    } else {
-      csv += `"(Bu dönemde kaydedilmiş cari hareket bulunmamaktadır)";"";"";"";"";"";"";""\n`;
-    }
-    csv += `\n`;
-
-    // BÖLÜM 4: MÜŞTERİ PORTFÖYÜ
-    csv += `=== 4. KAYITLI MÜŞTERİ LİSTESİ (${customers.length} KİŞİ/KURUM) ===\n`;
-    csv += `Müşteri No;Ad Soyad / Firma Ünvanı;Müşteri Türü;TCKN / VKN;Doğum Tarihi;Telefon;E-Posta;Kayıt Tarihi\n`;
-    customers.forEach(c => {
-      csv += `${formatExcelText(c.id)};"${c.name.replace(/"/g, '""')}";"${c.type}";${formatExcelText(c.identityNo)};"${c.birthDate || '-'}";${formatExcelText(c.phone)};"${c.email || '-'}";"${c.createdAt}"\n`;
+    // Sayfa 2: Poliçe Üretim Kayıtları
+    const policyColumns = [
+      { header: 'Poliçe No', width: 20, align: 'center' as const },
+      { header: 'Müşteri Adı', width: 34 },
+      { header: 'TCKN / VKN', width: 18, align: 'center' as const },
+      { header: 'Doğum Tarihi', width: 15, align: 'center' as const },
+      { header: 'Telefon', width: 18, align: 'center' as const },
+      { header: 'Poliçe Türü', width: 22 },
+      { header: 'Sigorta Şirketi', width: 25 },
+      { header: 'Başlangıç Tarihi', width: 18, align: 'center' as const },
+      { header: 'Bitiş Tarihi', width: 18, align: 'center' as const },
+      { header: 'Plaka', width: 16, align: 'center' as const },
+      { header: 'Belge Seri No', width: 18, align: 'center' as const },
+      { header: 'Net Prim (TL)', width: 20, isCurrency: true },
+      { header: 'Brüt Prim (TL)', width: 20, isCurrency: true },
+      { header: 'Durum', width: 15, align: 'center' as const }
+    ];
+    const policyRows = monthlyPolicies.map(p => {
+      const cust = customers.find(c => c.id === p.customerId || c.name.toLowerCase() === p.customerName.toLowerCase());
+      const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (cust?.identityNo && cust.identityNo !== '-' ? cust.identityNo : '-');
+      const phone = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (cust?.phone && cust.phone !== '-' ? cust.phone : '-');
+      const birth = cust?.birthDate || '-';
+      const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
+      const netVal = p.netPremium !== undefined && p.netPremium > 0 ? p.netPremium : '-';
+      return [
+        p.policyNo || p.id,
+        p.customerName,
+        tc,
+        birth,
+        phone,
+        p.type,
+        p.company,
+        p.startDate,
+        p.endDate,
+        plate,
+        docSerial,
+        netVal,
+        p.premium,
+        p.status
+      ];
     });
 
-    const filePeriodSlug = backupPeriod.replace('-', '_');
-    downloadCSV(`Elisam_Sigorta_Aylik_Tam_Yedek_${filePeriodSlug}.csv`, csv);
+    // Sayfa 3: Cari Hareketler
+    const movementColumns = [
+      { header: 'İşlem Tarihi', width: 16, align: 'center' as const },
+      { header: 'Vade Tarihi', width: 16, align: 'center' as const },
+      { header: 'Fiş No', width: 18, align: 'center' as const },
+      { header: 'Müşteri / Cari Adı', width: 34 },
+      { header: 'Açıklama', width: 38 },
+      { header: 'İşlem Türü', width: 20, align: 'center' as const },
+      { header: 'Borç (TL)', width: 20, isCurrency: true },
+      { header: 'Alacak (TL)', width: 20, isCurrency: true }
+    ];
+    const movementRows = monthlyMovements.map(m => [
+      m.date,
+      m.dueDate || '-',
+      m.receiptNo || '-',
+      m.customerName,
+      m.description,
+      m.movementType,
+      m.debitAmount,
+      m.creditAmount
+    ]);
+
+    // Sayfa 4: Müşteri Listesi
+    const customerColumns = [
+      { header: 'Müşteri No', width: 18, align: 'center' as const },
+      { header: 'Ad Soyad / Firma Ünvanı', width: 34 },
+      { header: 'Müşteri Türü', width: 16, align: 'center' as const },
+      { header: 'TCKN / VKN', width: 18, align: 'center' as const },
+      { header: 'Doğum Tarihi', width: 16, align: 'center' as const },
+      { header: 'Telefon', width: 18, align: 'center' as const },
+      { header: 'E-Posta', width: 28 },
+      { header: 'Kayıt Tarihi', width: 16, align: 'center' as const }
+    ];
+    const customerRows = customers.map(c => [
+      c.id,
+      c.name,
+      c.type,
+      c.identityNo || '-',
+      c.birthDate || '-',
+      c.phone || '-',
+      c.email || '-',
+      c.createdAt
+    ]);
+
+    await downloadExcelMultiSheet({
+      filename: `Elisam_Sigorta_Aylik_Tam_Yedek_${filePeriodSlug}.xlsx`,
+      sheets: [
+        { sheetName: 'Dönem Özeti', columns: summaryColumns, rows: summaryRows },
+        { sheetName: 'Poliçe Kayıtları', columns: policyColumns, rows: policyRows },
+        { sheetName: 'Cari Hareketler', columns: movementColumns, rows: movementRows },
+        { sheetName: 'Müşteri Portföyü', columns: customerColumns, rows: customerRows }
+      ]
+    });
   };
 
   // ==========================================
@@ -356,8 +415,8 @@ export default function SigortaRaporlarPage() {
     downloadAnchor.remove();
   };
 
-  // Standart Tekli Rapor İndirmeleri (Tarih Aralığı ve Sıralama Destekli)
-  const handleDownloadSingleCSV = (type: ReportType) => {
+  // Standart Tekli Rapor İndirmeleri (Tarih Aralığı ve Küçükten Büyüğe Sıralı, Geniş Sütun Aralıkları ile .xlsx)
+  const handleDownloadSingleCSV = async (type: ReportType) => {
     const today = new Date().toLocaleDateString('tr-TR');
 
     const effectivePolicies = (startDate || endDate) 
@@ -381,75 +440,116 @@ export default function SigortaRaporlarPage() {
     const sortedCustomers = [...effectiveCustomers].sort((a, b) => parseDateToTimestamp(a.createdAt) - parseDateToTimestamp(b.createdAt));
 
     if (type === 'musteriler') {
-      const headers = ['Müşteri ID', 'Ad Soyad', 'Müşteri Türü', 'TC Kimlik / VKN', 'Telefon', 'E-Posta', 'Kayıt Tarihi'];
-      const rows = sortedCustomers.map(c => [
-        formatExcelText(c.id),
-        `"${c.name.replace(/"/g, '""')}"`,
-        `"${c.type}"`,
-        formatExcelText(c.identityNo),
-        formatExcelText(c.phone),
-        `"${c.email || '-'}"`,
-        `"${c.createdAt}"`
-      ]);
-      if (rows.length === 0) rows.push(['"(Kayıtlı müşteri bulunamadı)"', '""', '""', '""', '""', '""', '""']);
-      const content = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
-      downloadCSV(`elisam-musteri-listesi-${today}.csv`, content);
+      await downloadExcelSingleSheet({
+        filename: `elisam-musteri-listesi-${today}.xlsx`,
+        sheetName: 'Müşteri Listesi',
+        columns: [
+          { header: 'Müşteri ID', width: 18, align: 'center' },
+          { header: 'Ad Soyad / Firma Ünvanı', width: 34 },
+          { header: 'Müşteri Türü', width: 16, align: 'center' },
+          { header: 'TC Kimlik / VKN', width: 18, align: 'center' },
+          { header: 'Telefon', width: 18, align: 'center' },
+          { header: 'E-Posta', width: 28 },
+          { header: 'Kayıt Tarihi', width: 16, align: 'center' }
+        ],
+        rows: sortedCustomers.map(c => [
+          c.id,
+          c.name,
+          c.type,
+          c.identityNo || '-',
+          c.phone || '-',
+          c.email || '-',
+          c.createdAt
+        ])
+      });
     } else if (type === 'aktif_policeler') {
-      const headers = ['Poliçe No', 'Müşteri Adı', 'TC Kimlik / VKN', 'Doğum Tarihi', 'Telefon', 'Poliçe Türü', 'Sigorta Şirketi', 'Başlangıç Tarihi', 'Bitiş Tarihi', 'Plaka', 'Belge Seri No', 'Net Prim (TL)', 'Brüt Prim (TL)', 'Durum'];
-      const rows = sortedPolicies.map(p => {
-        const cust = customers.find(c => c.id === p.customerId || c.name.toLowerCase() === p.customerName.toLowerCase());
-        const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (cust?.identityNo && cust.identityNo !== '-' ? cust.identityNo : '-');
-        const phone = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (cust?.phone && cust.phone !== '-' ? cust.phone : '-');
-        const birth = cust?.birthDate || '-';
-        const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
-        const netVal = p.netPremium !== undefined && p.netPremium > 0 ? formatExcelCurrency(p.netPremium) : '-';
-        return [
-          formatExcelText(p.policyNo || p.id),
-          `"${p.customerName.replace(/"/g, '""')}"`,
-          formatExcelText(tc),
-          `"${birth}"`,
-          formatExcelText(phone),
-          `"${p.type}"`,
-          `"${p.company}"`,
-          `"${p.startDate}"`,
-          `"${p.endDate}"`,
-          formatExcelText(plate),
-          formatExcelText(docSerial),
-          `"${netVal}"`,
-          `"${formatExcelCurrency(p.premium)}"`,
-          `"${p.status}"`
-        ];
+      await downloadExcelSingleSheet({
+        filename: `elisam-aktif-policeler-${today}.xlsx`,
+        sheetName: 'Aktif Poliçeler',
+        columns: [
+          { header: 'Poliçe No', width: 20, align: 'center' },
+          { header: 'Müşteri Adı', width: 34 },
+          { header: 'TC Kimlik / VKN', width: 18, align: 'center' },
+          { header: 'Doğum Tarihi', width: 15, align: 'center' },
+          { header: 'Telefon', width: 18, align: 'center' },
+          { header: 'Poliçe Türü', width: 22 },
+          { header: 'Sigorta Şirketi', width: 25 },
+          { header: 'Başlangıç Tarihi', width: 18, align: 'center' },
+          { header: 'Bitiş Tarihi', width: 18, align: 'center' },
+          { header: 'Plaka', width: 16, align: 'center' },
+          { header: 'Belge Seri No', width: 18, align: 'center' },
+          { header: 'Net Prim (TL)', width: 20, isCurrency: true },
+          { header: 'Brüt Prim (TL)', width: 20, isCurrency: true },
+          { header: 'Durum', width: 15, align: 'center' }
+        ],
+        rows: sortedPolicies.map(p => {
+          const cust = customers.find(c => c.id === p.customerId || c.name.toLowerCase() === p.customerName.toLowerCase());
+          const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (cust?.identityNo && cust.identityNo !== '-' ? cust.identityNo : '-');
+          const phone = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (cust?.phone && cust.phone !== '-' ? cust.phone : '-');
+          const birth = cust?.birthDate || '-';
+          const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
+          const netVal = p.netPremium !== undefined && p.netPremium > 0 ? p.netPremium : '-';
+          return [
+            p.policyNo || p.id,
+            p.customerName,
+            tc,
+            birth,
+            phone,
+            p.type,
+            p.company,
+            p.startDate,
+            p.endDate,
+            plate,
+            docSerial,
+            netVal,
+            p.premium,
+            p.status
+          ];
+        })
       });
-      if (rows.length === 0) rows.push(['"(Seçili kriterde kayıtlı poliçe bulunamadı)"', '""', '""', '""', '""', '""', '""', '""', '""', '""', '""', '""', '""', '""']);
-      const content = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
-      downloadCSV(`elisam-aktif-policeler-${today}.csv`, content);
     } else if (type === 'yaklasan_policeler') {
-      const headers = ['Poliçe No', 'Müşteri Adı', 'TC Kimlik / VKN', 'Doğum Tarihi', 'Telefon', 'Poliçe Türü', 'Bitiş Tarihi', 'Plaka', 'Belge Seri No', 'Net Prim (TL)', 'Brüt Prim (TL)', 'Durum'];
-      const rows = sortedUpcoming.map(p => {
-        const cust = customers.find(c => c.id === p.customerId || c.name.toLowerCase() === p.customerName.toLowerCase());
-        const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (cust?.identityNo && cust.identityNo !== '-' ? cust.identityNo : '-');
-        const phone = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (cust?.phone && cust.phone !== '-' ? cust.phone : '-');
-        const birth = cust?.birthDate || '-';
-        const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
-        const netVal = p.netPremium !== undefined && p.netPremium > 0 ? formatExcelCurrency(p.netPremium) : '-';
-        return [
-          formatExcelText(p.policyNo || p.id),
-          `"${p.customerName.replace(/"/g, '""')}"`,
-          formatExcelText(tc),
-          `"${birth}"`,
-          formatExcelText(phone),
-          `"${p.type}"`,
-          `"${p.endDate}"`,
-          formatExcelText(plate),
-          formatExcelText(docSerial),
-          `"${netVal}"`,
-          `"${formatExcelCurrency(p.premium)}"`,
-          `"${p.status}"`
-        ];
+      await downloadExcelSingleSheet({
+        filename: `elisam-yaklasan-policeler-${today}.xlsx`,
+        sheetName: 'Yaklaşan Poliçeler',
+        columns: [
+          { header: 'Poliçe No', width: 20, align: 'center' },
+          { header: 'Müşteri Adı', width: 34 },
+          { header: 'TC Kimlik / VKN', width: 18, align: 'center' },
+          { header: 'Doğum Tarihi', width: 15, align: 'center' },
+          { header: 'Telefon', width: 18, align: 'center' },
+          { header: 'Poliçe Türü', width: 22 },
+          { header: 'Sigorta Şirketi', width: 25 },
+          { header: 'Bitiş Tarihi', width: 18, align: 'center' },
+          { header: 'Plaka', width: 16, align: 'center' },
+          { header: 'Belge Seri No', width: 18, align: 'center' },
+          { header: 'Net Prim (TL)', width: 20, isCurrency: true },
+          { header: 'Brüt Prim (TL)', width: 20, isCurrency: true },
+          { header: 'Durum', width: 15, align: 'center' }
+        ],
+        rows: sortedUpcoming.map(p => {
+          const cust = customers.find(c => c.id === p.customerId || c.name.toLowerCase() === p.customerName.toLowerCase());
+          const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (cust?.identityNo && cust.identityNo !== '-' ? cust.identityNo : '-');
+          const phone = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (cust?.phone && cust.phone !== '-' ? cust.phone : '-');
+          const birth = cust?.birthDate || '-';
+          const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
+          const netVal = p.netPremium !== undefined && p.netPremium > 0 ? p.netPremium : '-';
+          return [
+            p.policyNo || p.id,
+            p.customerName,
+            tc,
+            birth,
+            phone,
+            p.type,
+            p.company || '-',
+            p.endDate,
+            plate,
+            docSerial,
+            netVal,
+            p.premium,
+            p.status
+          ];
+        })
       });
-      if (rows.length === 0) rows.push(['"(Yaklaşan poliçe bulunamadı)"', '""', '""', '""', '""', '""', '""', '""', '""', '""', '""', '""']);
-      const content = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
-      downloadCSV(`elisam-yaklasan-policeler-${today}.csv`, content);
     } else if (type === 'sirket_bazli') {
       const map: Record<string, { count: number; totalGross: number; totalNet: number }> = {};
       sortedPolicies.forEach(p => {
@@ -458,31 +558,52 @@ export default function SigortaRaporlarPage() {
         map[p.company].totalGross += p.premium;
         map[p.company].totalNet += (p.netPremium && p.netPremium > 0 ? p.netPremium : 0);
       });
-      const headers = ['Sigorta Şirketi', 'Poliçe Adedi', 'Toplam Net Prim (TL)', 'Toplam Brüt Prim (TL)'];
-      const rows = Object.entries(map).map(([k, v]) => [
-        `"${k.replace(/"/g, '""')}"`,
-        `"${v.count}"`,
-        `"${formatExcelCurrency(v.totalNet)}"`,
-        `"${formatExcelCurrency(v.totalGross)}"`
-      ]);
-      if (rows.length === 0) rows.push(['"(Veri yok)"', '""', '""', '""']);
-      const content = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
-      downloadCSV(`elisam-sirket-bazli-uretim-${today}.csv`, content);
+      const totalAllGross = sortedPolicies.reduce((s, p) => s + p.premium, 0);
+
+      await downloadExcelSingleSheet({
+        filename: `elisam-sirket-bazli-uretim-${today}.xlsx`,
+        sheetName: 'Şirket Dağılımı',
+        columns: [
+          { header: 'Sigorta Şirketi', width: 28 },
+          { header: 'Poliçe Adedi', width: 16, align: 'center' },
+          { header: 'Toplam Net Prim (TL)', width: 24, isCurrency: true },
+          { header: 'Toplam Brüt Prim (TL)', width: 24, isCurrency: true },
+          { header: 'Portföy Payı (%)', width: 18, align: 'center' }
+        ],
+        rows: Object.entries(map).map(([k, v]) => [
+          k,
+          v.count,
+          v.totalNet,
+          v.totalGross,
+          totalAllGross > 0 ? `%${((v.totalGross / totalAllGross) * 100).toFixed(1)}` : '%0'
+        ])
+      });
 
     } else if (type === 'finans_taksit') {
-      const headers = ['Tarih', 'Fiş No', 'Müşteri Adı', 'Açıklama', 'Hareket Türü', 'Borç (TL)', 'Alacak (TL)'];
-      const rows = sortedMovements.map(m => [
-        `"${m.date}"`,
-        formatExcelText(m.receiptNo),
-        `"${m.customerName.replace(/"/g, '""')}"`,
-        `"${m.description.replace(/"/g, '""')}"`,
-        `"${m.movementType}"`,
-        `"${formatExcelCurrency(m.debitAmount)}"`,
-        `"${formatExcelCurrency(m.creditAmount)}"`
-      ]);
-      if (rows.length === 0) rows.push(['"(Kayıtlı cari hareket bulunamadı)"', '""', '""', '""', '""', '""', '""']);
-      const content = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
-      downloadCSV(`elisam-cari-finans-raporu-${today}.csv`, content);
+      await downloadExcelSingleSheet({
+        filename: `elisam-cari-finans-raporu-${today}.xlsx`,
+        sheetName: 'Cari Hareketler',
+        columns: [
+          { header: 'İşlem Tarihi', width: 16, align: 'center' },
+          { header: 'Vade Tarihi', width: 16, align: 'center' },
+          { header: 'Fiş No', width: 18, align: 'center' },
+          { header: 'Müşteri / Cari Adı', width: 34 },
+          { header: 'Açıklama', width: 38 },
+          { header: 'Hareket Türü', width: 20, align: 'center' },
+          { header: 'Borç (TL)', width: 20, isCurrency: true },
+          { header: 'Alacak (TL)', width: 20, isCurrency: true }
+        ],
+        rows: sortedMovements.map(m => [
+          m.date,
+          m.dueDate || '-',
+          m.receiptNo || '-',
+          m.customerName,
+          m.description,
+          m.movementType,
+          m.debitAmount,
+          m.creditAmount
+        ])
+      });
     }
   };
 
@@ -873,8 +994,8 @@ export default function SigortaRaporlarPage() {
           >
             <FileSpreadsheet size={20} />
             <div style={{ textAlign: 'left' }}>
-              <div>Excel (CSV) Olarak Aylık Yedeği İndir</div>
-              <div style={{ fontSize: '0.74rem', opacity: 0.85, fontWeight: 500 }}>Tüm Poliçeler + Müşteriler + Cari Defter</div>
+              <div>Excel (.xlsx) Olarak Aylık Yedeği İndir</div>
+              <div style={{ fontSize: '0.74rem', opacity: 0.85, fontWeight: 500 }}>Tüm Poliçeler + Müşteriler + Cari Defter (Geniş Sütunlu)</div>
             </div>
           </button>
 
