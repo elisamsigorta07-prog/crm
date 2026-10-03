@@ -82,40 +82,6 @@ export default function SigortaRaporlarPage() {
     return true;
   };
 
-  // Seçili Aylık Yedekleme Dönemine göre filtrelenmiş veriler
-  const monthlyPolicies = policies.filter(p => isDateInPeriod(p.startDate, backupPeriod));
-  const monthlyMovements = movements.filter(m => isDateInPeriod(m.date, backupPeriod));
-
-  // Aylık Finansal Özet Hesaplamaları
-  const monthlyTotalPremium = monthlyPolicies.reduce((s, p) => s + (Number(p.premium) || 0), 0);
-  const monthlyTotalNetPremium = monthlyPolicies.reduce((s, p) => s + (p.netPremium && p.netPremium > 0 ? Number(p.netPremium) : 0), 0);
-  const monthlyDebitTotal = monthlyMovements.reduce((s, m) => s + (Number(m.debitAmount) || 0), 0);
-  const monthlyCreditTotal = monthlyMovements.reduce((s, m) => s + (Number(m.creditAmount) || 0), 0);
-  const monthlyNetBalance = monthlyDebitTotal - monthlyCreditTotal;
-
-  // Dönem Başlık Formatı (Örn: "Eylül 2026")
-  const getPeriodLabel = (period: string) => {
-    if (period === 'ALL') return 'TÜM ZAMANLAR (KONSOLİDE YILLIK)';
-    const [year, month] = period.split('-');
-    const months = [
-      'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
-      'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
-    ];
-    const mIdx = parseInt(month, 10) - 1;
-    return `${months[mIdx] || month} ${year}`;
-  };
-
-  const setRange = (range: string) => {
-    setQuickRange(range);
-    const now = new Date();
-    let start = new Date();
-    if (range === 'bu_hafta') { start.setDate(now.getDate() - 7); }
-    else if (range === 'bu_ay') { start = new Date(now.getFullYear(), now.getMonth(), 1); }
-    else if (range === 'bu_yil') { start = new Date(now.getFullYear(), 0, 1); }
-    setStartDate(start.toISOString().split('T')[0]);
-    setEndDate(now.toISOString().split('T')[0]);
-  };
-
   const parseDateToTimestamp = (dateStr?: string): number => {
     if (!dateStr) return 0;
     const s = dateStr.trim();
@@ -159,6 +125,44 @@ export default function SigortaRaporlarPage() {
       if (target > e) return false;
     }
     return true;
+  };
+
+  // Seçili Aylık Yedekleme Dönemine göre filtrelenmiş ve tarihe göre küçükten büyüğe (ay başından sona doğru) sıralanmış veriler
+  const monthlyPolicies = policies
+    .filter(p => isDateInPeriod(p.startDate, backupPeriod))
+    .sort((a, b) => parseDateToTimestamp(a.startDate) - parseDateToTimestamp(b.startDate));
+  const monthlyMovements = movements
+    .filter(m => isDateInPeriod(m.date, backupPeriod))
+    .sort((a, b) => parseDateToTimestamp(a.date) - parseDateToTimestamp(b.date));
+
+  // Aylık Finansal Özet Hesaplamaları
+  const monthlyTotalPremium = monthlyPolicies.reduce((s, p) => s + (Number(p.premium) || 0), 0);
+  const monthlyTotalNetPremium = monthlyPolicies.reduce((s, p) => s + (p.netPremium && p.netPremium > 0 ? Number(p.netPremium) : 0), 0);
+  const monthlyDebitTotal = monthlyMovements.reduce((s, m) => s + (Number(m.debitAmount) || 0), 0);
+  const monthlyCreditTotal = monthlyMovements.reduce((s, m) => s + (Number(m.creditAmount) || 0), 0);
+  const monthlyNetBalance = monthlyDebitTotal - monthlyCreditTotal;
+
+  // Dönem Başlık Formatı (Örn: "Eylül 2026")
+  const getPeriodLabel = (period: string) => {
+    if (period === 'ALL') return 'TÜM ZAMANLAR (KONSOLİDE YILLIK)';
+    const [year, month] = period.split('-');
+    const months = [
+      'Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran',
+      'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'
+    ];
+    const mIdx = parseInt(month, 10) - 1;
+    return `${months[mIdx] || month} ${year}`;
+  };
+
+  const setRange = (range: string) => {
+    setQuickRange(range);
+    const now = new Date();
+    let start = new Date();
+    if (range === 'bu_hafta') { start.setDate(now.getDate() - 7); }
+    else if (range === 'bu_ay') { start = new Date(now.getFullYear(), now.getMonth(), 1); }
+    else if (range === 'bu_yil') { start = new Date(now.getFullYear(), 0, 1); }
+    setStartDate(start.toISOString().split('T')[0]);
+    setEndDate(now.toISOString().split('T')[0]);
   };
 
   const downloadCSV = (filename: string, contentString: string) => {
@@ -359,12 +363,12 @@ export default function SigortaRaporlarPage() {
     const effectivePolicies = (startDate || endDate) 
       ? policies.filter(p => isDateInRange(p.startDate, startDate, endDate))
       : policies;
-    const sortedPolicies = [...effectivePolicies].sort((a, b) => parseDateToTimestamp(b.startDate) - parseDateToTimestamp(a.startDate));
+    const sortedPolicies = [...effectivePolicies].sort((a, b) => parseDateToTimestamp(a.startDate) - parseDateToTimestamp(b.startDate));
 
     const effectiveMovements = (startDate || endDate)
       ? movements.filter(m => isDateInRange(m.date, startDate, endDate))
       : movements;
-    const sortedMovements = [...effectiveMovements].sort((a, b) => parseDateToTimestamp(b.date) - parseDateToTimestamp(a.date));
+    const sortedMovements = [...effectiveMovements].sort((a, b) => parseDateToTimestamp(a.date) - parseDateToTimestamp(b.date));
 
     const effectiveUpcoming = (startDate || endDate)
       ? policies.filter(p => (p.status === 'Yaklaşıyor' || p.status === 'Biten') && isDateInRange(p.endDate, startDate, endDate))
@@ -374,7 +378,7 @@ export default function SigortaRaporlarPage() {
     const effectiveCustomers = (startDate || endDate)
       ? customers.filter(c => isDateInRange(c.createdAt, startDate, endDate))
       : customers;
-    const sortedCustomers = (effectiveCustomers.length > 0 ? effectiveCustomers : customers);
+    const sortedCustomers = [...effectiveCustomers].sort((a, b) => parseDateToTimestamp(a.createdAt) - parseDateToTimestamp(b.createdAt));
 
     if (type === 'musteriler') {
       const headers = ['Müşteri ID', 'Ad Soyad', 'Müşteri Türü', 'TC Kimlik / VKN', 'Telefon', 'E-Posta', 'Kayıt Tarihi'];
@@ -488,12 +492,12 @@ export default function SigortaRaporlarPage() {
     const effectivePolicies = (startDate || endDate) 
       ? policies.filter(p => isDateInRange(p.startDate, startDate, endDate))
       : policies;
-    const sortedPolicies = [...effectivePolicies].sort((a, b) => parseDateToTimestamp(b.startDate) - parseDateToTimestamp(a.startDate));
+    const sortedPolicies = [...effectivePolicies].sort((a, b) => parseDateToTimestamp(a.startDate) - parseDateToTimestamp(b.startDate));
 
     const effectiveMovements = (startDate || endDate) 
       ? movements.filter(m => isDateInRange(m.date, startDate, endDate))
       : movements;
-    const sortedMovements = [...effectiveMovements].sort((a, b) => parseDateToTimestamp(b.date) - parseDateToTimestamp(a.date));
+    const sortedMovements = [...effectiveMovements].sort((a, b) => parseDateToTimestamp(a.date) - parseDateToTimestamp(b.date));
 
     const effectiveUpcoming = (startDate || endDate)
       ? policies.filter(p => (p.status === 'Yaklaşıyor' || p.status === 'Biten') && isDateInRange(p.endDate, startDate, endDate))
@@ -503,7 +507,7 @@ export default function SigortaRaporlarPage() {
     const effectiveCustomers = (startDate || endDate)
       ? customers.filter(c => isDateInRange(c.createdAt, startDate, endDate))
       : customers;
-    const sortedCustomers = (effectiveCustomers.length > 0 ? effectiveCustomers : customers);
+    const sortedCustomers = [...effectiveCustomers].sort((a, b) => parseDateToTimestamp(a.createdAt) - parseDateToTimestamp(b.createdAt));
 
     if (type === 'musteriler') {
       generateModernPDF({
