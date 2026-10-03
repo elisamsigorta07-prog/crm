@@ -1259,7 +1259,7 @@ export default function PolicelerPage() {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ backgroundColor: '#f8fafc' }}>
+              <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
                 <th 
                   onClick={() => handleSort('policyNo')}
                   style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: sortField === 'policyNo' ? '#1d4ed8' : '#64748b', borderBottom: '1px solid #e2e8f0', cursor: 'pointer', userSelect: 'none' }}
