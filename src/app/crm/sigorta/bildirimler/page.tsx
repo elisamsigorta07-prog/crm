@@ -40,7 +40,7 @@ import {
   normalizeMoney,
   formatMoneyDisplay 
 } from '@/lib/supabaseService';
-import { formatExcelText, formatExcelCurrency, resolvePlateAndDocSerial } from '@/lib/excelHelper';
+import { formatExcelText, formatExcelCurrency, resolvePlateAndDocSerial, extractReferenceFromNotes } from '@/lib/excelHelper';
 import { downloadExcelSingleSheet } from '@/lib/excelExport';
 import styles from '../layout.module.css';
 
@@ -467,6 +467,7 @@ export default function SigortaBildirimlerPage() {
       { header: 'Müşteri Adı', width: 34 },
       { header: 'TC Kimlik / VKN', width: 18, align: 'center' as const },
       { header: 'Telefon', width: 18, align: 'center' as const },
+      { header: 'Referans', width: 28 },
       { header: 'Poliçe Türü', width: 22 },
       { header: 'Sigorta Şirketi', width: 25 },
       { header: 'Başlangıç Tarihi', width: 18, align: 'center' as const },
@@ -484,6 +485,7 @@ export default function SigortaBildirimlerPage() {
       item.customerName,
       item.customerTc,
       item.customerPhone,
+      extractReferenceFromNotes(item.notes),
       item.type,
       item.company,
       item.startDate || '-',
@@ -1110,6 +1112,17 @@ export default function SigortaBildirimlerPage() {
                           <span>📞 {item.customerPhone}</span>
                           {item.customerTc && item.customerTc !== '-' && <span>• TC: {item.customerTc}</span>}
                         </div>
+                        {(() => {
+                          const ref = extractReferenceFromNotes(item.notes);
+                          if (ref === '-') return null;
+                          return (
+                            <div style={{ marginTop: '3px' }}>
+                              <span style={{ fontSize: '0.74rem', color: '#4338ca', backgroundColor: '#eef2ff', border: '1px solid #c7d2fe', padding: '1px 6px', borderRadius: '4px', fontWeight: 650 }}>
+                                🏷️ Ref: {ref}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Poliçe No & Şirket */}

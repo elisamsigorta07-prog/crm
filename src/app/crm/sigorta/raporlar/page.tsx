@@ -24,7 +24,7 @@ import {
   fetchCariMovementsFromCloud 
 } from '@/lib/supabaseService';
 import { generateModernPDF } from '@/lib/pdfReportGenerator';
-import { formatExcelText, formatExcelCurrency, resolvePlateAndDocSerial } from '@/lib/excelHelper';
+import { formatExcelText, formatExcelCurrency, resolvePlateAndDocSerial, extractReferenceFromNotes } from '@/lib/excelHelper';
 import { downloadExcelSingleSheet, downloadExcelMultiSheet } from '@/lib/excelExport';
 import styles from '../layout.module.css';
 
@@ -208,6 +208,7 @@ export default function SigortaRaporlarPage() {
       { header: 'TCKN / VKN', width: 18, align: 'center' as const },
       { header: 'Doğum Tarihi', width: 15, align: 'center' as const },
       { header: 'Telefon', width: 18, align: 'center' as const },
+      { header: 'Referans', width: 28 },
       { header: 'Poliçe Türü', width: 22 },
       { header: 'Sigorta Şirketi', width: 25 },
       { header: 'Başlangıç Tarihi', width: 18, align: 'center' as const },
@@ -225,12 +226,14 @@ export default function SigortaRaporlarPage() {
       const birth = cust?.birthDate || '-';
       const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
       const netVal = p.netPremium !== undefined && p.netPremium > 0 ? p.netPremium : '-';
+      const refVal = extractReferenceFromNotes(p.notes || cust?.notes);
       return [
         p.policyNo || p.id,
         p.customerName,
         tc,
         birth,
         phone,
+        refVal,
         p.type,
         p.company,
         p.startDate,
@@ -273,6 +276,7 @@ export default function SigortaRaporlarPage() {
       { header: 'TCKN / VKN', width: 18, align: 'center' as const },
       { header: 'Doğum Tarihi', width: 16, align: 'center' as const },
       { header: 'Telefon', width: 18, align: 'center' as const },
+      { header: 'Referans', width: 28 },
       { header: 'E-Posta', width: 28 },
       { header: 'Kayıt Tarihi', width: 16, align: 'center' as const }
     ];
@@ -283,6 +287,7 @@ export default function SigortaRaporlarPage() {
       c.identityNo || '-',
       c.birthDate || '-',
       c.phone || '-',
+      extractReferenceFromNotes(c.notes),
       c.email || '-',
       c.createdAt
     ]);
@@ -449,6 +454,7 @@ export default function SigortaRaporlarPage() {
           { header: 'Müşteri Türü', width: 16, align: 'center' },
           { header: 'TC Kimlik / VKN', width: 18, align: 'center' },
           { header: 'Telefon', width: 18, align: 'center' },
+          { header: 'Referans', width: 28 },
           { header: 'E-Posta', width: 28 },
           { header: 'Kayıt Tarihi', width: 16, align: 'center' }
         ],
@@ -458,6 +464,7 @@ export default function SigortaRaporlarPage() {
           c.type,
           c.identityNo || '-',
           c.phone || '-',
+          extractReferenceFromNotes(c.notes),
           c.email || '-',
           c.createdAt
         ])
@@ -472,6 +479,7 @@ export default function SigortaRaporlarPage() {
           { header: 'TC Kimlik / VKN', width: 18, align: 'center' },
           { header: 'Doğum Tarihi', width: 15, align: 'center' },
           { header: 'Telefon', width: 18, align: 'center' },
+          { header: 'Referans', width: 28 },
           { header: 'Poliçe Türü', width: 22 },
           { header: 'Sigorta Şirketi', width: 25 },
           { header: 'Başlangıç Tarihi', width: 18, align: 'center' },
@@ -489,12 +497,14 @@ export default function SigortaRaporlarPage() {
           const birth = cust?.birthDate || '-';
           const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
           const netVal = p.netPremium !== undefined && p.netPremium > 0 ? p.netPremium : '-';
+          const refVal = extractReferenceFromNotes(p.notes || cust?.notes);
           return [
             p.policyNo || p.id,
             p.customerName,
             tc,
             birth,
             phone,
+            refVal,
             p.type,
             p.company,
             p.startDate,
@@ -517,6 +527,7 @@ export default function SigortaRaporlarPage() {
           { header: 'TC Kimlik / VKN', width: 18, align: 'center' },
           { header: 'Doğum Tarihi', width: 15, align: 'center' },
           { header: 'Telefon', width: 18, align: 'center' },
+          { header: 'Referans', width: 28 },
           { header: 'Poliçe Türü', width: 22 },
           { header: 'Sigorta Şirketi', width: 25 },
           { header: 'Bitiş Tarihi', width: 18, align: 'center' },
@@ -533,12 +544,14 @@ export default function SigortaRaporlarPage() {
           const birth = cust?.birthDate || '-';
           const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
           const netVal = p.netPremium !== undefined && p.netPremium > 0 ? p.netPremium : '-';
+          const refVal = extractReferenceFromNotes(p.notes || cust?.notes);
           return [
             p.policyNo || p.id,
             p.customerName,
             tc,
             birth,
             phone,
+            refVal,
             p.type,
             p.company || '-',
             p.endDate,

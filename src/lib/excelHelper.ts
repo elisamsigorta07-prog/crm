@@ -148,3 +148,35 @@ export function resolvePlateAndDocSerial(
   };
 }
 
+/**
+ * Notlar alanından temiz referans bilgisini çıkartır.
+ * Sistem tarafından otomatik eklenen genel şablon metinleri ("Yeni poliçe kaydı." vb.)
+ * referans olarak görünmesin diye temizlenir.
+ */
+export function extractReferenceFromNotes(notes?: string | null): string {
+  if (!notes) return '-';
+  const trimmed = notes.trim();
+  if (!trimmed || trimmed === '-') return '-';
+
+  const systemPlaceholders = [
+    'yeni poliçe kaydı.',
+    'yeni poliçe kaydı',
+    'poliçe kesimi ile otomatik oluşturuldu.',
+    'poliçe kesimi ile otomatik oluşturuldu',
+    'poliçe kesimi ile otomatik kaydedildi.',
+    'poliçe kesimi ile otomatik kaydedildi',
+    'kayıtlı özel not bulunmuyor.',
+    'kayıtlı özel not bulunmuyor',
+    'cari hareket ile otomatik tanımlandı.',
+    'cari hareket ile otomatik tanımlandı',
+    'poliçe kesiminde tahsil edildi.',
+    'poliçe kesiminde tahsil edildi'
+  ];
+
+  if (systemPlaceholders.includes(trimmed.toLowerCase())) {
+    return '-';
+  }
+
+  // Notlar içinde birden fazla satır varsa tek satırda temiz göster (Excel hücre düzeni için)
+  return trimmed.replace(/[\r\n]+/g, ' ');
+}

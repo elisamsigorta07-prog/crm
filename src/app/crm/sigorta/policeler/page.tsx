@@ -53,7 +53,7 @@ import {
   formatMoneyInput,
   formatMoneyDisplay
 } from '@/lib/supabaseService';
-import { formatExcelText, formatExcelCurrency, resolvePlateAndDocSerial } from '@/lib/excelHelper';
+import { formatExcelText, formatExcelCurrency, resolvePlateAndDocSerial, extractReferenceFromNotes } from '@/lib/excelHelper';
 import { downloadExcelSingleSheet } from '@/lib/excelExport';
 import styles from '../layout.module.css';
 
@@ -612,7 +612,7 @@ export default function PolicelerPage() {
       vehicleModelYear: vehicleModelYear || undefined,
       vehicleRegistrationDate: vehicleRegistrationDate || undefined,
       vehicleValue: vehicleValue || undefined,
-      notes: notes || 'Yeni poliçe kaydı.'
+      notes: notes ? notes.trim() : ''
     };
 
     if (editingPolicy) {
@@ -818,14 +818,15 @@ export default function PolicelerPage() {
       { header: 'Müşteri Adı', width: 34 },
       { header: 'TC / VKN', width: 18, align: 'center' as const },
       { header: 'Telefon', width: 18, align: 'center' as const },
+      { header: 'Referans', width: 28 },
       { header: 'Poliçe Türü', width: 22 },
       { header: 'Sigorta Şirketi', width: 25 },
       { header: 'Başlangıç Tarihi', width: 18, align: 'center' as const },
       { header: 'Bitiş Tarihi', width: 18, align: 'center' as const },
       { header: 'Plaka', width: 16, align: 'center' as const },
       { header: 'Belge Seri No', width: 18, align: 'center' as const },
-      { header: 'Brüt Prim (TL)', width: 20, isCurrency: true },
       { header: 'Net Prim (TL)', width: 20, isCurrency: true },
+      { header: 'Brüt Prim (TL)', width: 20, isCurrency: true },
       { header: 'Ödenen Tutar (TL)', width: 20, isCurrency: true },
       { header: 'Kalan Borç (TL)', width: 20, isCurrency: true },
       { header: 'Ödeme Durumu', width: 16, align: 'center' as const },
@@ -837,12 +838,14 @@ export default function PolicelerPage() {
       const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (matchedCust?.identityNo || '-');
       const phone = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (matchedCust?.phone || '-');
       const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || matchedCust?.plate, p.documentSerial || matchedCust?.documentSerial, p.notes || matchedCust?.notes);
+      const refNotes = extractReferenceFromNotes(p.notes || matchedCust?.notes);
 
       return [
         p.policyNo || p.id,
         p.customerName,
         tc,
         phone,
+        refNotes,
         p.type,
         p.company,
         p.startDate,
@@ -1366,6 +1369,17 @@ export default function PolicelerPage() {
                         <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '2px' }}>
                           📞 {pol.customerPhone || '-'} {pol.customerTc && pol.customerTc !== '-' && `• TC: ${pol.customerTc}`}
                         </div>
+                        {(() => {
+                          const ref = extractReferenceFromNotes(pol.notes || matchedCust?.notes);
+                          if (ref === '-') return null;
+                          return (
+                            <div style={{ marginTop: '3px' }}>
+                              <span style={{ fontSize: '0.74rem', color: '#4338ca', backgroundColor: '#eef2ff', border: '1px solid #c7d2fe', padding: '1px 6px', borderRadius: '4px', fontWeight: 650 }}>
+                                🏷️ Ref: {ref}
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Tür & Şirket */}
@@ -2043,14 +2057,16 @@ export default function PolicelerPage() {
                 </div>
               </div>
 
-              {/* KART 4: NOTLAR */}
+              {/* KART 4: REFERANS & NOTLAR */}
               <div style={{ marginBottom: '22px' }}>
-                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Poliçe & Müşteri Notları (Teklif / Araç Dökümü)</label>
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '4px' }}>
+                  🏷️ Referans & Poliçe Notları <span style={{ fontSize: '0.74rem', color: '#6366f1', fontWeight: 500 }}>(Excel'de Referans sütununda görünür)</span>
+                </label>
                 <textarea 
                   value={notes} 
                   onChange={(e) => setNotes(e.target.value)} 
-                  placeholder="Teklif, araç detayları veya poliçeye dair özel açıklamalar..." 
-                  rows={5} 
+                  placeholder="Müşteriyi getiren referans (Örn: Ahmet Bey, Ali Vural referansı), teklif veya poliçeye dair özel açıklamalar..." 
+                  rows={4} 
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.86rem', lineHeight: 1.5, fontFamily: 'inherit' }}
                 />
               </div>
