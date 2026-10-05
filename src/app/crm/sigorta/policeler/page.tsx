@@ -162,6 +162,7 @@ export default function PolicelerPage() {
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerBirthDate, setCustomerBirthDate] = useState('');
   const [customerAddress, setCustomerAddress] = useState('');
+  const [reference, setReference] = useState('');
 
   // Form State - Poliçe Bilgileri
   const [policyNo, setPolicyNo] = useState('');
@@ -241,6 +242,7 @@ export default function PolicelerPage() {
     setCustomerEmail('');
     setCustomerBirthDate('');
     setCustomerAddress('');
+    setReference('');
     setPolicyNo('');
     setType('Trafik');
     setCustomType('');
@@ -291,6 +293,9 @@ export default function PolicelerPage() {
       setCustomerAddress(matchedCust.address || '');
     }
 
+    const initialRef = pol.reference || matchedCust?.reference || (extractReferenceFromNotes(pol.notes || matchedCust?.notes) !== '-' ? extractReferenceFromNotes(pol.notes || matchedCust?.notes) : '');
+    setReference(initialRef);
+
     setPlate(pol.plate || matchedCust?.plate || '');
     setDocumentSerial(pol.documentSerial || matchedCust?.documentSerial || '');
     setVehicleUsage(pol.vehicleUsage || matchedCust?.vehicleUsage || '');
@@ -326,6 +331,7 @@ export default function PolicelerPage() {
       setCustomerEmail('');
       setCustomerBirthDate('');
       setCustomerAddress('');
+      setReference('');
       return;
     }
     const found = customers.find(c => c.id === cId);
@@ -337,6 +343,8 @@ export default function PolicelerPage() {
       setCustomerEmail(found.email === '-' ? '' : found.email);
       setCustomerBirthDate(found.birthDate || '');
       setCustomerAddress(found.address || '');
+      const foundRef = found.reference || (extractReferenceFromNotes(found.notes) !== '-' ? extractReferenceFromNotes(found.notes) : '');
+      if (foundRef) setReference(foundRef);
       if (found.plate) setPlate(found.plate);
       if (found.documentSerial) setDocumentSerial(found.documentSerial);
       if (found.vehicleUsage) setVehicleUsage(found.vehicleUsage);
@@ -402,6 +410,10 @@ export default function PolicelerPage() {
     const parsedPhone = extract(/(?:Telefon|Tel|Gsm|Cep):\s*(.*)/i);
     if (parsedPhone) setCustomerPhone(parsedPhone);
     else if (!customerPhone) setCustomerPhone('05-- --- -- --');
+
+    // 4.1. Referans
+    const parsedRef = extract(/(?:Referans|Ref|Tavsiye\s*Eden|Aracı):\s*(.*)/i);
+    if (parsedRef) setReference(parsedRef);
 
     // 5. Poliçe Numarası
     const parsedPolicyNo = extract(/(?:Poliçe\s*(?:No|Numarası)):\s*(.*)/i);
@@ -539,6 +551,7 @@ export default function PolicelerPage() {
         identityNo: customerTc || existingCust.identityNo,
         birthDate: customerBirthDate || existingCust.birthDate,
         address: customerAddress || existingCust.address,
+        reference: reference ? reference.trim() : existingCust.reference,
         policyNo: finalPolicyNo,
         insuranceType: finalType,
         policyStartDate: startDate,
@@ -563,7 +576,8 @@ export default function PolicelerPage() {
         identityNo: customerTc || '-',
         address: customerAddress || 'Alanya / Antalya',
         birthDate: customerBirthDate || undefined,
-        notes: notes || 'Poliçe kesimi ile otomatik kaydedildi.',
+        reference: reference ? reference.trim() : undefined,
+        notes: notes ? notes.trim() : '',
         createdAt: new Date().toLocaleDateString('tr-TR'),
         policyNo: finalPolicyNo,
         insuranceType: finalType,
@@ -591,6 +605,7 @@ export default function PolicelerPage() {
       customerName,
       customerPhone: customerPhone || '-',
       customerTc: customerTc || '-',
+      reference: reference ? reference.trim() : undefined,
       type: finalType,
       company: finalCompany,
       startDate: startDate ? new Date(startDate).toLocaleDateString('tr-TR') : new Date().toLocaleDateString('tr-TR'),
@@ -838,7 +853,7 @@ export default function PolicelerPage() {
       const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (matchedCust?.identityNo || '-');
       const phone = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (matchedCust?.phone || '-');
       const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || matchedCust?.plate, p.documentSerial || matchedCust?.documentSerial, p.notes || matchedCust?.notes);
-      const refNotes = extractReferenceFromNotes(p.notes || matchedCust?.notes);
+      const refNotes = p.reference || matchedCust?.reference || extractReferenceFromNotes(p.notes || matchedCust?.notes);
 
       return [
         p.policyNo || p.id,
@@ -879,7 +894,8 @@ export default function PolicelerPage() {
         (p.customerPhone && p.customerPhone.includes(term)) ||
         (p.customerTc && p.customerTc.includes(term)) ||
         p.company.toLowerCase().includes(term) ||
-        p.type.toLowerCase().includes(term);
+        p.type.toLowerCase().includes(term) ||
+        (p.reference && p.reference.toLowerCase().includes(term));
       
       let matchesTab = true;
       if (activeTab === 'Aktifler') matchesTab = p.status === 'Aktif';
@@ -1285,6 +1301,8 @@ export default function PolicelerPage() {
                   </div>
                 </th>
 
+                <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Referans</th>
+
                 <th style={{ textAlign: 'left', padding: '14px 16px', fontSize: '0.82rem', fontWeight: 700, color: '#64748b', borderBottom: '1px solid #e2e8f0' }}>Sigorta Türü / Şirket</th>
 
                 <th 
@@ -1369,28 +1387,33 @@ export default function PolicelerPage() {
                         <div style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '2px' }}>
                           📞 {pol.customerPhone || '-'} {pol.customerTc && pol.customerTc !== '-' && `• TC: ${pol.customerTc}`}
                         </div>
+                      </td>
+
+                      {/* Referans Sütunu */}
+                      <td style={{ padding: '14px 16px' }}>
                         {(() => {
-                          const ref = extractReferenceFromNotes(pol.notes || matchedCust?.notes);
-                          if (ref === '-') return null;
+                          const refVal = pol.reference || matchedCust?.reference || extractReferenceFromNotes(pol.notes || matchedCust?.notes);
+                          if (!refVal || refVal === '-') {
+                            return <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>-</span>;
+                          }
                           return (
-                            <div style={{ marginTop: '5px' }}>
-                              <span style={{ 
-                                display: 'inline-block',
-                                fontSize: '0.78rem', 
-                                color: '#3730a3', 
-                                backgroundColor: '#eef2ff', 
-                                border: '1px solid #c7d2fe', 
-                                padding: '4px 10px', 
-                                borderRadius: '6px', 
-                                fontWeight: 650,
-                                lineHeight: '1.45',
-                                whiteSpace: 'pre-line',
-                                wordBreak: 'break-word',
-                                maxWidth: '100%'
-                              }}>
-                                🏷️ Ref: {ref}
-                              </span>
-                            </div>
+                            <span style={{ 
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              fontSize: '0.82rem', 
+                              color: '#1e40af', 
+                              backgroundColor: '#eff6ff', 
+                              border: '1px solid #bfdbfe', 
+                              padding: '4px 10px', 
+                              borderRadius: '6px', 
+                              fontWeight: 700,
+                              lineHeight: '1.4',
+                              whiteSpace: 'pre-line',
+                              wordBreak: 'break-word',
+                              maxWidth: '220px'
+                            }}>
+                              🏷️ {refVal}
+                            </span>
                           );
                         })()}
                       </td>
@@ -1552,7 +1575,7 @@ export default function PolicelerPage() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={9} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                  <td colSpan={10} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
                     Kayıtlı veya filtreye uyan poliçe bulunamadı. &ldquo;Yeni Poliçe Kes (Müşteri & Poliçe)&rdquo; butonundan hem müşterinizi kaydedip hem poliçenizi kesebilirsiniz.
                   </td>
                 </tr>
@@ -1825,15 +1848,38 @@ export default function PolicelerPage() {
                   </div>
                 </div>
 
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Adres & İletişim Notu</label>
-                  <input 
-                    type="text" 
-                    value={customerAddress} 
-                    onChange={(e) => setCustomerAddress(e.target.value)} 
-                    placeholder="Mahmutlar Mah. Alanya / Antalya" 
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }} 
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 750, color: '#1d4ed8', marginBottom: '4px' }}>
+                      🏷️ Referans (Referans Olan Kişi / Firma / Aracı)
+                    </label>
+                    <input 
+                      type="text" 
+                      value={reference} 
+                      onChange={(e) => setReference(e.target.value)} 
+                      placeholder="Örn: Burak Çelik, Ahmet Bey, Galeri Ali..." 
+                      style={{ 
+                        width: '100%', 
+                        padding: '9px 12px', 
+                        borderRadius: '8px', 
+                        border: '1.5px solid #93c5fd', 
+                        backgroundColor: '#f0f7ff', 
+                        fontWeight: 700, 
+                        color: '#1e3a8a', 
+                        outline: 'none' 
+                      }} 
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, color: '#475569', marginBottom: '4px' }}>Adres & İletişim Notu</label>
+                    <input 
+                      type="text" 
+                      value={customerAddress} 
+                      onChange={(e) => setCustomerAddress(e.target.value)} 
+                      placeholder="Mahmutlar Mah. Alanya / Antalya" 
+                      style={{ width: '100%', padding: '9px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none' }} 
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -2070,16 +2116,16 @@ export default function PolicelerPage() {
                 </div>
               </div>
 
-              {/* KART 4: REFERANS & NOTLAR */}
+              {/* KART 4: NOTLAR */}
               <div style={{ marginBottom: '22px' }}>
                 <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 700, color: '#1e293b', marginBottom: '4px' }}>
-                  🏷️ Referans & Poliçe Notları <span style={{ fontSize: '0.74rem', color: '#6366f1', fontWeight: 500 }}>(Excel'de Referans sütununda görünür)</span>
+                  📝 Ek Poliçe Notları & Açıklamalar
                 </label>
                 <textarea 
                   value={notes} 
                   onChange={(e) => setNotes(e.target.value)} 
-                  placeholder="Müşteriyi getiren referans (Örn: Ahmet Bey, Ali Vural referansı), teklif veya poliçeye dair özel açıklamalar..." 
-                  rows={4} 
+                  placeholder="Teklif veya poliçeye dair ek özel notlar..." 
+                  rows={3} 
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', outline: 'none', fontSize: '0.86rem', lineHeight: 1.5, fontFamily: 'inherit' }}
                 />
               </div>
@@ -2149,6 +2195,18 @@ export default function PolicelerPage() {
                 <div style={{ fontWeight: 800, color: '#0f172a', fontSize: '1rem' }}>{selectedPolicy.customerName}</div>
                 <div style={{ fontSize: '0.84rem', color: '#475569', marginTop: '4px' }}>📞 {selectedPolicy.customerPhone || '-'}</div>
                 {selectedPolicy.customerTc && <div style={{ fontSize: '0.84rem', color: '#475569' }}>🆔 TC/VKN: {selectedPolicy.customerTc}</div>}
+                {(() => {
+                  const matchedCustomer = customers.find(c => c.id === selectedPolicy.customerId || c.name === selectedPolicy.customerName);
+                  const ref = selectedPolicy.reference || matchedCustomer?.reference || extractReferenceFromNotes(selectedPolicy.notes || matchedCustomer?.notes);
+                  if (!ref || ref === '-') return null;
+                  return (
+                    <div style={{ marginTop: '6px' }}>
+                      <span style={{ fontSize: '0.78rem', color: '#1e40af', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>
+                        🏷️ Referans: {ref}
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div style={{ padding: '14px', backgroundColor: '#f0f9ff', borderRadius: '10px', border: '1px solid #bae6fd' }}>

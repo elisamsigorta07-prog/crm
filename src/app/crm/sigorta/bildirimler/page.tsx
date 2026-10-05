@@ -64,6 +64,7 @@ export interface RenewalItem {
   urgency: 'expired' | 'today' | 'critical' | 'week' | 'twoWeeks' | 'month' | 'future';
   status: string;
   source: 'policy' | 'customer';
+  reference?: string;
   notes?: string;
 }
 
@@ -196,6 +197,7 @@ export default function SigortaBildirimlerPage() {
         urgency,
         status: p.status || 'Aktif',
         source: 'policy',
+        reference: p.reference || (p.notes && extractReferenceFromNotes(p.notes) !== '-' ? extractReferenceFromNotes(p.notes) : undefined),
         notes: p.notes
       };
 
@@ -242,6 +244,7 @@ export default function SigortaBildirimlerPage() {
           urgency,
           status: daysRemaining < 0 ? 'Biten' : 'Yaklaşıyor',
           source: 'customer',
+          reference: c.reference || (c.notes && extractReferenceFromNotes(c.notes) !== '-' ? extractReferenceFromNotes(c.notes) : undefined),
           notes: c.notes
         });
       }
@@ -485,7 +488,7 @@ export default function SigortaBildirimlerPage() {
       item.customerName,
       item.customerTc,
       item.customerPhone,
-      extractReferenceFromNotes(item.notes),
+      item.reference || extractReferenceFromNotes(item.notes),
       item.type,
       item.company,
       item.startDate || '-',
@@ -1113,8 +1116,8 @@ export default function SigortaBildirimlerPage() {
                           {item.customerTc && item.customerTc !== '-' && <span>• TC: {item.customerTc}</span>}
                         </div>
                         {(() => {
-                          const ref = extractReferenceFromNotes(item.notes);
-                          if (ref === '-') return null;
+                          const ref = item.reference || extractReferenceFromNotes(item.notes);
+                          if (!ref || ref === '-') return null;
                           return (
                             <div style={{ marginTop: '5px' }}>
                               <span style={{ 

@@ -1,7 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { Customer, Policy } from '@/data/crmData';
 import { RentCustomer, RentalBooking, RentVehicle } from '@/data/rentCrmData';
-import { resolvePlateAndDocSerial } from './excelHelper';
+import { resolvePlateAndDocSerial, extractReferenceFromNotes } from './excelHelper';
 
 export interface CariMovement {
   id: string;
@@ -75,6 +75,7 @@ export async function fetchCustomersFromCloud(): Promise<Customer[]> {
           email: c.email || local?.email || '-',
           address: c.address || local?.address || 'Alanya / Antalya',
           birthDate: c.birth_date || c.birthDate || local?.birthDate || undefined,
+          reference: c.reference || local?.reference || (rawNotes && extractReferenceFromNotes(rawNotes) !== '-' ? extractReferenceFromNotes(rawNotes) : undefined),
           notes: rawNotes || undefined,
           createdAt: c.created_at ? new Date(c.created_at).toLocaleDateString('tr-TR') : (local?.createdAt || new Date().toLocaleDateString('tr-TR')),
           policyNo: c.policy_no || c.policyNo || local?.policyNo || undefined,
@@ -116,6 +117,9 @@ export async function upsertCustomerToCloud(customer: Customer): Promise<void> {
   if (!isSupabaseConfigured()) return;
   try {
     let customerNotes = customer.notes || '';
+    if (customer.reference && !customerNotes.toLowerCase().includes('referans:') && !customerNotes.toLowerCase().includes('ref:')) {
+      customerNotes = (customerNotes ? customerNotes + '\n' : '') + `Referans: ${customer.reference}`;
+    }
     if (customer.documentSerial && !customerNotes.toLowerCase().includes('belge seri') && !customerNotes.toLowerCase().includes('ruhsat seri')) {
       customerNotes = (customerNotes ? customerNotes + '\n' : '') + `Belge Seri: ${customer.documentSerial}`;
     }
@@ -137,6 +141,7 @@ export async function upsertCustomerToCloud(customer: Customer): Promise<void> {
 
     const extendedRow: any = {
       ...baseRow,
+      ...(customer.reference ? { reference: customer.reference } : {}),
       ...(customer.plate ? { plate: customer.plate } : {}),
       ...(customer.documentSerial ? { document_serial: customer.documentSerial } : {}),
       ...(customer.policyNo ? { policy_no: customer.policyNo } : {}),
@@ -381,6 +386,7 @@ export async function fetchPoliciesFromCloud(): Promise<Policy[]> {
           vehicleModelYear: vYear,
           vehicleRegistrationDate: vReg,
           vehicleValue: vVal,
+          reference: p.reference || local?.reference || (rawNotes && extractReferenceFromNotes(rawNotes) !== '-' ? extractReferenceFromNotes(rawNotes) : undefined),
           notes: rawNotes || undefined
         };
       });
@@ -427,6 +433,9 @@ export async function upsertPolicyToCloud(policy: Policy): Promise<void> {
   if (!isSupabaseConfigured()) return;
   try {
     let policyNotes = sanitizedPolicy.notes || '';
+    if (sanitizedPolicy.reference && !policyNotes.toLowerCase().includes('referans:') && !policyNotes.toLowerCase().includes('ref:')) {
+      policyNotes = (policyNotes ? policyNotes + '\n' : '') + `Referans: ${sanitizedPolicy.reference}`;
+    }
     if (sanitizedPolicy.documentSerial && !policyNotes.toLowerCase().includes('belge seri') && !policyNotes.toLowerCase().includes('ruhsat seri')) {
       policyNotes = (policyNotes ? policyNotes + '\n' : '') + `Belge Seri: ${sanitizedPolicy.documentSerial}`;
     }
@@ -467,6 +476,7 @@ export async function upsertPolicyToCloud(policy: Policy): Promise<void> {
     // Try with document_serial and vehicle columns if they exist in Supabase
     const extendedRow: any = {
       ...baseRow,
+      ...(sanitizedPolicy.reference ? { reference: sanitizedPolicy.reference } : {}),
       ...(sanitizedPolicy.netPremium !== undefined ? { net_premium: sanitizedPolicy.netPremium } : {}),
       ...(sanitizedPolicy.documentSerial ? { document_serial: sanitizedPolicy.documentSerial } : {}),
       ...(sanitizedPolicy.vehicleUsage ? { vehicle_usage: sanitizedPolicy.vehicleUsage } : {}),

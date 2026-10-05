@@ -15,6 +15,7 @@ export interface Customer {
   email: string;
   address: string;
   birthDate?: string;  // Doğum Tarihi
+  reference?: string;  // Referans olan kişi / firma / aracı bilgisi
   notes?: string;
   createdAt: string;
   // Araç ve Sigorta bilgileri
@@ -39,6 +40,7 @@ export interface Policy {
   customerName: string;
   customerPhone?: string;
   customerTc?: string;
+  reference?: string; // Referans olan kişi / firma / aracı bilgisi
   type: string;
   company: string;
   startDate: string;

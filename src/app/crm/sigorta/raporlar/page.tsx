@@ -226,7 +226,7 @@ export default function SigortaRaporlarPage() {
       const birth = cust?.birthDate || '-';
       const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
       const netVal = p.netPremium !== undefined && p.netPremium > 0 ? p.netPremium : '-';
-      const refVal = extractReferenceFromNotes(p.notes || cust?.notes);
+      const refVal = p.reference || cust?.reference || extractReferenceFromNotes(p.notes || cust?.notes);
       return [
         p.policyNo || p.id,
         p.customerName,
@@ -287,7 +287,7 @@ export default function SigortaRaporlarPage() {
       c.identityNo || '-',
       c.birthDate || '-',
       c.phone || '-',
-      extractReferenceFromNotes(c.notes),
+      c.reference || extractReferenceFromNotes(c.notes),
       c.email || '-',
       c.createdAt
     ]);
@@ -464,7 +464,7 @@ export default function SigortaRaporlarPage() {
           c.type,
           c.identityNo || '-',
           c.phone || '-',
-          extractReferenceFromNotes(c.notes),
+          c.reference || extractReferenceFromNotes(c.notes),
           c.email || '-',
           c.createdAt
         ])
@@ -497,7 +497,7 @@ export default function SigortaRaporlarPage() {
           const birth = cust?.birthDate || '-';
           const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
           const netVal = p.netPremium !== undefined && p.netPremium > 0 ? p.netPremium : '-';
-          const refVal = extractReferenceFromNotes(p.notes || cust?.notes);
+          const refVal = p.reference || cust?.reference || extractReferenceFromNotes(p.notes || cust?.notes);
           return [
             p.policyNo || p.id,
             p.customerName,
@@ -544,7 +544,7 @@ export default function SigortaRaporlarPage() {
           const birth = cust?.birthDate || '-';
           const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
           const netVal = p.netPremium !== undefined && p.netPremium > 0 ? p.netPremium : '-';
-          const refVal = extractReferenceFromNotes(p.notes || cust?.notes);
+          const refVal = p.reference || cust?.reference || extractReferenceFromNotes(p.notes || cust?.notes);
           return [
             p.policyNo || p.id,
             p.customerName,
