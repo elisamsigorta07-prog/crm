@@ -70,19 +70,35 @@ function buildSheetData(
     const isEven = rowIdx % 2 === 0;
     const rowBg = isEven ? '#ffffff' : ZEBRA_BG_COLOR;
 
-    // Satırdaki maksimum metin uzunluğunu tespit et
-    const maxValLength = Math.max(
-      ...rowVals.map(v => (v !== null && v !== undefined ? String(v).length : 0)),
-      0
-    );
+    // Her satırın dikey yüksekliğini, içerikteki en uzun metnin satır sayısına göre eksiksiz hesapla
+    let dynamicRowHeight = 28; // Tek satırlı standart kayıtlar için ferah yükseklik (28pt)
 
-    // Ferah satır yüksekliği: Normal satırlarda en az 28pt
-    // Uzun referans, not veya unvan içeren satırlarda metinlerin sıkışmaması için 38pt - 48pt
-    let dynamicRowHeight = 28;
-    if (maxValLength > 65) {
-      dynamicRowHeight = 48;
-    } else if (maxValLength > 30) {
-      dynamicRowHeight = 38;
+    for (let cIdx = 0; cIdx < columns.length; cIdx++) {
+      const col = columns[cIdx];
+      const val = rowVals[cIdx];
+      if (val !== null && val !== undefined) {
+        const text = String(val).trim();
+        if (text) {
+          const colWidth = col.width || 20;
+          // Excel yazı boyutu ve hücre içi kenar payları dikkate alınarak bir satıra sığacak karakter adedi
+          const charsPerLine = Math.max(Math.floor(colWidth * 0.70), 8);
+
+          // Varsa kullanıcının girdiği satır sonları (\n) ve her satırın genişliğe göre kayan alt satırları
+          const paragraphs = text.split('\n');
+          let totalLinesInCell = 0;
+          for (const p of paragraphs) {
+            totalLinesInCell += Math.max(1, Math.ceil(p.length / charsPerLine));
+          }
+
+          if (totalLinesInCell > 1) {
+            // Her satır için 22pt satır yüksekliği + 16pt üst/alt ferah iç boşluk (dikeyde asla kesilmez)
+            const requiredHeight = (totalLinesInCell * 22) + 16;
+            if (requiredHeight > dynamicRowHeight) {
+              dynamicRowHeight = requiredHeight;
+            }
+          }
+        }
+      }
     }
 
     return columns.map((col, colIdx) => {

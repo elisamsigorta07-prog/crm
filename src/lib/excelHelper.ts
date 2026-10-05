@@ -177,6 +177,6 @@ export function extractReferenceFromNotes(notes?: string | null): string {
     return '-';
   }
 
-  // Notlar içinde birden fazla satır varsa tek satırda temiz göster (Excel hücre düzeni için)
-  return trimmed.replace(/[\r\n]+/g, ' ');
+  // Satır sonlarını düzgün normalize et
+  return trimmed.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 }

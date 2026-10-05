@@ -818,7 +818,7 @@ export default function PolicelerPage() {
       { header: 'Müşteri Adı', width: 34 },
       { header: 'TC / VKN', width: 18, align: 'center' as const },
       { header: 'Telefon', width: 18, align: 'center' as const },
-      { header: 'Referans', width: 38, wrap: true },
+      { header: 'Referans', width: 48, wrap: true },
       { header: 'Poliçe Türü', width: 22 },
       { header: 'Sigorta Şirketi', width: 25 },
       { header: 'Başlangıç Tarihi', width: 18, align: 'center' as const },
@@ -1376,16 +1376,17 @@ export default function PolicelerPage() {
                             <div style={{ marginTop: '5px' }}>
                               <span style={{ 
                                 display: 'inline-block',
-                                fontSize: '0.76rem', 
+                                fontSize: '0.78rem', 
                                 color: '#3730a3', 
                                 backgroundColor: '#eef2ff', 
                                 border: '1px solid #c7d2fe', 
-                                padding: '3px 8px', 
+                                padding: '4px 10px', 
                                 borderRadius: '6px', 
                                 fontWeight: 650,
-                                lineHeight: '1.4',
-                                maxWidth: '380px',
-                                wordBreak: 'break-word'
+                                lineHeight: '1.45',
+                                whiteSpace: 'pre-line',
+                                wordBreak: 'break-word',
+                                maxWidth: '100%'
                               }}>
                                 🏷️ Ref: {ref}
                               </span>
