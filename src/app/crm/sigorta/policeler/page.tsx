@@ -53,7 +53,7 @@ import {
   formatMoneyInput,
   formatMoneyDisplay
 } from '@/lib/supabaseService';
-import { formatExcelText, formatExcelCurrency, resolvePlateAndDocSerial, extractReferenceFromNotes } from '@/lib/excelHelper';
+import { formatExcelText, formatExcelCurrency, resolvePlateAndDocSerial, extractReferenceFromNotes, sanitizeReference } from '@/lib/excelHelper';
 import { downloadExcelSingleSheet } from '@/lib/excelExport';
 import styles from '../layout.module.css';
 
@@ -207,8 +207,10 @@ export default function PolicelerPage() {
             const prem = normalizeMoney(p.premium);
             const netPrem = p.netPremium ? normalizeMoney(p.netPremium) : undefined;
             const paid = normalizeMoney(p.paidAmount);
+            const cleanRef = sanitizeReference(p.reference, p.notes);
             return {
               ...p,
+              reference: cleanRef,
               premium: prem,
               netPremium: netPrem,
               paidAmount: paid,
@@ -216,14 +218,22 @@ export default function PolicelerPage() {
             };
           });
           setPolicies(sanitizedPols);
+          localStorage.setItem('elisam_policies', JSON.stringify(sanitizedPols));
           sanitizedPols.forEach(p => {
             const original = cloudPols.find(orig => orig.id === p.id);
-            if (original && original.premium !== p.premium) {
+            if (original && (original.premium !== p.premium || original.reference !== p.reference)) {
               upsertPolicyToCloud(p);
             }
           });
         }
-        if (cloudCusts) setCustomers(cloudCusts);
+        if (cloudCusts) {
+          const sanitizedCusts = cloudCusts.map(c => ({
+            ...c,
+            reference: sanitizeReference(c.reference, c.notes)
+          }));
+          setCustomers(sanitizedCusts);
+          localStorage.setItem('elisam_customers', JSON.stringify(sanitizedCusts));
+        }
       } catch (err) {
         console.error('Supabase initial load error:', err);
       }
@@ -293,7 +303,7 @@ export default function PolicelerPage() {
       setCustomerAddress(matchedCust.address || '');
     }
 
-    const initialRef = pol.reference || matchedCust?.reference || (extractReferenceFromNotes(pol.notes || matchedCust?.notes) !== '-' ? extractReferenceFromNotes(pol.notes || matchedCust?.notes) : '');
+    const initialRef = sanitizeReference(pol.reference || matchedCust?.reference, pol.notes || matchedCust?.notes) || '';
     setReference(initialRef);
 
     setPlate(pol.plate || matchedCust?.plate || '');
@@ -343,7 +353,7 @@ export default function PolicelerPage() {
       setCustomerEmail(found.email === '-' ? '' : found.email);
       setCustomerBirthDate(found.birthDate || '');
       setCustomerAddress(found.address || '');
-      const foundRef = found.reference || (extractReferenceFromNotes(found.notes) !== '-' ? extractReferenceFromNotes(found.notes) : '');
+      const foundRef = sanitizeReference(found.reference, found.notes) || '';
       if (foundRef) setReference(foundRef);
       if (found.plate) setPlate(found.plate);
       if (found.documentSerial) setDocumentSerial(found.documentSerial);
@@ -413,7 +423,10 @@ export default function PolicelerPage() {
 
     // 4.1. Referans
     const parsedRef = extract(/(?:Referans|Ref|Tavsiye\s*Eden|Aracı):\s*(.*)/i);
-    if (parsedRef) setReference(parsedRef);
+    if (parsedRef) {
+      const cleanPRef = sanitizeReference(parsedRef);
+      if (cleanPRef) setReference(cleanPRef);
+    }
 
     // 5. Poliçe Numarası
     const parsedPolicyNo = extract(/(?:Poliçe\s*(?:No|Numarası)):\s*(.*)/i);
@@ -551,7 +564,7 @@ export default function PolicelerPage() {
         identityNo: customerTc || existingCust.identityNo,
         birthDate: customerBirthDate || existingCust.birthDate,
         address: customerAddress || existingCust.address,
-        reference: reference ? reference.trim() : existingCust.reference,
+        reference: sanitizeReference(reference, notes) || existingCust.reference,
         policyNo: finalPolicyNo,
         insuranceType: finalType,
         policyStartDate: startDate,
@@ -576,7 +589,7 @@ export default function PolicelerPage() {
         identityNo: customerTc || '-',
         address: customerAddress || 'Alanya / Antalya',
         birthDate: customerBirthDate || undefined,
-        reference: reference ? reference.trim() : undefined,
+        reference: sanitizeReference(reference, notes),
         notes: notes ? notes.trim() : '',
         createdAt: new Date().toLocaleDateString('tr-TR'),
         policyNo: finalPolicyNo,
@@ -605,7 +618,7 @@ export default function PolicelerPage() {
       customerName,
       customerPhone: customerPhone || '-',
       customerTc: customerTc || '-',
-      reference: reference ? reference.trim() : undefined,
+      reference: sanitizeReference(reference, notes),
       type: finalType,
       company: finalCompany,
       startDate: startDate ? new Date(startDate).toLocaleDateString('tr-TR') : new Date().toLocaleDateString('tr-TR'),
@@ -854,7 +867,7 @@ export default function PolicelerPage() {
       const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (matchedCust?.identityNo || '-');
       const phone = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (matchedCust?.phone || '-');
       const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || matchedCust?.plate, p.documentSerial || matchedCust?.documentSerial, p.notes || matchedCust?.notes);
-      const refVal = (p.reference && p.reference.trim()) || (matchedCust?.reference && matchedCust.reference.trim()) || extractReferenceFromNotes(p.notes || matchedCust?.notes);
+      const refVal = sanitizeReference(p.reference || matchedCust?.reference, p.notes || matchedCust?.notes) || '-';
       const notesVal = (p.notes && p.notes.trim()) || (matchedCust?.notes && matchedCust.notes.trim()) || '-';
 
       return [
@@ -1395,26 +1408,29 @@ export default function PolicelerPage() {
                       {/* Referans Sütunu */}
                       <td style={{ padding: '14px 16px' }}>
                         {(() => {
-                          const refVal = pol.reference || matchedCust?.reference || extractReferenceFromNotes(pol.notes || matchedCust?.notes);
-                          if (!refVal || refVal === '-') {
+                          const refVal = sanitizeReference(pol.reference || matchedCust?.reference, pol.notes || matchedCust?.notes);
+                          if (!refVal) {
                             return <span style={{ color: '#94a3b8', fontSize: '0.85rem' }}>-</span>;
                           }
                           return (
-                            <span style={{ 
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              fontSize: '0.82rem', 
-                              color: '#1e40af', 
-                              backgroundColor: '#eff6ff', 
-                              border: '1px solid #bfdbfe', 
-                              padding: '4px 10px', 
-                              borderRadius: '6px', 
-                              fontWeight: 700,
-                              lineHeight: '1.4',
-                              whiteSpace: 'pre-line',
-                              wordBreak: 'break-word',
-                              maxWidth: '220px'
-                            }}>
+                            <span 
+                              title={refVal}
+                              style={{ 
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                fontSize: '0.82rem', 
+                                color: '#1e40af', 
+                                backgroundColor: '#eff6ff', 
+                                border: '1px solid #bfdbfe', 
+                                padding: '4px 10px', 
+                                borderRadius: '6px', 
+                                fontWeight: 700,
+                                lineHeight: '1.3',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                maxWidth: '180px'
+                              }}>
                               🏷️ {refVal}
                             </span>
                           );
@@ -2200,8 +2216,8 @@ export default function PolicelerPage() {
                 {selectedPolicy.customerTc && <div style={{ fontSize: '0.84rem', color: '#475569' }}>🆔 TC/VKN: {selectedPolicy.customerTc}</div>}
                 {(() => {
                   const matchedCustomer = customers.find(c => c.id === selectedPolicy.customerId || c.name === selectedPolicy.customerName);
-                  const ref = selectedPolicy.reference || matchedCustomer?.reference || extractReferenceFromNotes(selectedPolicy.notes || matchedCustomer?.notes);
-                  if (!ref || ref === '-') return null;
+                  const ref = sanitizeReference(selectedPolicy.reference || matchedCustomer?.reference, selectedPolicy.notes || matchedCustomer?.notes);
+                  if (!ref) return null;
                   return (
                     <div style={{ marginTop: '6px' }}>
                       <span style={{ fontSize: '0.78rem', color: '#1e40af', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', padding: '2px 8px', borderRadius: '4px', fontWeight: 700 }}>

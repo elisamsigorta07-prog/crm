@@ -1,7 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { Customer, Policy } from '@/data/crmData';
 import { RentCustomer, RentalBooking, RentVehicle } from '@/data/rentCrmData';
-import { resolvePlateAndDocSerial, extractReferenceFromNotes } from './excelHelper';
+import { resolvePlateAndDocSerial, extractReferenceFromNotes, sanitizeReference } from './excelHelper';
 
 export interface CariMovement {
   id: string;
@@ -75,7 +75,7 @@ export async function fetchCustomersFromCloud(): Promise<Customer[]> {
           email: c.email || local?.email || '-',
           address: c.address || local?.address || 'Alanya / Antalya',
           birthDate: c.birth_date || c.birthDate || local?.birthDate || undefined,
-          reference: c.reference || local?.reference || (rawNotes && extractReferenceFromNotes(rawNotes) !== '-' ? extractReferenceFromNotes(rawNotes) : undefined),
+          reference: sanitizeReference(c.reference || local?.reference, rawNotes),
           notes: rawNotes || undefined,
           createdAt: c.created_at ? new Date(c.created_at).toLocaleDateString('tr-TR') : (local?.createdAt || new Date().toLocaleDateString('tr-TR')),
           policyNo: c.policy_no || c.policyNo || local?.policyNo || undefined,
@@ -103,11 +103,17 @@ export async function fetchCustomersFromCloud(): Promise<Customer[]> {
 }
 
 export async function upsertCustomerToCloud(customer: Customer): Promise<void> {
+  const cleanRef = sanitizeReference(customer.reference, customer.notes);
+  const sanitizedCustomer: Customer = {
+    ...customer,
+    reference: cleanRef
+  };
+
   // LocalStorage update
   try {
     const saved = localStorage.getItem('elisam_customers');
     const list: Customer[] = saved ? JSON.parse(saved) : [];
-    const updated = [customer, ...list.filter(c => c.id !== customer.id)];
+    const updated = [sanitizedCustomer, ...list.filter(c => c.id !== customer.id)];
     localStorage.setItem('elisam_customers', JSON.stringify(updated));
   } catch (err) {
     console.error(err);
@@ -117,8 +123,8 @@ export async function upsertCustomerToCloud(customer: Customer): Promise<void> {
   if (!isSupabaseConfigured()) return;
   try {
     let customerNotes = customer.notes || '';
-    if (customer.reference && !customerNotes.toLowerCase().includes('referans:') && !customerNotes.toLowerCase().includes('ref:')) {
-      customerNotes = (customerNotes ? customerNotes + '\n' : '') + `Referans: ${customer.reference}`;
+    if (cleanRef && !customerNotes.toLowerCase().includes('referans:') && !customerNotes.toLowerCase().includes('ref:')) {
+      customerNotes = (customerNotes ? customerNotes + '\n' : '') + `Referans: ${cleanRef}`;
     }
     if (customer.documentSerial && !customerNotes.toLowerCase().includes('belge seri') && !customerNotes.toLowerCase().includes('ruhsat seri')) {
       customerNotes = (customerNotes ? customerNotes + '\n' : '') + `Belge Seri: ${customer.documentSerial}`;
@@ -386,7 +392,7 @@ export async function fetchPoliciesFromCloud(): Promise<Policy[]> {
           vehicleModelYear: vYear,
           vehicleRegistrationDate: vReg,
           vehicleValue: vVal,
-          reference: p.reference || local?.reference || (rawNotes && extractReferenceFromNotes(rawNotes) !== '-' ? extractReferenceFromNotes(rawNotes) : undefined),
+          reference: sanitizeReference(p.reference || local?.reference, rawNotes),
           notes: rawNotes || undefined
         };
       });
@@ -402,6 +408,7 @@ export async function fetchPoliciesFromCloud(): Promise<Policy[]> {
       const list: Policy[] = JSON.parse(saved);
       return list.map(p => ({ 
         ...p, 
+        reference: sanitizeReference(p.reference, p.notes),
         premium: normalizeMoney(p.premium), 
         netPremium: p.netPremium ? normalizeMoney(p.netPremium) : undefined,
         paidAmount: normalizeMoney(p.paidAmount), 
@@ -413,8 +420,10 @@ export async function fetchPoliciesFromCloud(): Promise<Policy[]> {
 }
 
 export async function upsertPolicyToCloud(policy: Policy): Promise<void> {
+  const cleanRef = sanitizeReference(policy.reference, policy.notes);
   const sanitizedPolicy: Policy = {
     ...policy,
+    reference: cleanRef,
     premium: normalizeMoney(policy.premium),
     netPremium: policy.netPremium ? normalizeMoney(policy.netPremium) : undefined,
     paidAmount: normalizeMoney(policy.paidAmount),
@@ -433,8 +442,8 @@ export async function upsertPolicyToCloud(policy: Policy): Promise<void> {
   if (!isSupabaseConfigured()) return;
   try {
     let policyNotes = sanitizedPolicy.notes || '';
-    if (sanitizedPolicy.reference && !policyNotes.toLowerCase().includes('referans:') && !policyNotes.toLowerCase().includes('ref:')) {
-      policyNotes = (policyNotes ? policyNotes + '\n' : '') + `Referans: ${sanitizedPolicy.reference}`;
+    if (cleanRef && !policyNotes.toLowerCase().includes('referans:') && !policyNotes.toLowerCase().includes('ref:')) {
+      policyNotes = (policyNotes ? policyNotes + '\n' : '') + `Referans: ${cleanRef}`;
     }
     if (sanitizedPolicy.documentSerial && !policyNotes.toLowerCase().includes('belge seri') && !policyNotes.toLowerCase().includes('ruhsat seri')) {
       policyNotes = (policyNotes ? policyNotes + '\n' : '') + `Belge Seri: ${sanitizedPolicy.documentSerial}`;

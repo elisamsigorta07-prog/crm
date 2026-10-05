@@ -149,6 +149,37 @@ export function resolvePlateAndDocSerial(
 }
 
 /**
+ * Referans bilgisini doğrular ve temizler.
+ * Eğer değer boşsa, tire ise, çok satırlıysa, teklif/not metni içeriyorsa veya 60 karakterden uzunsa
+ * kesinlikle referans kişi/firma ismi değildir (nottur); bu yüzden temizlenir.
+ */
+export function sanitizeReference(refCandidate?: string | null, notes?: string | null): string | undefined {
+  if (!refCandidate) return undefined;
+  const val = String(refCandidate).trim();
+  if (!val || val === '-' || val === 'undefined' || val === 'null') return undefined;
+  // Çok satırlı metinler kesinlikle not veya teklif dökümüdür
+  if (val.includes('\n') || val.includes('\r')) return undefined;
+  // Not alanının kendisiyle aynıysa
+  if (notes && val === notes.trim()) return undefined;
+  // Teklif veya form şablonu içeriyorsa
+  const lower = val.toLowerCase();
+  if (
+    lower.startsWith('teklif bilgileri') ||
+    lower.includes('ad / soy ad') ||
+    lower.includes('tckn/vergi no') ||
+    lower.includes('doğum tarihi:') ||
+    lower.includes('dogum tarihi:') ||
+    lower.includes('araç bilgileri')
+  ) {
+    return undefined;
+  }
+  // Referans kişi veya firma adı makul uzunlukta olmalıdır
+  if (val.length > 60) return undefined;
+
+  return val;
+}
+
+/**
  * Notlar alanından sadece açıkça belirtilmiş referans bilgisini (Referans: ..., Ref: ... vb.) çıkartır.
  * Genel notların Referans sütununu kirletmesini engeller.
  */
@@ -160,8 +191,8 @@ export function extractReferenceFromNotes(notes?: string | null): string {
   // Sadece açıkça Referans: ... veya Ref: ... yazılmışsa ayrıştır
   const match = trimmed.match(/(?:Referans|Ref|Tavsiye\s*Eden|Aracı)[:\s]+([^\r\n]+)/i);
   if (match && match[1]) {
-    const val = match[1].trim();
-    if (val && val !== '-') return val;
+    const val = sanitizeReference(match[1].trim());
+    if (val) return val;
   }
 
   return '-';

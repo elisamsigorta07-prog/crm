@@ -24,7 +24,7 @@ import {
   fetchCariMovementsFromCloud 
 } from '@/lib/supabaseService';
 import { generateModernPDF } from '@/lib/pdfReportGenerator';
-import { formatExcelText, formatExcelCurrency, resolvePlateAndDocSerial, extractReferenceFromNotes } from '@/lib/excelHelper';
+import { formatExcelText, formatExcelCurrency, resolvePlateAndDocSerial, extractReferenceFromNotes, sanitizeReference } from '@/lib/excelHelper';
 import { downloadExcelSingleSheet, downloadExcelMultiSheet } from '@/lib/excelExport';
 import styles from '../layout.module.css';
 
@@ -227,7 +227,7 @@ export default function SigortaRaporlarPage() {
       const birth = cust?.birthDate || '-';
       const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
       const netVal = p.netPremium !== undefined && p.netPremium > 0 ? p.netPremium : '-';
-      const refVal = (p.reference && p.reference.trim()) || (cust?.reference && cust.reference.trim()) || extractReferenceFromNotes(p.notes || cust?.notes);
+      const refVal = sanitizeReference(p.reference || cust?.reference, p.notes || cust?.notes) || '-';
       const notesVal = (p.notes && p.notes.trim()) || (cust?.notes && cust.notes.trim()) || '-';
       return [
         p.policyNo || p.id,
@@ -291,7 +291,7 @@ export default function SigortaRaporlarPage() {
       c.identityNo || '-',
       c.birthDate || '-',
       c.phone || '-',
-      (c.reference && c.reference.trim()) || extractReferenceFromNotes(c.notes),
+      sanitizeReference(c.reference, c.notes) || '-',
       c.email || '-',
       c.createdAt,
       (c.notes && c.notes.trim()) || '-'
@@ -470,7 +470,7 @@ export default function SigortaRaporlarPage() {
           c.type,
           c.identityNo || '-',
           c.phone || '-',
-          (c.reference && c.reference.trim()) || extractReferenceFromNotes(c.notes),
+          sanitizeReference(c.reference, c.notes) || '-',
           c.email || '-',
           c.createdAt,
           (c.notes && c.notes.trim()) || '-'
@@ -505,7 +505,7 @@ export default function SigortaRaporlarPage() {
           const birth = cust?.birthDate || '-';
           const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
           const netVal = p.netPremium !== undefined && p.netPremium > 0 ? p.netPremium : '-';
-          const refVal = (p.reference && p.reference.trim()) || (cust?.reference && cust.reference.trim()) || extractReferenceFromNotes(p.notes || cust?.notes);
+          const refVal = sanitizeReference(p.reference || cust?.reference, p.notes || cust?.notes) || '-';
           const notesVal = (p.notes && p.notes.trim()) || (cust?.notes && cust.notes.trim()) || '-';
           return [
             p.policyNo || p.id,
@@ -555,7 +555,7 @@ export default function SigortaRaporlarPage() {
           const birth = cust?.birthDate || '-';
           const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
           const netVal = p.netPremium !== undefined && p.netPremium > 0 ? p.netPremium : '-';
-          const refVal = (p.reference && p.reference.trim()) || (cust?.reference && cust.reference.trim()) || extractReferenceFromNotes(p.notes || cust?.notes);
+          const refVal = sanitizeReference(p.reference || cust?.reference, p.notes || cust?.notes) || '-';
           const notesVal = (p.notes && p.notes.trim()) || (cust?.notes && cust.notes.trim()) || '-';
           return [
             p.policyNo || p.id,

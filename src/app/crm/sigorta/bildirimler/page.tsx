@@ -40,7 +40,7 @@ import {
   normalizeMoney,
   formatMoneyDisplay 
 } from '@/lib/supabaseService';
-import { formatExcelText, formatExcelCurrency, resolvePlateAndDocSerial, extractReferenceFromNotes } from '@/lib/excelHelper';
+import { formatExcelText, formatExcelCurrency, resolvePlateAndDocSerial, extractReferenceFromNotes, sanitizeReference } from '@/lib/excelHelper';
 import { downloadExcelSingleSheet } from '@/lib/excelExport';
 import styles from '../layout.module.css';
 
@@ -197,7 +197,7 @@ export default function SigortaBildirimlerPage() {
         urgency,
         status: p.status || 'Aktif',
         source: 'policy',
-        reference: p.reference || cust?.reference || (p.notes && extractReferenceFromNotes(p.notes) !== '-' ? extractReferenceFromNotes(p.notes) : undefined),
+        reference: sanitizeReference(p.reference || cust?.reference, p.notes || cust?.notes),
         notes: p.notes
       };
 
@@ -244,7 +244,7 @@ export default function SigortaBildirimlerPage() {
           urgency,
           status: daysRemaining < 0 ? 'Biten' : 'Yaklaşıyor',
           source: 'customer',
-          reference: c.reference || (c.notes && extractReferenceFromNotes(c.notes) !== '-' ? extractReferenceFromNotes(c.notes) : undefined),
+          reference: sanitizeReference(c.reference, c.notes),
           notes: c.notes
         });
       }
@@ -489,7 +489,7 @@ export default function SigortaBildirimlerPage() {
       item.customerName,
       item.customerTc,
       item.customerPhone,
-      (item.reference && item.reference.trim()) || extractReferenceFromNotes(item.notes),
+      sanitizeReference(item.reference, item.notes) || '-',
       item.type,
       item.company,
       item.startDate || '-',
@@ -1118,24 +1118,27 @@ export default function SigortaBildirimlerPage() {
                           {item.customerTc && item.customerTc !== '-' && <span>• TC: {item.customerTc}</span>}
                         </div>
                         {(() => {
-                          const ref = item.reference || extractReferenceFromNotes(item.notes);
-                          if (!ref || ref === '-') return null;
+                          const ref = sanitizeReference(item.reference, item.notes);
+                          if (!ref) return null;
                           return (
                             <div style={{ marginTop: '5px' }}>
-                              <span style={{ 
-                                display: 'inline-block',
-                                fontSize: '0.78rem', 
-                                color: '#3730a3', 
-                                backgroundColor: '#eef2ff', 
-                                border: '1px solid #c7d2fe', 
-                                padding: '4px 10px', 
-                                borderRadius: '6px', 
-                                fontWeight: 650,
-                                lineHeight: '1.45',
-                                whiteSpace: 'pre-line',
-                                wordBreak: 'break-word',
-                                maxWidth: '100%'
-                              }}>
+                              <span 
+                                title={ref}
+                                style={{ 
+                                  display: 'inline-block',
+                                  fontSize: '0.78rem', 
+                                  color: '#3730a3', 
+                                  backgroundColor: '#eef2ff', 
+                                  border: '1px solid #c7d2fe', 
+                                  padding: '2px 8px', 
+                                  borderRadius: '5px', 
+                                  fontWeight: 650,
+                                  lineHeight: '1.3',
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  maxWidth: '180px'
+                                }}>
                                 🏷️ Ref: {ref}
                               </span>
                             </div>
