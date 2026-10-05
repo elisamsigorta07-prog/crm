@@ -6,6 +6,7 @@ export interface ExcelColumnConfig {
   align?: 'left' | 'center' | 'right';
   isCurrency?: boolean;
   isDate?: boolean;
+  wrap?: boolean;
 }
 
 export interface SingleSheetExportParams {
@@ -45,7 +46,7 @@ function buildSheetData(
     type: String,
     fontWeight: 'bold',
     fontSize: 11,
-    height: 30, // Ferah başlık yüksekliği
+    height: 32, // Ferah başlık yüksekliği
     backgroundColor: HEADER_BG_COLOR,
     textColor: HEADER_TEXT_COLOR,
     align: col.align || (col.isCurrency ? 'right' : 'center'),
@@ -64,19 +65,43 @@ function buildSheetData(
     rightBorderColor: '#3b82f6'
   }));
 
-  // 2. Veri Satırları - Tam Çerçeveli Tablo Formatı (Zebra desenli)
+  // 2. Veri Satırları - Tam Çerçeveli Tablo Formatı (Ferah Satır Aralıklı ve Metin Kaydırmalı)
   const dataRows: Row[] = rawRows.map((rowVals, rowIdx) => {
     const isEven = rowIdx % 2 === 0;
     const rowBg = isEven ? '#ffffff' : ZEBRA_BG_COLOR;
+
+    // Satırdaki maksimum metin uzunluğunu tespit et
+    const maxValLength = Math.max(
+      ...rowVals.map(v => (v !== null && v !== undefined ? String(v).length : 0)),
+      0
+    );
+
+    // Ferah satır yüksekliği: Normal satırlarda en az 28pt
+    // Uzun referans, not veya unvan içeren satırlarda metinlerin sıkışmaması için 38pt - 48pt
+    let dynamicRowHeight = 28;
+    if (maxValLength > 65) {
+      dynamicRowHeight = 48;
+    } else if (maxValLength > 30) {
+      dynamicRowHeight = 38;
+    }
 
     return columns.map((col, colIdx) => {
       const rawVal = rowVals[colIdx];
       const align = col.align || (col.isCurrency ? 'right' : 'left');
 
+      const isTextWrapped = col.wrap !== undefined
+        ? col.wrap
+        : (col.header.toLowerCase().includes('referans') ||
+           col.header.toLowerCase().includes('not') ||
+           col.header.toLowerCase().includes('açıklama') ||
+           col.header.toLowerCase().includes('müşteri') ||
+           col.header.toLowerCase().includes('ünvan'));
+
       const baseCellProps = {
         align: align,
         alignVertical: 'center' as const,
-        height: 22,
+        height: dynamicRowHeight,
+        wrap: isTextWrapped,
         backgroundColor: rowBg,
         borderStyle: 'thin' as const,
         borderColor: CELL_BORDER_COLOR,

@@ -467,7 +467,7 @@ export default function SigortaBildirimlerPage() {
       { header: 'Müşteri Adı', width: 34 },
       { header: 'TC Kimlik / VKN', width: 18, align: 'center' as const },
       { header: 'Telefon', width: 18, align: 'center' as const },
-      { header: 'Referans', width: 28 },
+      { header: 'Referans', width: 38, wrap: true },
       { header: 'Poliçe Türü', width: 22 },
       { header: 'Sigorta Şirketi', width: 25 },
       { header: 'Başlangıç Tarihi', width: 18, align: 'center' as const },
@@ -1116,8 +1116,20 @@ export default function SigortaBildirimlerPage() {
                           const ref = extractReferenceFromNotes(item.notes);
                           if (ref === '-') return null;
                           return (
-                            <div style={{ marginTop: '3px' }}>
-                              <span style={{ fontSize: '0.74rem', color: '#4338ca', backgroundColor: '#eef2ff', border: '1px solid #c7d2fe', padding: '1px 6px', borderRadius: '4px', fontWeight: 650 }}>
+                            <div style={{ marginTop: '5px' }}>
+                              <span style={{ 
+                                display: 'inline-block',
+                                fontSize: '0.76rem', 
+                                color: '#3730a3', 
+                                backgroundColor: '#eef2ff', 
+                                border: '1px solid #c7d2fe', 
+                                padding: '3px 8px', 
+                                borderRadius: '6px', 
+                                fontWeight: 650,
+                                lineHeight: '1.4',
+                                maxWidth: '380px',
+                                wordBreak: 'break-word'
+                              }}>
                                 🏷️ Ref: {ref}
                               </span>
                             </div>
