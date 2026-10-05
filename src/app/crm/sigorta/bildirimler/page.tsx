@@ -480,8 +480,7 @@ export default function SigortaBildirimlerPage() {
       { header: 'Plaka', width: 16, align: 'center' as const },
       { header: 'Belge Seri No', width: 18, align: 'center' as const },
       { header: 'Net Prim (TL)', width: 20, isCurrency: true },
-      { header: 'Brüt Prim (TL)', width: 20, isCurrency: true },
-      { header: 'Notlar', width: 45, wrap: true }
+      { header: 'Brüt Prim (TL)', width: 20, isCurrency: true }
     ];
 
     const rows = sortedItems.map(item => [
@@ -499,8 +498,7 @@ export default function SigortaBildirimlerPage() {
       item.plate,
       item.documentSerial,
       item.netPremium !== undefined && item.netPremium > 0 ? item.netPremium : '-',
-      item.premium,
-      (item.notes && item.notes.trim()) || '-'
+      item.premium
     ]);
 
     await downloadExcelSingleSheet({

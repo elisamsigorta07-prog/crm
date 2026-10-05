@@ -217,8 +217,7 @@ export default function SigortaRaporlarPage() {
       { header: 'Belge Seri No', width: 18, align: 'center' as const },
       { header: 'Net Prim (TL)', width: 20, isCurrency: true },
       { header: 'Brüt Prim (TL)', width: 20, isCurrency: true },
-      { header: 'Durum', width: 15, align: 'center' as const },
-      { header: 'Notlar', width: 45, wrap: true }
+      { header: 'Durum', width: 15, align: 'center' as const }
     ];
     const policyRows = monthlyPolicies.map(p => {
       const cust = customers.find(c => c.id === p.customerId || c.name.toLowerCase() === p.customerName.toLowerCase());
@@ -228,7 +227,6 @@ export default function SigortaRaporlarPage() {
       const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
       const netVal = p.netPremium !== undefined && p.netPremium > 0 ? p.netPremium : '-';
       const refVal = sanitizeReference(p.reference || cust?.reference, p.notes || cust?.notes) || '-';
-      const notesVal = (p.notes && p.notes.trim()) || (cust?.notes && cust.notes.trim()) || '-';
       return [
         p.policyNo || p.id,
         p.customerName,
@@ -244,8 +242,7 @@ export default function SigortaRaporlarPage() {
         docSerial,
         netVal,
         p.premium,
-        p.status,
-        notesVal
+        p.status
       ];
     });
 
@@ -281,8 +278,7 @@ export default function SigortaRaporlarPage() {
       { header: 'Telefon', width: 18, align: 'center' as const },
       { header: 'Referans', width: 26 },
       { header: 'E-Posta', width: 28 },
-      { header: 'Kayıt Tarihi', width: 16, align: 'center' as const },
-      { header: 'Notlar', width: 45, wrap: true }
+      { header: 'Kayıt Tarihi', width: 16, align: 'center' as const }
     ];
     const customerRows = customers.map(c => [
       c.id,
@@ -293,8 +289,7 @@ export default function SigortaRaporlarPage() {
       c.phone || '-',
       sanitizeReference(c.reference, c.notes) || '-',
       c.email || '-',
-      c.createdAt,
-      (c.notes && c.notes.trim()) || '-'
+      c.createdAt
     ]);
 
     await downloadExcelMultiSheet({
@@ -461,8 +456,7 @@ export default function SigortaRaporlarPage() {
           { header: 'Telefon', width: 18, align: 'center' },
           { header: 'Referans', width: 26 },
           { header: 'E-Posta', width: 28 },
-          { header: 'Kayıt Tarihi', width: 16, align: 'center' },
-          { header: 'Notlar', width: 45, wrap: true }
+          { header: 'Kayıt Tarihi', width: 16, align: 'center' }
         ],
         rows: sortedCustomers.map(c => [
           c.id,
@@ -472,8 +466,7 @@ export default function SigortaRaporlarPage() {
           c.phone || '-',
           sanitizeReference(c.reference, c.notes) || '-',
           c.email || '-',
-          c.createdAt,
-          (c.notes && c.notes.trim()) || '-'
+          c.createdAt
         ])
       });
     } else if (type === 'aktif_policeler') {
@@ -495,8 +488,7 @@ export default function SigortaRaporlarPage() {
           { header: 'Belge Seri No', width: 18, align: 'center' },
           { header: 'Net Prim (TL)', width: 20, isCurrency: true },
           { header: 'Brüt Prim (TL)', width: 20, isCurrency: true },
-          { header: 'Durum', width: 15, align: 'center' },
-          { header: 'Notlar', width: 45, wrap: true }
+          { header: 'Durum', width: 15, align: 'center' }
         ],
         rows: sortedPolicies.map(p => {
           const cust = customers.find(c => c.id === p.customerId || c.name.toLowerCase() === p.customerName.toLowerCase());
@@ -506,7 +498,6 @@ export default function SigortaRaporlarPage() {
           const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
           const netVal = p.netPremium !== undefined && p.netPremium > 0 ? p.netPremium : '-';
           const refVal = sanitizeReference(p.reference || cust?.reference, p.notes || cust?.notes) || '-';
-          const notesVal = (p.notes && p.notes.trim()) || (cust?.notes && cust.notes.trim()) || '-';
           return [
             p.policyNo || p.id,
             p.customerName,
@@ -522,8 +513,7 @@ export default function SigortaRaporlarPage() {
             docSerial,
             netVal,
             p.premium,
-            p.status,
-            notesVal
+            p.status
           ];
         })
       });
@@ -545,8 +535,7 @@ export default function SigortaRaporlarPage() {
           { header: 'Belge Seri No', width: 18, align: 'center' },
           { header: 'Net Prim (TL)', width: 20, isCurrency: true },
           { header: 'Brüt Prim (TL)', width: 20, isCurrency: true },
-          { header: 'Durum', width: 15, align: 'center' },
-          { header: 'Notlar', width: 45, wrap: true }
+          { header: 'Durum', width: 15, align: 'center' }
         ],
         rows: sortedUpcoming.map(p => {
           const cust = customers.find(c => c.id === p.customerId || c.name.toLowerCase() === p.customerName.toLowerCase());
@@ -556,7 +545,6 @@ export default function SigortaRaporlarPage() {
           const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || cust?.plate, p.documentSerial || cust?.documentSerial, p.notes || cust?.notes);
           const netVal = p.netPremium !== undefined && p.netPremium > 0 ? p.netPremium : '-';
           const refVal = sanitizeReference(p.reference || cust?.reference, p.notes || cust?.notes) || '-';
-          const notesVal = (p.notes && p.notes.trim()) || (cust?.notes && cust.notes.trim()) || '-';
           return [
             p.policyNo || p.id,
             p.customerName,
@@ -571,8 +559,7 @@ export default function SigortaRaporlarPage() {
             docSerial,
             netVal,
             p.premium,
-            p.status,
-            notesVal
+            p.status
           ];
         })
       });

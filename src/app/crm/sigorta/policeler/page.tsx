@@ -858,8 +858,7 @@ export default function PolicelerPage() {
       { header: 'Ödenen Tutar (TL)', width: 20, isCurrency: true },
       { header: 'Kalan Borç (TL)', width: 20, isCurrency: true },
       { header: 'Ödeme Durumu', width: 16, align: 'center' as const },
-      { header: 'Durum', width: 15, align: 'center' as const },
-      { header: 'Notlar', width: 45, wrap: true }
+      { header: 'Durum', width: 15, align: 'center' as const }
     ];
 
     const rows = sortedAndFilteredPolicies.map(p => {
@@ -868,7 +867,6 @@ export default function PolicelerPage() {
       const phone = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (matchedCust?.phone || '-');
       const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || matchedCust?.plate, p.documentSerial || matchedCust?.documentSerial, p.notes || matchedCust?.notes);
       const refVal = sanitizeReference(p.reference || matchedCust?.reference, p.notes || matchedCust?.notes) || '-';
-      const notesVal = (p.notes && p.notes.trim()) || (matchedCust?.notes && matchedCust.notes.trim()) || '-';
 
       return [
         p.policyNo || p.id,
@@ -887,8 +885,7 @@ export default function PolicelerPage() {
         p.paidAmount,
         p.remainingAmount || 0,
         p.paymentStatus || '-',
-        p.status,
-        notesVal
+        p.status
       ];
     });
 
