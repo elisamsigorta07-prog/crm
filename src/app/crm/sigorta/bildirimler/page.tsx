@@ -197,7 +197,7 @@ export default function SigortaBildirimlerPage() {
         urgency,
         status: p.status || 'Aktif',
         source: 'policy',
-        reference: p.reference || (p.notes && extractReferenceFromNotes(p.notes) !== '-' ? extractReferenceFromNotes(p.notes) : undefined),
+        reference: p.reference || cust?.reference || (p.notes && extractReferenceFromNotes(p.notes) !== '-' ? extractReferenceFromNotes(p.notes) : undefined),
         notes: p.notes
       };
 
@@ -470,7 +470,7 @@ export default function SigortaBildirimlerPage() {
       { header: 'Müşteri Adı', width: 34 },
       { header: 'TC Kimlik / VKN', width: 18, align: 'center' as const },
       { header: 'Telefon', width: 18, align: 'center' as const },
-      { header: 'Referans', width: 48, wrap: true },
+      { header: 'Referans', width: 26 },
       { header: 'Poliçe Türü', width: 22 },
       { header: 'Sigorta Şirketi', width: 25 },
       { header: 'Başlangıç Tarihi', width: 18, align: 'center' as const },
@@ -480,7 +480,8 @@ export default function SigortaBildirimlerPage() {
       { header: 'Plaka', width: 16, align: 'center' as const },
       { header: 'Belge Seri No', width: 18, align: 'center' as const },
       { header: 'Net Prim (TL)', width: 20, isCurrency: true },
-      { header: 'Brüt Prim (TL)', width: 20, isCurrency: true }
+      { header: 'Brüt Prim (TL)', width: 20, isCurrency: true },
+      { header: 'Notlar', width: 45, wrap: true }
     ];
 
     const rows = sortedItems.map(item => [
@@ -488,7 +489,7 @@ export default function SigortaBildirimlerPage() {
       item.customerName,
       item.customerTc,
       item.customerPhone,
-      item.reference || extractReferenceFromNotes(item.notes),
+      (item.reference && item.reference.trim()) || extractReferenceFromNotes(item.notes),
       item.type,
       item.company,
       item.startDate || '-',
@@ -498,7 +499,8 @@ export default function SigortaBildirimlerPage() {
       item.plate,
       item.documentSerial,
       item.netPremium !== undefined && item.netPremium > 0 ? item.netPremium : '-',
-      item.premium
+      item.premium,
+      (item.notes && item.notes.trim()) || '-'
     ]);
 
     await downloadExcelSingleSheet({

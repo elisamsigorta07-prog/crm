@@ -833,7 +833,7 @@ export default function PolicelerPage() {
       { header: 'Müşteri Adı', width: 34 },
       { header: 'TC / VKN', width: 18, align: 'center' as const },
       { header: 'Telefon', width: 18, align: 'center' as const },
-      { header: 'Referans', width: 48, wrap: true },
+      { header: 'Referans', width: 26 },
       { header: 'Poliçe Türü', width: 22 },
       { header: 'Sigorta Şirketi', width: 25 },
       { header: 'Başlangıç Tarihi', width: 18, align: 'center' as const },
@@ -845,7 +845,8 @@ export default function PolicelerPage() {
       { header: 'Ödenen Tutar (TL)', width: 20, isCurrency: true },
       { header: 'Kalan Borç (TL)', width: 20, isCurrency: true },
       { header: 'Ödeme Durumu', width: 16, align: 'center' as const },
-      { header: 'Durum', width: 15, align: 'center' as const }
+      { header: 'Durum', width: 15, align: 'center' as const },
+      { header: 'Notlar', width: 45, wrap: true }
     ];
 
     const rows = sortedAndFilteredPolicies.map(p => {
@@ -853,26 +854,28 @@ export default function PolicelerPage() {
       const tc = p.customerTc && p.customerTc !== '-' ? p.customerTc : (matchedCust?.identityNo || '-');
       const phone = p.customerPhone && p.customerPhone !== '-' ? p.customerPhone : (matchedCust?.phone || '-');
       const { plate, docSerial } = resolvePlateAndDocSerial(p.plate || matchedCust?.plate, p.documentSerial || matchedCust?.documentSerial, p.notes || matchedCust?.notes);
-      const refNotes = p.reference || matchedCust?.reference || extractReferenceFromNotes(p.notes || matchedCust?.notes);
+      const refVal = (p.reference && p.reference.trim()) || (matchedCust?.reference && matchedCust.reference.trim()) || extractReferenceFromNotes(p.notes || matchedCust?.notes);
+      const notesVal = (p.notes && p.notes.trim()) || (matchedCust?.notes && matchedCust.notes.trim()) || '-';
 
       return [
         p.policyNo || p.id,
         p.customerName,
         tc,
         phone,
-        refNotes,
+        refVal,
         p.type,
         p.company,
         p.startDate,
         p.endDate,
         plate,
         docSerial,
-        p.premium,
         p.netPremium || 0,
+        p.premium,
         p.paidAmount,
         p.remainingAmount || 0,
         p.paymentStatus || '-',
-        p.status
+        p.status,
+        notesVal
       ];
     });
 

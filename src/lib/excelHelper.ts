@@ -149,34 +149,20 @@ export function resolvePlateAndDocSerial(
 }
 
 /**
- * Notlar alanından temiz referans bilgisini çıkartır.
- * Sistem tarafından otomatik eklenen genel şablon metinleri ("Yeni poliçe kaydı." vb.)
- * referans olarak görünmesin diye temizlenir.
+ * Notlar alanından sadece açıkça belirtilmiş referans bilgisini (Referans: ..., Ref: ... vb.) çıkartır.
+ * Genel notların Referans sütununu kirletmesini engeller.
  */
 export function extractReferenceFromNotes(notes?: string | null): string {
   if (!notes) return '-';
   const trimmed = notes.trim();
   if (!trimmed || trimmed === '-') return '-';
 
-  const systemPlaceholders = [
-    'yeni poliçe kaydı.',
-    'yeni poliçe kaydı',
-    'poliçe kesimi ile otomatik oluşturuldu.',
-    'poliçe kesimi ile otomatik oluşturuldu',
-    'poliçe kesimi ile otomatik kaydedildi.',
-    'poliçe kesimi ile otomatik kaydedildi',
-    'kayıtlı özel not bulunmuyor.',
-    'kayıtlı özel not bulunmuyor',
-    'cari hareket ile otomatik tanımlandı.',
-    'cari hareket ile otomatik tanımlandı',
-    'poliçe kesiminde tahsil edildi.',
-    'poliçe kesiminde tahsil edildi'
-  ];
-
-  if (systemPlaceholders.includes(trimmed.toLowerCase())) {
-    return '-';
+  // Sadece açıkça Referans: ... veya Ref: ... yazılmışsa ayrıştır
+  const match = trimmed.match(/(?:Referans|Ref|Tavsiye\s*Eden|Aracı)[:\s]+([^\r\n]+)/i);
+  if (match && match[1]) {
+    const val = match[1].trim();
+    if (val && val !== '-') return val;
   }
 
-  // Satır sonlarını düzgün normalize et
-  return trimmed.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  return '-';
 }
