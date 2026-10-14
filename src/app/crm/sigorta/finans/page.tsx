@@ -309,7 +309,16 @@ export default function SigortaFinansPage() {
 
   // Filtered movements based on selected customer & search
   const filteredMovements = movements.filter(m => {
-    const matchesCustomer = selectedCustomerId === 'ALL' || m.customerId === selectedCustomerId || m.customerName.toLowerCase() === selectedCustomerId.toLowerCase();
+    let matchesCustomer = false;
+    if (selectedCustomerId === 'ALL') {
+      matchesCustomer = true;
+    } else if (selectedCustomerId.startsWith('NAME-')) {
+      // customerId'si olmayan hareketler: isimle eşleştir
+      const targetName = selectedCustomerId.slice(5).toLowerCase().trim();
+      matchesCustomer = m.customerName.toLowerCase().trim() === targetName;
+    } else {
+      matchesCustomer = m.customerId === selectedCustomerId || m.customerName.toLowerCase().trim() === selectedCustomerId.toLowerCase().trim();
+    }
     const matchesSearch = 
       m.description.toLowerCase().includes(tableSearchTerm.toLowerCase()) ||
       (m.receiptNo && m.receiptNo.toLowerCase().includes(tableSearchTerm.toLowerCase())) ||
@@ -336,15 +345,25 @@ export default function SigortaFinansPage() {
   const totalCredit = filteredMovements.reduce((sum, m) => sum + m.creditAmount, 0);
   const netRemainingBalance = totalDebit - totalCredit;
 
-  // Merged customer list: customers table + unique entries from movements (deduped by id)
+  // Merged customer list: customers table + unique entries from movements (deduped by id AND name)
   const allCustomerOptions = (() => {
     const fromCustomers = customers.map(c => ({ id: c.id, name: c.name, phone: c.phone, type: c.type }));
     const seenIds = new Set(fromCustomers.map(c => c.id));
+    const seenNames = new Set(fromCustomers.map(c => c.name.toLowerCase().trim()));
+
     const fromMovements = movements
-      .filter(m => m.customerId && m.customerName && !seenIds.has(m.customerId))
+      .filter(m => m.customerName && m.customerName.trim() !== '')
       .reduce<{ id: string; name: string; phone: string; type: string }[]>((acc, m) => {
-        if (!acc.find(x => x.id === m.customerId)) {
-          acc.push({ id: m.customerId, name: m.customerName, phone: '', type: '' });
+        // customerId null/boş olsa bile customerName ile eşleştir
+        const effectiveId = m.customerId || `NAME-${m.customerName.trim()}`;
+        const nameLower = m.customerName.toLowerCase().trim();
+        if (!seenIds.has(effectiveId) && !seenNames.has(nameLower)) {
+          // daha önce eklenmediyse ekle
+          if (!acc.find(x => x.id === effectiveId || x.name.toLowerCase().trim() === nameLower)) {
+            acc.push({ id: effectiveId, name: m.customerName.trim(), phone: '', type: '' });
+            seenIds.add(effectiveId);
+            seenNames.add(nameLower);
+          }
         }
         return acc;
       }, []);
