@@ -41,6 +41,7 @@ import {
   mergeCustomersWithCariMovements,
   normalizeCariCustomerName,
   isSyntheticCariCustomerId,
+  generateUniqueCrmId,
   upsertCariMovementToCloud,
   deleteCariMovementFromCloud,
   clearCariMovementsFromCloud,
@@ -241,9 +242,12 @@ export default function SigortaFinansPage() {
 
     // Auto create customer in customer list if new
     let custId = formCustomerId;
-    const existingCust = customers.find(c => c.id === custId || c.name.toLowerCase() === formCustomerName.trim().toLowerCase());
+    const existingCust = customers.find(c => 
+      (custId && c.id === custId) || 
+      normalizeCariCustomerName(c.name) === normalizeCariCustomerName(formCustomerName)
+    );
     if (!existingCust) {
-      custId = `CUST-${Math.floor(100 + Math.random() * 900)}`;
+      custId = generateUniqueCrmId('CUST');
       const isCorp = /(?:ŞİRKETİ|LİMİTED|LTD|A\.Ş|SANAYİ|TİCARET|AŞ|HOLDİNG)/i.test(formCustomerName);
       const newCust: Customer = {
         id: custId,
@@ -264,7 +268,7 @@ export default function SigortaFinansPage() {
     }
 
     const newMov: CariMovement = {
-      id: editingMovement ? editingMovement.id : `CAR-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: editingMovement ? editingMovement.id : generateUniqueCrmId('CAR'),
       date: formattedDate,
       dueDate: formattedDueDate || undefined,
       receiptNo: formReceiptNo || '-',

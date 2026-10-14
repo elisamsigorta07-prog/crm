@@ -26,6 +26,13 @@ export interface CariMovement {
   notes?: string;
 }
 
+/** Çakışmasız (collision-proof) benzersiz CRM ID üretici */
+export function generateUniqueCrmId(prefix: 'CUST' | 'CAR' | 'POL' | 'RENT'): string {
+  const ts = Date.now().toString(36).toUpperCase();
+  const rand = Math.floor(1000 + Math.random() * 9000).toString(36).toUpperCase();
+  return `${prefix}-${ts}${rand}`;
+}
+
 const SUPABASE_PAGE_SIZE = 1000;
 
 async function fetchSupabaseTableAll(

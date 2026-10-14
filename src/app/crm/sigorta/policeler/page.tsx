@@ -48,10 +48,10 @@ import {
   upsertCustomerToCloud, 
   deletePolicyFromCloud, 
   upsertCariMovementToCloud,
-  fetchCariMovementsFromCloud,
   normalizeMoney,
   formatMoneyInput,
-  formatMoneyDisplay
+  formatMoneyDisplay,
+  generateUniqueCrmId
 } from '@/lib/supabaseService';
 import { formatExcelText, formatExcelCurrency, resolvePlateAndDocSerial, extractReferenceFromNotes, sanitizeReference } from '@/lib/excelHelper';
 import { downloadExcelSingleSheet } from '@/lib/excelExport';
@@ -544,7 +544,7 @@ export default function PolicelerPage() {
     const instCount = paymentType === 'Taksitli' ? installmentCount : 1;
 
     // 1. SAVE / UPDATE CUSTOMER
-    let customerId = selectedExistingCustomerId !== 'NEW' ? selectedExistingCustomerId : `CUST-${Math.floor(100 + Math.random() * 900)}`;
+    let customerId = selectedExistingCustomerId !== 'NEW' ? selectedExistingCustomerId : generateUniqueCrmId('CUST');
     let customerToSave: Customer;
     
     // Resolve plate and documentSerial cleanly so they are never mixed up
@@ -552,7 +552,10 @@ export default function PolicelerPage() {
     const cleanPlate = resolvedVeh.plate !== '-' ? resolvedVeh.plate : (plate.trim() || undefined);
     const cleanDocSerial = resolvedVeh.docSerial !== '-' ? resolvedVeh.docSerial : (documentSerial.trim() || undefined);
 
-    const existingCust = customers.find(c => c.id === customerId || c.name.toLowerCase() === customerName.toLowerCase());
+    const existingCust = customers.find(c => 
+      c.id === customerId || 
+      c.name.toLocaleLowerCase('tr-TR').trim() === customerName.toLocaleLowerCase('tr-TR').trim()
+    );
     if (existingCust) {
       customerId = existingCust.id;
       customerToSave = {
