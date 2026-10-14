@@ -336,6 +336,21 @@ export default function SigortaFinansPage() {
   const totalCredit = filteredMovements.reduce((sum, m) => sum + m.creditAmount, 0);
   const netRemainingBalance = totalDebit - totalCredit;
 
+  // Merged customer list: customers table + unique entries from movements (deduped by id)
+  const allCustomerOptions = (() => {
+    const fromCustomers = customers.map(c => ({ id: c.id, name: c.name, phone: c.phone, type: c.type }));
+    const seenIds = new Set(fromCustomers.map(c => c.id));
+    const fromMovements = movements
+      .filter(m => m.customerId && m.customerName && !seenIds.has(m.customerId))
+      .reduce<{ id: string; name: string; phone: string; type: string }[]>((acc, m) => {
+        if (!acc.find(x => x.id === m.customerId)) {
+          acc.push({ id: m.customerId, name: m.customerName, phone: '', type: '' });
+        }
+        return acc;
+      }, []);
+    return [...fromCustomers, ...fromMovements].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+  })();
+
   // Selected customer name for title
   const currentCustomerObj = customers.find(c => c.id === selectedCustomerId);
   const headerCustomerTitle = selectedCustomerId === 'ALL' 
@@ -559,6 +574,24 @@ export default function SigortaFinansPage() {
                   </button>
                 )}
               </div>
+              <input
+                type="text"
+                value={customerSearchTerm}
+                onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                placeholder="🔍 Müşteri ara..."
+                style={{
+                  width: '100%',
+                  maxWidth: '480px',
+                  padding: '7px 12px',
+                  borderRadius: '6px',
+                  border: '1.5px solid #94a3b8',
+                  backgroundColor: '#f8fafc',
+                  fontSize: '0.85rem',
+                  outline: 'none',
+                  marginBottom: '4px',
+                  display: 'block'
+                }}
+              />
               <select
                 value={selectedCustomerId}
                 onChange={(e) => setSelectedCustomerId(e.target.value)}
@@ -577,10 +610,14 @@ export default function SigortaFinansPage() {
                 }}
               >
                 <option value="ALL">📋 TÜM MÜŞTERİLERİN GENEL CARİ HESAP EKSTRESİ</option>
-                {customers.map(c => (
-                  <option key={c.id} value={c.id}>👤 {c.name} ({c.type} - {c.phone})</option>
-                ))}
+                {allCustomerOptions
+                  .filter(c => !customerSearchTerm || c.name.toLowerCase().includes(customerSearchTerm.toLowerCase()))
+                  .map(c => (
+                    <option key={c.id} value={c.id}>👤 {c.name}{c.phone ? ` (${c.phone})` : ''}</option>
+                  ))
+                }
               </select>
+
             </div>
           </div>
 
