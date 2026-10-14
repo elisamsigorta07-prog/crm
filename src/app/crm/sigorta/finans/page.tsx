@@ -86,8 +86,35 @@ export default function SigortaFinansPage() {
           fetchCariMovementsFromCloud(),
           fetchCustomersFromCloud()
         ]);
-        if (cloudMovs) setMovements(cloudMovs);
-        if (cloudCusts) setCustomers(cloudCusts);
+        const movs = cloudMovs || [];
+        const custs = cloudCusts || [];
+        setMovements(movs);
+
+        // movements'taki müşterileri customers listesine ekle (eksik olanlar varsa)
+        const custMap = new Map(custs.map(c => [c.id, c]));
+        const custNameMap = new Map(custs.map(c => [c.name.toLowerCase().trim(), c]));
+        const extraCustomers: typeof custs = [];
+        const seenExtra = new Set<string>();
+        for (const m of movs) {
+          if (!m.customerName) continue;
+          const nameLower = m.customerName.toLowerCase().trim();
+          const id = m.customerId || `NAME-${m.customerName.trim()}`;
+          if (!custMap.has(id) && !custNameMap.has(nameLower) && !seenExtra.has(nameLower)) {
+            seenExtra.add(nameLower);
+            const isCorp = /(?:ŞİRKETİ|LİMİTED|LTD|A\.Ş|SANAYİ|TİCARET|AŞ|HOLDİNG|NAKLİYAT)/i.test(m.customerName);
+            extraCustomers.push({
+              id,
+              name: m.customerName.trim(),
+              type: isCorp ? 'Kurumsal' : 'Bireysel',
+              phone: '-',
+              email: '-',
+              identityNo: '-',
+              address: 'Alanya / Antalya',
+              createdAt: new Date().toLocaleDateString('tr-TR'),
+            });
+          }
+        }
+        setCustomers([...custs, ...extraCustomers]);
       } catch (err) {
         console.error('Supabase initial load error:', err);
       }
