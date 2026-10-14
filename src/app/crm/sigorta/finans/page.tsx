@@ -38,6 +38,7 @@ import {
   CariMovement,
   fetchCariMovementsFromCloud,
   fetchCustomersFromCloud,
+  mergeCustomersWithCariMovements,
   upsertCariMovementToCloud,
   deleteCariMovementFromCloud,
   clearCariMovementsFromCloud,
@@ -89,32 +90,7 @@ export default function SigortaFinansPage() {
         const movs = cloudMovs || [];
         const custs = cloudCusts || [];
         setMovements(movs);
-
-        // movements'taki müşterileri customers listesine ekle (eksik olanlar varsa)
-        const custMap = new Map(custs.map(c => [c.id, c]));
-        const custNameMap = new Map(custs.map(c => [c.name.toLowerCase().trim(), c]));
-        const extraCustomers: typeof custs = [];
-        const seenExtra = new Set<string>();
-        for (const m of movs) {
-          if (!m.customerName) continue;
-          const nameLower = m.customerName.toLowerCase().trim();
-          const id = m.customerId || `NAME-${m.customerName.trim()}`;
-          if (!custMap.has(id) && !custNameMap.has(nameLower) && !seenExtra.has(nameLower)) {
-            seenExtra.add(nameLower);
-            const isCorp = /(?:ŞİRKETİ|LİMİTED|LTD|A\.Ş|SANAYİ|TİCARET|AŞ|HOLDİNG|NAKLİYAT)/i.test(m.customerName);
-            extraCustomers.push({
-              id,
-              name: m.customerName.trim(),
-              type: isCorp ? 'Kurumsal' : 'Bireysel',
-              phone: '-',
-              email: '-',
-              identityNo: '-',
-              address: 'Alanya / Antalya',
-              createdAt: new Date().toLocaleDateString('tr-TR'),
-            });
-          }
-        }
-        setCustomers([...custs, ...extraCustomers]);
+        setCustomers(mergeCustomersWithCariMovements(custs, movs));
       } catch (err) {
         console.error('Supabase initial load error:', err);
       }
@@ -334,17 +310,35 @@ export default function SigortaFinansPage() {
     }
   };
 
+  const normalizeCustomerName = (n: string) => n.toLocaleLowerCase('tr-TR').trim();
+
+  const allCustomerOptions = mergeCustomersWithCariMovements(customers, movements).map((c) => ({
+    id: c.id,
+    name: c.name,
+    phone: c.phone,
+    type: c.type,
+  }));
+
+  const selectedCustomerOption =
+    selectedCustomerId === 'ALL'
+      ? null
+      : allCustomerOptions.find((c) => c.id === selectedCustomerId);
+
   // Filtered movements based on selected customer & search
   const filteredMovements = movements.filter(m => {
     let matchesCustomer = false;
     if (selectedCustomerId === 'ALL') {
       matchesCustomer = true;
     } else if (selectedCustomerId.startsWith('NAME-')) {
-      // customerId'si olmayan hareketler: isimle eşleştir
-      const targetName = selectedCustomerId.slice(5).toLowerCase().trim();
-      matchesCustomer = m.customerName.toLowerCase().trim() === targetName;
+      const targetName = normalizeCustomerName(selectedCustomerId.slice(5));
+      matchesCustomer = normalizeCustomerName(m.customerName) === targetName;
     } else {
-      matchesCustomer = m.customerId === selectedCustomerId || m.customerName.toLowerCase().trim() === selectedCustomerId.toLowerCase().trim();
+      const targetName = selectedCustomerOption
+        ? normalizeCustomerName(selectedCustomerOption.name)
+        : normalizeCustomerName(selectedCustomerId);
+      matchesCustomer =
+        m.customerId === selectedCustomerId ||
+        normalizeCustomerName(m.customerName) === targetName;
     }
     const matchesSearch = 
       m.description.toLowerCase().includes(tableSearchTerm.toLowerCase()) ||
@@ -372,33 +366,10 @@ export default function SigortaFinansPage() {
   const totalCredit = filteredMovements.reduce((sum, m) => sum + m.creditAmount, 0);
   const netRemainingBalance = totalDebit - totalCredit;
 
-  // Merged customer list: customers table + unique entries from movements (deduped by id AND name)
-  const allCustomerOptions = (() => {
-    const fromCustomers = customers.map(c => ({ id: c.id, name: c.name, phone: c.phone, type: c.type }));
-    const seenIds = new Set(fromCustomers.map(c => c.id));
-    const seenNames = new Set(fromCustomers.map(c => c.name.toLowerCase().trim()));
-
-    const fromMovements = movements
-      .filter(m => m.customerName && m.customerName.trim() !== '')
-      .reduce<{ id: string; name: string; phone: string; type: string }[]>((acc, m) => {
-        // customerId null/boş olsa bile customerName ile eşleştir
-        const effectiveId = m.customerId || `NAME-${m.customerName.trim()}`;
-        const nameLower = m.customerName.toLowerCase().trim();
-        if (!seenIds.has(effectiveId) && !seenNames.has(nameLower)) {
-          // daha önce eklenmediyse ekle
-          if (!acc.find(x => x.id === effectiveId || x.name.toLowerCase().trim() === nameLower)) {
-            acc.push({ id: effectiveId, name: m.customerName.trim(), phone: '', type: '' });
-            seenIds.add(effectiveId);
-            seenNames.add(nameLower);
-          }
-        }
-        return acc;
-      }, []);
-    return [...fromCustomers, ...fromMovements].sort((a, b) => a.name.localeCompare(b.name, 'tr'));
-  })();
-
   // Selected customer name for title
-  const currentCustomerObj = customers.find(c => c.id === selectedCustomerId);
+  const currentCustomerObj =
+    allCustomerOptions.find((c) => c.id === selectedCustomerId) ||
+    customers.find((c) => c.id === selectedCustomerId);
   const headerCustomerTitle = selectedCustomerId === 'ALL' 
     ? 'GENEL CARİ HESAP EKSTRESİ (TÜM MÜŞTERİLER)' 
     : (currentCustomerObj ? `${currentCustomerObj.name.toUpperCase()} - HESAP ÖZETİ` : `${selectedCustomerId.toUpperCase()} - HESAP ÖZETİ`);

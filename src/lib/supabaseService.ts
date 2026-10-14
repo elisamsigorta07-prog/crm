@@ -26,6 +26,74 @@ export interface CariMovement {
   notes?: string;
 }
 
+const SUPABASE_PAGE_SIZE = 1000;
+
+async function fetchSupabaseTableAll(
+  table: string,
+  select: string,
+  order?: { column: string; ascending: boolean }
+): Promise<{ data: any[] | null; error: { message: string } | null }> {
+  const all: any[] = [];
+  let from = 0;
+  while (true) {
+    let query = supabase.from(table).select(select).range(from, from + SUPABASE_PAGE_SIZE - 1);
+    if (order) {
+      query = query.order(order.column, { ascending: order.ascending });
+    }
+    const { data, error } = await query;
+    if (error) return { data: null, error };
+    if (!data?.length) break;
+    all.push(...data);
+    if (data.length < SUPABASE_PAGE_SIZE) break;
+    from += SUPABASE_PAGE_SIZE;
+  }
+  return { data: all, error: null };
+}
+
+/** customers tablosu + cari_movements içindeki benzersiz müşteri ünvanları */
+export function mergeCustomersWithCariMovements(
+  customers: Customer[],
+  movements: CariMovement[]
+): Customer[] {
+  const normalizeName = (n: string) => n.toLocaleLowerCase('tr-TR').trim();
+  const byName = new Map<string, Customer>();
+
+  for (const m of movements) {
+    const name = m.customerName?.trim();
+    if (!name) continue;
+    const nameKey = normalizeName(name);
+    if (byName.has(nameKey)) continue;
+
+    const matched = customers.find(
+      (c) => normalizeName(c.name) === nameKey || (!!m.customerId && c.id === m.customerId)
+    );
+    if (matched) {
+      byName.set(nameKey, matched);
+      continue;
+    }
+
+    const cid = m.customerId?.trim();
+    const isCorp = /(?:ŞİRKETİ|LİMİTED|LTD|A\.Ş|SANAYİ|TİCARET|AŞ|HOLDİNG|NAKLİYAT)/i.test(name);
+    byName.set(nameKey, {
+      id: cid && cid !== '-' ? cid : `NAME-${name}`,
+      name,
+      type: isCorp ? 'Kurumsal' : 'Bireysel',
+      phone: '-',
+      email: '-',
+      identityNo: '-',
+      address: 'Alanya / Antalya',
+      createdAt: new Date().toLocaleDateString('tr-TR'),
+    });
+  }
+
+  for (const c of customers) {
+    const nameKey = normalizeName(c.name);
+    if (!byName.has(nameKey)) byName.set(nameKey, c);
+  }
+
+  return Array.from(byName.values()).sort((a, b) => a.name.localeCompare(b.name, 'tr'));
+}
+
 // -------------------------------------------------------------
 // 1. MÜŞTERİLER (CUSTOMERS)
 // -------------------------------------------------------------
@@ -36,10 +104,9 @@ export async function fetchCustomersFromCloud(): Promise<Customer[]> {
       return saved ? JSON.parse(saved) : [];
     }
 
-    // Her iki tabloyu paralel çek
     const [custResult, movResult] = await Promise.all([
       supabase.from('customers').select('*').order('created_at', { ascending: false }),
-      supabase.from('cari_movements').select('customer_id, customer_name')
+      fetchSupabaseTableAll('cari_movements', 'customer_id, customer_name'),
     ]);
 
     if (custResult.error) {
@@ -95,33 +162,24 @@ export async function fetchCustomersFromCloud(): Promise<Customer[]> {
       };
     });
 
-    // cari_movements'taki müşterileri de ekle (customers tablosunda olmayanları)
-    const custIdSet = new Set(mapped.map(c => c.id));
-    const custNameSet = new Set(mapped.map(c => c.name.toLowerCase().trim()));
-    const seenExtra = new Set<string>();
-
-    if (movResult.data) {
-      for (const m of movResult.data as any[]) {
-        if (!m.customer_name) continue;
-        const nameLower = (m.customer_name as string).toLowerCase().trim();
-        const effectiveId = m.customer_id || `NAME-${m.customer_name.trim()}`;
-        if (!custIdSet.has(effectiveId) && !custNameSet.has(nameLower) && !seenExtra.has(nameLower)) {
-          seenExtra.add(nameLower);
-          const isCorp = /(?:ŞİRKETİ|LİMİTED|LTD|A\.Ş|SANAYİ|TİCARET|AŞ|HOLDİNG|NAKLİYAT)/i.test(m.customer_name);
-          mapped.push({
-            id: effectiveId,
-            name: (m.customer_name as string).trim(),
-            type: isCorp ? 'Kurumsal' : 'Bireysel',
-            phone: '-', email: '-', identityNo: '-',
-            address: 'Alanya / Antalya',
-            createdAt: new Date().toLocaleDateString('tr-TR'),
-          });
-        }
-      }
+    if (movResult.error) {
+      console.warn('Supabase cari_movements (müşteri listesi) fetch error:', movResult.error.message);
     }
 
-    localStorage.setItem('elisam_customers', JSON.stringify(mapped));
-    return mapped;
+    const movStubs: CariMovement[] = (movResult.data || []).map((m: any) => ({
+      id: '',
+      date: '',
+      customerId: m.customer_id ?? '',
+      customerName: m.customer_name ?? '',
+      description: '',
+      movementType: 'Cari Hareket Girişi',
+      debitAmount: 0,
+      creditAmount: 0,
+    }));
+
+    const merged = mergeCustomersWithCariMovements(mapped, movStubs);
+    localStorage.setItem('elisam_customers', JSON.stringify(merged));
+    return merged;
   } catch (err) {
     console.error('fetchCustomersFromCloud error:', err);
   }
@@ -570,10 +628,10 @@ export async function fetchCariMovementsFromCloud(): Promise<CariMovement[]> {
       return saved ? JSON.parse(saved) : [];
     }
 
-    const { data, error } = await supabase
-      .from('cari_movements')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const { data, error } = await fetchSupabaseTableAll('cari_movements', '*', {
+      column: 'created_at',
+      ascending: false,
+    });
 
     if (error) {
       console.warn('Supabase cari_movements fetch error, fallback to local:', error.message);
