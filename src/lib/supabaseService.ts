@@ -36,65 +36,92 @@ export async function fetchCustomersFromCloud(): Promise<Customer[]> {
       return saved ? JSON.parse(saved) : [];
     }
 
-    const { data, error } = await supabase
-      .from('customers')
-      .select('*')
-      .order('created_at', { ascending: false });
+    // Her iki tabloyu paralel çek
+    const [custResult, movResult] = await Promise.all([
+      supabase.from('customers').select('*').order('created_at', { ascending: false }),
+      supabase.from('cari_movements').select('customer_id, customer_name')
+    ]);
 
-    if (error) {
-      console.warn('Supabase customers fetch error, using localStorage fallback:', error.message);
+    if (custResult.error) {
+      console.warn('Supabase customers fetch error, using localStorage fallback:', custResult.error.message);
       const saved = localStorage.getItem('elisam_customers');
       return saved ? JSON.parse(saved) : [];
     }
 
-    if (data) {
-      const existingLocal: Customer[] = (() => {
-        try {
-          const s = localStorage.getItem('elisam_customers');
-          return s ? JSON.parse(s) : [];
-        } catch { return []; }
-      })();
-      const localMap = new Map(existingLocal.map(lc => [lc.id, lc]));
+    const data = custResult.data || [];
 
-      const mapped: Customer[] = data.map((c: any) => {
-        const local = localMap.get(c.id);
-        const rawNotes = c.notes || local?.notes || '';
-        const rawPlate = c.plate || local?.plate || undefined;
-        const rawDocSerial = c.document_serial || c.documentSerial || local?.documentSerial || undefined;
-        const resolvedVeh = resolvePlateAndDocSerial(rawPlate, rawDocSerial, rawNotes);
+    const existingLocal: Customer[] = (() => {
+      try {
+        const s = localStorage.getItem('elisam_customers');
+        return s ? JSON.parse(s) : [];
+      } catch { return []; }
+    })();
+    const localMap = new Map(existingLocal.map(lc => [lc.id, lc]));
 
-        const cleanPlate = resolvedVeh.plate !== '-' ? resolvedVeh.plate : (rawPlate || undefined);
-        const cleanDocSerial = resolvedVeh.docSerial !== '-' ? resolvedVeh.docSerial : (rawDocSerial || undefined);
+    const mapped: Customer[] = data.map((c: any) => {
+      const local = localMap.get(c.id);
+      const rawNotes = c.notes || local?.notes || '';
+      const rawPlate = c.plate || local?.plate || undefined;
+      const rawDocSerial = c.document_serial || c.documentSerial || local?.documentSerial || undefined;
+      const resolvedVeh = resolvePlateAndDocSerial(rawPlate, rawDocSerial, rawNotes);
 
-        return {
-          id: c.id,
-          name: c.name,
-          type: c.type || 'Bireysel',
-          identityNo: c.identity_no || c.identityNo || local?.identityNo || '-',
-          phone: c.phone || local?.phone || '-',
-          email: c.email || local?.email || '-',
-          address: c.address || local?.address || 'Alanya / Antalya',
-          birthDate: c.birth_date || c.birthDate || local?.birthDate || undefined,
-          reference: sanitizeReference(c.reference || local?.reference, rawNotes),
-          notes: rawNotes || undefined,
-          createdAt: c.created_at ? new Date(c.created_at).toLocaleDateString('tr-TR') : (local?.createdAt || new Date().toLocaleDateString('tr-TR')),
-          policyNo: c.policy_no || c.policyNo || local?.policyNo || undefined,
-          insuranceType: c.insurance_type || c.insuranceType || local?.insuranceType || undefined,
-          policyStartDate: c.policy_start_date || c.policyStartDate || local?.policyStartDate || undefined,
-          policyEndDate: c.policy_end_date || c.policyEndDate || local?.policyEndDate || undefined,
-          plate: cleanPlate,
-          documentSerial: cleanDocSerial,
-          vehicleUsage: c.vehicle_usage || c.vehicleUsage || local?.vehicleUsage || undefined,
-          vehicleBrand: c.vehicle_brand || c.vehicleBrand || local?.vehicleBrand || undefined,
-          vehicleType: c.vehicle_type || c.vehicleType || local?.vehicleType || undefined,
-          vehicleModelYear: c.vehicle_model_year || c.vehicleModelYear || local?.vehicleModelYear || undefined,
-          vehicleRegistrationDate: c.vehicle_registration_date || c.vehicleRegistrationDate || local?.vehicleRegistrationDate || undefined,
-          vehicleValue: c.vehicle_value || c.vehicleValue || local?.vehicleValue || undefined
-        };
-      });
-      localStorage.setItem('elisam_customers', JSON.stringify(mapped));
-      return mapped;
+      const cleanPlate = resolvedVeh.plate !== '-' ? resolvedVeh.plate : (rawPlate || undefined);
+      const cleanDocSerial = resolvedVeh.docSerial !== '-' ? resolvedVeh.docSerial : (rawDocSerial || undefined);
+
+      return {
+        id: c.id,
+        name: c.name,
+        type: c.type || 'Bireysel',
+        identityNo: c.identity_no || c.identityNo || local?.identityNo || '-',
+        phone: c.phone || local?.phone || '-',
+        email: c.email || local?.email || '-',
+        address: c.address || local?.address || 'Alanya / Antalya',
+        birthDate: c.birth_date || c.birthDate || local?.birthDate || undefined,
+        reference: sanitizeReference(c.reference || local?.reference, rawNotes),
+        notes: rawNotes || undefined,
+        createdAt: c.created_at ? new Date(c.created_at).toLocaleDateString('tr-TR') : (local?.createdAt || new Date().toLocaleDateString('tr-TR')),
+        policyNo: c.policy_no || c.policyNo || local?.policyNo || undefined,
+        insuranceType: c.insurance_type || c.insuranceType || local?.insuranceType || undefined,
+        policyStartDate: c.policy_start_date || c.policyStartDate || local?.policyStartDate || undefined,
+        policyEndDate: c.policy_end_date || c.policyEndDate || local?.policyEndDate || undefined,
+        plate: cleanPlate,
+        documentSerial: cleanDocSerial,
+        vehicleUsage: c.vehicle_usage || c.vehicleUsage || local?.vehicleUsage || undefined,
+        vehicleBrand: c.vehicle_brand || c.vehicleBrand || local?.vehicleBrand || undefined,
+        vehicleType: c.vehicle_type || c.vehicleType || local?.vehicleType || undefined,
+        vehicleModelYear: c.vehicle_model_year || c.vehicleModelYear || local?.vehicleModelYear || undefined,
+        vehicleRegistrationDate: c.vehicle_registration_date || c.vehicleRegistrationDate || local?.vehicleRegistrationDate || undefined,
+        vehicleValue: c.vehicle_value || c.vehicleValue || local?.vehicleValue || undefined
+      };
+    });
+
+    // cari_movements'taki müşterileri de ekle (customers tablosunda olmayanları)
+    const custIdSet = new Set(mapped.map(c => c.id));
+    const custNameSet = new Set(mapped.map(c => c.name.toLowerCase().trim()));
+    const seenExtra = new Set<string>();
+
+    if (movResult.data) {
+      for (const m of movResult.data as any[]) {
+        if (!m.customer_name) continue;
+        const nameLower = (m.customer_name as string).toLowerCase().trim();
+        const effectiveId = m.customer_id || `NAME-${m.customer_name.trim()}`;
+        if (!custIdSet.has(effectiveId) && !custNameSet.has(nameLower) && !seenExtra.has(nameLower)) {
+          seenExtra.add(nameLower);
+          const isCorp = /(?:ŞİRKETİ|LİMİTED|LTD|A\.Ş|SANAYİ|TİCARET|AŞ|HOLDİNG|NAKLİYAT)/i.test(m.customer_name);
+          mapped.push({
+            id: effectiveId,
+            name: (m.customer_name as string).trim(),
+            type: isCorp ? 'Kurumsal' : 'Bireysel',
+            phone: '-', email: '-', identityNo: '-',
+            address: 'Alanya / Antalya',
+            createdAt: new Date().toLocaleDateString('tr-TR'),
+          });
+        }
+      }
     }
+
+    localStorage.setItem('elisam_customers', JSON.stringify(mapped));
+    return mapped;
   } catch (err) {
     console.error('fetchCustomersFromCloud error:', err);
   }
