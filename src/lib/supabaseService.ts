@@ -50,12 +50,25 @@ async function fetchSupabaseTableAll(
   return { data: all, error: null };
 }
 
-/** customers tablosu + cari_movements içindeki benzersiz müşteri ünvanları */
+export function normalizeCariCustomerName(n: string): string {
+  return n.toLocaleLowerCase('tr-TR').trim();
+}
+
+/** Finans listesinde cari hareket ünvanı için sabit seçim kimliği */
+export function cariCustomerOptionId(normalizedName: string): string {
+  return `CARI:${normalizedName}`;
+}
+
+export function isSyntheticCariCustomerId(id: string): boolean {
+  return id.startsWith('CARI:') || id.startsWith('NAME-');
+}
+
+/** customers tablosu + cari_movements içindeki benzersiz müşteri ünvanları (ünvan cari kayıttaki gibidir) */
 export function mergeCustomersWithCariMovements(
   customers: Customer[],
   movements: CariMovement[]
 ): Customer[] {
-  const normalizeName = (n: string) => n.toLocaleLowerCase('tr-TR').trim();
+  const normalizeName = normalizeCariCustomerName;
   const byName = new Map<string, Customer>();
 
   for (const m of movements) {
@@ -64,18 +77,15 @@ export function mergeCustomersWithCariMovements(
     const nameKey = normalizeName(name);
     if (byName.has(nameKey)) continue;
 
-    const matched = customers.find(
-      (c) => normalizeName(c.name) === nameKey || (!!m.customerId && c.id === m.customerId)
-    );
-    if (matched) {
-      byName.set(nameKey, matched);
+    const matchedByName = customers.find((c) => normalizeName(c.name) === nameKey);
+    if (matchedByName) {
+      byName.set(nameKey, matchedByName);
       continue;
     }
 
-    const cid = m.customerId?.trim();
     const isCorp = /(?:ŞİRKETİ|LİMİTED|LTD|A\.Ş|SANAYİ|TİCARET|AŞ|HOLDİNG|NAKLİYAT)/i.test(name);
     byName.set(nameKey, {
-      id: cid && cid !== '-' ? cid : `NAME-${name}`,
+      id: cariCustomerOptionId(nameKey),
       name,
       type: isCorp ? 'Kurumsal' : 'Bireysel',
       phone: '-',
@@ -83,6 +93,7 @@ export function mergeCustomersWithCariMovements(
       identityNo: '-',
       address: 'Alanya / Antalya',
       createdAt: new Date().toLocaleDateString('tr-TR'),
+      notes: m.customerId?.trim() ? `Cari bağlantı ID: ${m.customerId.trim()}` : 'Cari hareketten tanımlandı.',
     });
   }
 

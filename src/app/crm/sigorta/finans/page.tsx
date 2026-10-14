@@ -39,6 +39,8 @@ import {
   fetchCariMovementsFromCloud,
   fetchCustomersFromCloud,
   mergeCustomersWithCariMovements,
+  normalizeCariCustomerName,
+  isSyntheticCariCustomerId,
   upsertCariMovementToCloud,
   deleteCariMovementFromCloud,
   clearCariMovementsFromCloud,
@@ -128,9 +130,9 @@ export default function SigortaFinansPage() {
     
     // Set default customer if filtered, otherwise leave empty for user selection
     if (selectedCustomerId !== 'ALL') {
-      const matched = customers.find(c => c.id === selectedCustomerId);
+      const matched = mergeCustomersWithCariMovements(customers, movements).find(c => c.id === selectedCustomerId);
       setFormCustomerId(selectedCustomerId);
-      setFormCustomerName(matched?.name || selectedCustomerId);
+      setFormCustomerName(matched?.name || (selectedCustomerId.startsWith('CARI:') ? selectedCustomerId.slice(5) : selectedCustomerId));
     } else {
       setFormCustomerId('');
       setFormCustomerName('');
@@ -286,6 +288,8 @@ export default function SigortaFinansPage() {
     setIsAddModalOpen(false);
   };
 
+  const mergedCustomers = mergeCustomersWithCariMovements(customers, movements);
+
   // Delete Movement
   const handleDeleteMovement = (id: string, desc: string) => {
     if (confirm(`"${desc}" hareketini silmek istediğinize emin misiniz?`)) {
@@ -296,23 +300,24 @@ export default function SigortaFinansPage() {
 
   // Delete Customer and all their movements
   const handleDeleteCustomer = (customerIdToDelete: string) => {
-    const targetCust = customers.find(c => c.id === customerIdToDelete);
+    const targetCust = mergedCustomers.find(c => c.id === customerIdToDelete);
     const name = targetCust?.name || customerIdToDelete;
 
     if (confirm(`"${name}" müşterisini ve bu müşteriye ait tüm cari/finans hareketlerini sistemden tamamen silmek istediğinize emin misiniz?`)) {
-      setCustomers(customers.filter(c => c.id !== customerIdToDelete && c.name.toLowerCase() !== customerIdToDelete.toLowerCase()));
-      setMovements(movements.filter(m => m.customerId !== customerIdToDelete && m.customerName.toLowerCase() !== name.toLowerCase()));
+      const nameNorm = normalizeCariCustomerName(name);
+      setCustomers(customers.filter(c => c.id !== customerIdToDelete && normalizeCariCustomerName(c.name) !== nameNorm));
+      setMovements(movements.filter(m => normalizeCariCustomerName(m.customerName) !== nameNorm));
 
-      deleteCustomerFromCloud(customerIdToDelete);
+      if (!isSyntheticCariCustomerId(customerIdToDelete)) {
+        deleteCustomerFromCloud(customerIdToDelete);
+      }
 
       setSelectedCustomerId('ALL');
       alert(`"${name}" müşterisi ve tüm cari hareketleri başarıyla silindi.`);
     }
   };
 
-  const normalizeCustomerName = (n: string) => n.toLocaleLowerCase('tr-TR').trim();
-
-  const allCustomerOptions = mergeCustomersWithCariMovements(customers, movements).map((c) => ({
+  const allCustomerOptions = mergedCustomers.map((c) => ({
     id: c.id,
     name: c.name,
     phone: c.phone,
@@ -329,16 +334,20 @@ export default function SigortaFinansPage() {
     let matchesCustomer = false;
     if (selectedCustomerId === 'ALL') {
       matchesCustomer = true;
+    } else if (selectedCustomerId.startsWith('CARI:')) {
+      const targetName = selectedCustomerId.slice(5);
+      matchesCustomer = normalizeCariCustomerName(m.customerName) === targetName;
     } else if (selectedCustomerId.startsWith('NAME-')) {
-      const targetName = normalizeCustomerName(selectedCustomerId.slice(5));
-      matchesCustomer = normalizeCustomerName(m.customerName) === targetName;
+      const targetName = normalizeCariCustomerName(selectedCustomerId.slice(5));
+      matchesCustomer = normalizeCariCustomerName(m.customerName) === targetName;
     } else {
       const targetName = selectedCustomerOption
-        ? normalizeCustomerName(selectedCustomerOption.name)
-        : normalizeCustomerName(selectedCustomerId);
+        ? normalizeCariCustomerName(selectedCustomerOption.name)
+        : normalizeCariCustomerName(selectedCustomerId);
       matchesCustomer =
-        m.customerId === selectedCustomerId ||
-        normalizeCustomerName(m.customerName) === targetName;
+        (m.customerId === selectedCustomerId &&
+          normalizeCariCustomerName(m.customerName) === targetName) ||
+        normalizeCariCustomerName(m.customerName) === targetName;
     }
     const matchesSearch = 
       m.description.toLowerCase().includes(tableSearchTerm.toLowerCase()) ||
@@ -390,7 +399,7 @@ export default function SigortaFinansPage() {
         identityNo: matchedCustomer?.identityNo || '-',
         address: matchedCustomer?.address || 'Alanya / Antalya'
       } : (movements.length > 0 && movements[0]?.customerName ? {
-        name: `Genel Döküm (${customers.length} Kayıtlı Müşteri / Cari)`,
+        name: `Genel Döküm (${mergedCustomers.length} Kayıtlı Müşteri / Cari)`,
         type: 'Konsolide Cari Hesap Dökümü',
         phone: '0551 438 77 71',
         address: 'Alanya / Antalya'
@@ -567,7 +576,10 @@ export default function SigortaFinansPage() {
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '3px' }}>
                 <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155' }}>
-                  HESAP ÖZETİ GÖRÜNTÜLENECEK MÜŞTERİ:
+                  HESAP ÖZETİ GÖRÜNTÜLENECEK MÜŞTERİ:{' '}
+                  <span style={{ fontWeight: 600, color: '#64748b' }}>
+                    ({allCustomerOptions.length} hesap — müşteriler + cari ekstre)
+                  </span>
                 </label>
                 {selectedCustomerId !== 'ALL' && (
                   <button
@@ -1057,7 +1069,7 @@ export default function SigortaFinansPage() {
                       boxShadow: '0 8px 20px rgba(0,0,0,0.1)',
                       zIndex: 50
                     }}>
-                      {customers.filter(c => {
+                      {mergedCustomers.filter(c => {
                         const q = modalCustomerSearch.toLowerCase();
                         return c.name.toLowerCase().includes(q) ||
                                (c.identityNo && c.identityNo.includes(q)) ||
@@ -1065,7 +1077,7 @@ export default function SigortaFinansPage() {
                                (c.plate && c.plate.toLowerCase().includes(q)) ||
                                (c.policyNo && c.policyNo.toLowerCase().includes(q));
                       }).length > 0 ? (
-                        customers.filter(c => {
+                        mergedCustomers.filter(c => {
                           const q = modalCustomerSearch.toLowerCase();
                           return c.name.toLowerCase().includes(q) ||
                                  (c.identityNo && c.identityNo.includes(q)) ||
@@ -1124,14 +1136,14 @@ export default function SigortaFinansPage() {
                       if (cid === 'NEW') {
                         setFormCustomerName('');
                       } else {
-                        const matched = customers.find(c => c.id === cid);
+                        const matched = mergedCustomers.find(c => c.id === cid);
                         if (matched) setFormCustomerName(matched.name);
                       }
                     }}
                     style={{ width: '100%', padding: '8px 10px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none', backgroundColor: '#ffffff', fontSize: '0.86rem', fontWeight: 600 }}
                   >
                     <option value="NEW">-- Yeni / Farklı Müşteri Tanımlayacağım --</option>
-                    {customers.map(c => (
+                    {mergedCustomers.map(c => (
                       <option key={c.id} value={c.id}>👤 {c.name} ({c.type} - {c.phone})</option>
                     ))}
                   </select>
