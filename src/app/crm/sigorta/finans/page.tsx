@@ -53,6 +53,25 @@ import { formatExcelText } from '@/lib/excelHelper';
 import { downloadExcelSingleSheet } from '@/lib/excelExport';
 import styles from '../layout.module.css';
 
+const getMovementDateValue = (date: string): number => {
+  const value = date.trim();
+  const localDateMatch = value.match(/^(\d{1,2})[./](\d{1,2})[./](\d{4})$/);
+
+  if (localDateMatch) {
+    const [, day, month, year] = localDateMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day)).getTime();
+  }
+
+  const isoDateMatch = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoDateMatch) {
+    const [, year, month, day] = isoDateMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day)).getTime();
+  }
+
+  const parsedDate = Date.parse(value);
+  return Number.isNaN(parsedDate) ? Number.POSITIVE_INFINITY : parsedDate;
+};
+
 export default function SigortaFinansPage() {
   const [movements, setMovements] = useState<CariMovement[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -363,16 +382,23 @@ export default function SigortaFinansPage() {
     return matchesCustomer && matchesSearch && matchesType;
   });
 
+  // Show the statement in chronological order so running balances follow transaction dates.
+  const sortedMovements = [...filteredMovements]
+    .map((movement, originalIndex) => ({
+      movement,
+      originalIndex,
+      dateValue: getMovementDateValue(movement.date),
+    }))
+    .sort((a, b) => a.dateValue - b.dateValue || a.originalIndex - b.originalIndex)
+    .map(({ movement }) => movement);
+
   // Calculate Cumulative Running Balances for each row
-  let runningBalance = 0;
-  const movementsWithBalance = filteredMovements.map(m => {
+  const movementsWithBalance = sortedMovements.reduce<Array<CariMovement & { currentBalance: number }>>((balances, m) => {
     // In Turkish Cari: Borç increases customer debt (+), Alacak / Tahsilat decreases customer debt (-)
-    runningBalance += (m.debitAmount - m.creditAmount);
-    return {
-      ...m,
-      currentBalance: runningBalance
-    };
-  });
+    const currentBalance = (balances[balances.length - 1]?.currentBalance || 0) + m.debitAmount - m.creditAmount;
+    balances.push({ ...m, currentBalance });
+    return balances;
+  }, []);
 
   // Totals
   const totalDebit = filteredMovements.reduce((sum, m) => sum + m.debitAmount, 0);
