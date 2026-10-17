@@ -26,7 +26,9 @@ import {
   Building2,
   Trash2,
   Edit2,
-  Receipt
+  Receipt,
+  Archive,
+  RotateCcw
 } from 'lucide-react';
 import { 
   Customer, 
@@ -37,14 +39,16 @@ import {
 import { 
   CariMovement,
   fetchCariMovementsFromCloud,
+  fetchCariMovementTrashFromCloud,
   fetchCustomersFromCloud,
   mergeCustomersWithCariMovements,
   normalizeCariCustomerName,
   isSyntheticCariCustomerId,
   generateUniqueCrmId,
-  upsertCariMovementToCloud,
+  createCariMovementInCloud,
+  updateCariMovementInCloud,
   deleteCariMovementFromCloud,
-  clearCariMovementsFromCloud,
+  restoreCariMovementFromTrash,
   upsertCustomerToCloud,
   deleteCustomerFromCloud
 } from '@/lib/supabaseService';
@@ -74,6 +78,7 @@ const getMovementDateValue = (date: string): number => {
 
 export default function SigortaFinansPage() {
   const [movements, setMovements] = useState<CariMovement[]>([]);
+  const [trashedMovements, setTrashedMovements] = useState<CariMovement[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   
@@ -85,6 +90,7 @@ export default function SigortaFinansPage() {
 
   // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isTrashOpen, setIsTrashOpen] = useState(false);
   const [modalActionType, setModalActionType] = useState<'BORC' | 'TAHSILAT' | 'GIDEN_ODEME' | 'IADE' | 'DEVIR'>('BORC');
   const [editingMovement, setEditingMovement] = useState<CariMovement | null>(null);
 
@@ -105,13 +111,15 @@ export default function SigortaFinansPage() {
     setIsMounted(true);
     async function loadInitialData() {
       try {
-        const [cloudMovs, cloudCusts] = await Promise.all([
+        const [cloudMovs, cloudTrash, cloudCusts] = await Promise.all([
           fetchCariMovementsFromCloud(),
+          fetchCariMovementTrashFromCloud(),
           fetchCustomersFromCloud()
         ]);
         const movs = cloudMovs || [];
         const custs = cloudCusts || [];
         setMovements(movs);
+        setTrashedMovements(cloudTrash || []);
         setCustomers(mergeCustomersWithCariMovements(custs, movs));
       } catch (err) {
         console.error('Supabase initial load error:', err);
@@ -145,7 +153,7 @@ export default function SigortaFinansPage() {
     setModalCustomerSearch('');
     setFormDate(new Date().toLocaleDateString('tr-TR'));
     setFormDueDate('');
-    setFormReceiptNo(getNextReceiptNo(movements));
+    setFormReceiptNo(getNextReceiptNo([...movements, ...trashedMovements]));
     setFormAmount('');
     
     // Set default customer if filtered, otherwise leave empty for user selection
@@ -213,7 +221,7 @@ export default function SigortaFinansPage() {
   };
 
   // Save Movement
-  const handleSaveMovement = (e: React.FormEvent) => {
+  const handleSaveMovement = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formCustomerName.trim() || !formAmount || Number(formAmount) <= 0) {
       alert('Lütfen müşteri adını ve geçerli bir tutar girin.');
@@ -261,10 +269,8 @@ export default function SigortaFinansPage() {
 
     // Auto create customer in customer list if new
     let custId = formCustomerId;
-    const existingCust = customers.find(c => 
-      (custId && c.id === custId) || 
-      normalizeCariCustomerName(c.name) === normalizeCariCustomerName(formCustomerName)
-    );
+    const existingCust = (custId ? customers.find(c => c.id === custId) : undefined) ||
+      customers.find(c => normalizeCariCustomerName(c.name) === normalizeCariCustomerName(formCustomerName));
     if (!existingCust) {
       custId = generateUniqueCrmId('CUST');
       const isCorp = /(?:ŞİRKETİ|LİMİTED|LTD|A\.Ş|SANAYİ|TİCARET|AŞ|HOLDİNG)/i.test(formCustomerName);
@@ -281,7 +287,13 @@ export default function SigortaFinansPage() {
       };
       const updatedCustList = [newCust, ...customers];
       setCustomers(updatedCustList);
-      upsertCustomerToCloud(newCust);
+      try {
+        await upsertCustomerToCloud(newCust);
+      } catch (err) {
+        console.error('Cari müşteri kaydedilemedi:', err);
+        alert('Müşteri buluta kaydedilemedi. Finans hareketi oluşturulmadı; lütfen tekrar deneyin.');
+        return;
+      }
     } else {
       custId = existingCust.id;
     }
@@ -300,13 +312,19 @@ export default function SigortaFinansPage() {
       notes: formNotes || undefined
     };
 
-    if (editingMovement) {
-      setMovements(movements.map(m => m.id === editingMovement.id ? newMov : m));
-    } else {
-      setMovements([...movements, newMov]);
+    try {
+      if (editingMovement) {
+        await updateCariMovementInCloud(newMov);
+        setMovements(movements.map(m => m.id === editingMovement.id ? newMov : m));
+      } else {
+        await createCariMovementInCloud(newMov);
+        setMovements([...movements, newMov]);
+      }
+    } catch (err) {
+      console.error('Cari hareket kaydedilemedi:', err);
+      alert('Hareket kaydedilemedi. Mevcut kayıtların üzerine yazılmadı; lütfen tekrar deneyin.');
+      return;
     }
-    // Async Cloud Save
-    upsertCariMovementToCloud(newMov);
 
     setIsAddModalOpen(false);
   };
@@ -314,26 +332,56 @@ export default function SigortaFinansPage() {
   const mergedCustomers = mergeCustomersWithCariMovements(customers, movements);
 
   // Delete Movement
-  const handleDeleteMovement = (id: string, desc: string) => {
+  const handleDeleteMovement = async (id: string, desc: string) => {
     if (confirm(`"${desc}" hareketini silmek istediğinize emin misiniz?`)) {
-      setMovements(movements.filter(m => m.id !== id));
-      deleteCariMovementFromCloud(id);
+      try {
+        const trashed = await deleteCariMovementFromCloud(id);
+        setMovements(movements.filter(m => m.id !== id));
+        setTrashedMovements([trashed, ...trashedMovements.filter((movement) => movement.id !== id)]);
+      } catch (err) {
+        console.error('Cari hareket silinemedi:', err);
+        alert('Kayıt silinemedi. Liste değiştirilmedi; lütfen tekrar deneyin.');
+      }
+    }
+  };
+
+  const handleRestoreMovement = async (movementId: string) => {
+    try {
+      const restored = await restoreCariMovementFromTrash(movementId);
+      setTrashedMovements(trashedMovements.filter((movement) => movement.id !== movementId));
+      setMovements([restored, ...movements.filter((movement) => movement.id !== movementId)]);
+    } catch (err) {
+      console.error('Cari hareket geri yüklenemedi:', err);
+      alert(err instanceof Error ? err.message : 'Kayıt geri yüklenemedi. Lütfen tekrar deneyin.');
     }
   };
 
   // Delete Customer and all their movements
-  const handleDeleteCustomer = (customerIdToDelete: string) => {
+  const handleDeleteCustomer = async (customerIdToDelete: string) => {
     const targetCust = mergedCustomers.find(c => c.id === customerIdToDelete);
     const name = targetCust?.name || customerIdToDelete;
+    const nameNorm = normalizeCariCustomerName(name);
+    const relatedMovements = movements.filter(m =>
+      m.customerId === customerIdToDelete || normalizeCariCustomerName(m.customerName) === nameNorm
+    );
+
+    if (relatedMovements.length > 0) {
+      alert(`Bu cariye bağlı ${relatedMovements.length} finans hareketi var. Kayıt bütünlüğünü korumak için müşteri silinmedi.`);
+      return;
+    }
 
     if (confirm(`"${name}" müşterisini ve bu müşteriye ait tüm cari/finans hareketlerini sistemden tamamen silmek istediğinize emin misiniz?`)) {
-      const nameNorm = normalizeCariCustomerName(name);
-      setCustomers(customers.filter(c => c.id !== customerIdToDelete && normalizeCariCustomerName(c.name) !== nameNorm));
-      setMovements(movements.filter(m => normalizeCariCustomerName(m.customerName) !== nameNorm));
-
       if (!isSyntheticCariCustomerId(customerIdToDelete)) {
-        deleteCustomerFromCloud(customerIdToDelete);
+        try {
+          await deleteCustomerFromCloud(customerIdToDelete);
+        } catch (err) {
+          console.error('Cari müşteri silinemedi:', err);
+          alert(err instanceof Error ? err.message : 'Müşteri silinemedi; kayıt listesi değiştirilmedi.');
+          return;
+        }
       }
+
+      setCustomers(customers.filter(c => c.id !== customerIdToDelete && normalizeCariCustomerName(c.name) !== nameNorm));
 
       setSelectedCustomerId('ALL');
       alert(`"${name}" müşterisi ve tüm cari hareketleri başarıyla silindi.`);
@@ -513,14 +561,6 @@ export default function SigortaFinansPage() {
     });
   };
 
-  // Clear all movements
-  const handleClearAllMovements = () => {
-    if (confirm('Tüm cari ekstre hareketlerini temizlemek ve sıfırlamak istediğinize emin misiniz?')) {
-      setMovements([]);
-      clearCariMovementsFromCloud();
-    }
-  };
-
   return (
     <div>
       {/* Top Header */}
@@ -573,27 +613,26 @@ export default function SigortaFinansPage() {
             <Download size={16} /> Excel (CSV)
           </button>
 
-          {movements.length > 0 && (
-            <button 
-              onClick={handleClearAllMovements}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '10px 14px',
-                backgroundColor: '#fef2f2',
-                color: '#dc2626',
-                borderRadius: '10px',
-                border: '1px solid #fecaca',
-                fontWeight: 700,
-                fontSize: '0.88rem',
-                cursor: 'pointer'
-              }}
-              title="Tüm ekstre hareketlerini temizle"
-            >
-              <Trash2 size={16} /> Ekstreyi Sıfırla
-            </button>
-          )}
+          <button
+            onClick={() => setIsTrashOpen(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '10px 14px',
+              backgroundColor: '#fff7ed',
+              color: '#c2410c',
+              borderRadius: '10px',
+              border: '1px solid #fed7aa',
+              fontWeight: 700,
+              fontSize: '0.88rem',
+              cursor: 'pointer'
+            }}
+            title="Silinen finans hareketlerini görüntüle ve geri yükle"
+          >
+            <Archive size={16} /> Çöp Kutusu ({trashedMovements.length})
+          </button>
+
         </div>
       </div>
 
@@ -1023,6 +1062,65 @@ export default function SigortaFinansPage() {
         </div>
 
       </div>
+
+      {isTrashOpen && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15,23,42,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1100, padding: '20px' }}>
+          <div style={{ backgroundColor: '#fff', borderRadius: '14px', width: '100%', maxWidth: '920px', maxHeight: '88vh', overflowY: 'auto', padding: '22px', boxShadow: '0 20px 40px rgba(0,0,0,0.22)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
+              <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.2rem', color: '#9a3412' }}>
+                <Archive size={21} /> Finans Çöp Kutusu
+              </h2>
+              <button onClick={() => setIsTrashOpen(false)} aria-label="Çöp kutusunu kapat" style={{ border: 0, background: 'none', cursor: 'pointer', color: '#64748b' }}>
+                <X size={23} />
+              </button>
+            </div>
+            <p style={{ margin: '0 0 16px', color: '#64748b', fontSize: '0.88rem' }}>
+              Silinen kayıtlar en az 90 gün saklanır; otomatik olarak kalıcı silinmez. Geri yükleme kaydı aynı ID ile aktif ekstreye döndürür.
+            </p>
+            {trashedMovements.length === 0 ? (
+              <div style={{ padding: '36px 16px', textAlign: 'center', color: '#64748b', border: '1px dashed #cbd5e1', borderRadius: '10px' }}>
+                Çöp kutusunda kayıt yok.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: '9px' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '760px', fontSize: '0.84rem' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#fff7ed', color: '#7c2d12', textAlign: 'left' }}>
+                      <th style={{ padding: '10px' }}>Silinme tarihi</th>
+                      <th style={{ padding: '10px' }}>Fiş / Tarih</th>
+                      <th style={{ padding: '10px' }}>Cari</th>
+                      <th style={{ padding: '10px' }}>Açıklama</th>
+                      <th style={{ padding: '10px', textAlign: 'right' }}>Tutar</th>
+                      <th style={{ padding: '10px', textAlign: 'center' }}>İşlem</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trashedMovements.map((movement) => (
+                      <tr key={movement.id} style={{ borderTop: '1px solid #fed7aa' }}>
+                        <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>{movement.deletedAt ? new Date(movement.deletedAt).toLocaleString('tr-TR') : '-'}</td>
+                        <td style={{ padding: '10px', whiteSpace: 'nowrap' }}>{movement.receiptNo || '-'}<br />{movement.date}</td>
+                        <td style={{ padding: '10px' }}>{movement.customerName}</td>
+                        <td style={{ padding: '10px' }}>{movement.description}</td>
+                        <td style={{ padding: '10px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          {(movement.debitAmount || movement.creditAmount).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺
+                        </td>
+                        <td style={{ padding: '10px', textAlign: 'center' }}>
+                          <button
+                            onClick={() => handleRestoreMovement(movement.id)}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '7px 9px', border: '1px solid #86efac', borderRadius: '7px', color: '#166534', background: '#f0fdf4', cursor: 'pointer', fontWeight: 700 }}
+                          >
+                            <RotateCcw size={14} /> Geri Yükle
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* HAREKET EKLEME & DÜZENLEME MODALI */}
       {isAddModalOpen && (

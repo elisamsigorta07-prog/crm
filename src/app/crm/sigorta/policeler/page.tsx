@@ -42,12 +42,13 @@ import {
   Installment
 } from '@/data/crmData';
 import { 
+  CariMovement,
   fetchPoliciesFromCloud, 
   fetchCustomersFromCloud, 
   upsertPolicyToCloud, 
   upsertCustomerToCloud, 
   deletePolicyFromCloud, 
-  upsertCariMovementToCloud,
+  createCariMovementsInCloud,
   normalizeMoney,
   formatMoneyInput,
   formatMoneyDisplay,
@@ -527,7 +528,7 @@ export default function PolicelerPage() {
   };
 
   // Save Policy & Customer in One Single Action
-  const handleSavePolicyAndCustomer = (e: React.FormEvent) => {
+  const handleSavePolicyAndCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!customerName || !premium) {
       alert('Lütfen en azından Müşteri Adı ve Prim Tutarını girin.');
@@ -552,10 +553,8 @@ export default function PolicelerPage() {
     const cleanPlate = resolvedVeh.plate !== '-' ? resolvedVeh.plate : (plate.trim() || undefined);
     const cleanDocSerial = resolvedVeh.docSerial !== '-' ? resolvedVeh.docSerial : (documentSerial.trim() || undefined);
 
-    const existingCust = customers.find(c => 
-      c.id === customerId || 
-      c.name.toLocaleLowerCase('tr-TR').trim() === customerName.toLocaleLowerCase('tr-TR').trim()
-    );
+    const existingCust = customers.find(c => c.id === customerId) ||
+      customers.find(c => c.name.toLocaleLowerCase('tr-TR').trim() === customerName.toLocaleLowerCase('tr-TR').trim());
     if (existingCust) {
       customerId = existingCust.id;
       customerToSave = {
@@ -581,7 +580,6 @@ export default function PolicelerPage() {
         vehicleRegistrationDate: vehicleRegistrationDate || existingCust.vehicleRegistrationDate,
         vehicleValue: vehicleValue || existingCust.vehicleValue
       };
-      setCustomers(customers.map(c => c.id === customerId ? customerToSave : c));
     } else {
       customerToSave = {
         id: customerId,
@@ -608,10 +606,18 @@ export default function PolicelerPage() {
         vehicleRegistrationDate,
         vehicleValue
       };
-      setCustomers([customerToSave, ...customers]);
     }
-    // Async Cloud Save Customer
-    upsertCustomerToCloud(customerToSave);
+    // Save the customer first so the policy/ledger never points at an unsaved customer.
+    try {
+      await upsertCustomerToCloud(customerToSave);
+    } catch (err) {
+      console.error('Poliçe müşterisi kaydedilemedi:', err);
+      alert('Müşteri buluta kaydedilemedi. Poliçe ve cari hareket oluşturulmadı; lütfen tekrar deneyin.');
+      return;
+    }
+    setCustomers(existingCust
+      ? customers.map(c => c.id === customerId ? customerToSave : c)
+      : [customerToSave, ...customers]);
 
     // 2. SAVE / UPDATE POLICY
     const newPolicyRecord: Policy = {
@@ -654,11 +660,15 @@ export default function PolicelerPage() {
     // Async Cloud Save Policy
     upsertPolicyToCloud(newPolicyRecord);
 
-    // 3. AUTO-SYNC WITH FINANS & CARİ HESAP EKSTRESİ (elisam_cari_movements)
-    try {
-      const savedMovs = JSON.parse(localStorage.getItem('elisam_cari_movements') || '[]');
+    // A policy edit must not rewrite or remove financial movements. Only a new policy
+    // creates its initial ledger rows; later financial changes belong in Finance.
+    if (!editingPolicy) try {
+      const savedMovs: CariMovement[] = JSON.parse(localStorage.getItem('elisam_cari_movements') || '[]');
+      const trashedMovs: CariMovement[] = JSON.parse(localStorage.getItem('elisam_cari_movement_trash') || '[]');
+      const allKnownMovs = [...savedMovs, ...trashedMovs];
+      const newMovements: CariMovement[] = [];
       
-      const getNextReceiptNo = (currentMovements: any[]): string => {
+      const getNextReceiptNo = (currentMovements: CariMovement[]): string => {
         if (!currentMovements || currentMovements.length === 0) return 'E000001';
         const numbers = currentMovements
           .map(m => {
@@ -670,15 +680,13 @@ export default function PolicelerPage() {
         return `E${String(maxNum + 1).padStart(6, '0')}`;
       };
 
-      let updatedMovs = savedMovs.filter((m: any) => !(m.receiptNo === finalPolicyNo || m.description?.includes(finalPolicyNo)));
-      
       const formattedStartDate = startDate ? (startDate.includes('-') ? startDate.split('-').reverse().join('.') : startDate) : new Date().toLocaleDateString('tr-TR');
       const formattedEndDate = endDate ? (endDate.includes('-') ? endDate.split('-').reverse().join('.') : endDate) : '';
 
       // 1. Borç Kaydı: Poliçe Tahakkuku
-      const receiptNoDebt = getNextReceiptNo(updatedMovs);
+      const receiptNoDebt = getNextReceiptNo(allKnownMovs);
       const debtMovement = {
-        id: `CAR-${Math.floor(1000 + Math.random() * 9000)}`,
+        id: generateUniqueCrmId('CAR'),
         date: formattedStartDate,
         dueDate: formattedEndDate || undefined,
         receiptNo: receiptNoDebt,
@@ -690,14 +698,13 @@ export default function PolicelerPage() {
         creditAmount: 0,
         notes: notes || 'Poliçe kesimi ile otomatik oluşturuldu.'
       };
-      updatedMovs = [debtMovement, ...updatedMovs];
-      upsertCariMovementToCloud(debtMovement);
+      newMovements.push(debtMovement);
 
       // 2. Tahsilat Kaydı (Peşin tahsilat yapıldıysa)
       if (paid > 0) {
-        const receiptNoPaid = getNextReceiptNo(updatedMovs);
+        const receiptNoPaid = getNextReceiptNo([...allKnownMovs, debtMovement]);
         const paidMovement = {
-          id: `CAR-${Math.floor(1000 + Math.random() * 9000)}`,
+          id: generateUniqueCrmId('CAR'),
           date: formattedStartDate,
           dueDate: undefined,
           receiptNo: receiptNoPaid,
@@ -709,13 +716,12 @@ export default function PolicelerPage() {
           creditAmount: paid,
           notes: 'Poliçe kesiminde tahsil edildi.'
         };
-        updatedMovs = [paidMovement, ...updatedMovs];
-        upsertCariMovementToCloud(paidMovement);
+        newMovements.push(paidMovement);
       }
-
-      localStorage.setItem('elisam_cari_movements', JSON.stringify(updatedMovs));
+      await createCariMovementsInCloud(newMovements);
     } catch (err) {
       console.error('Finans cari sync hatası:', err);
+      alert('Poliçe kaydedildi; cari hareketler kaydedilemedi. Finans kayıtları korunmuştur. Lütfen Finans bölümünden kontrol edin.');
     }
 
     setIsAddModalOpen(false);
@@ -733,14 +739,6 @@ export default function PolicelerPage() {
 
       // Async Cloud Delete
       deletePolicyFromCloud(id);
-
-      try {
-        const savedMovs = JSON.parse(localStorage.getItem('elisam_cari_movements') || '[]');
-        const updatedMovs = savedMovs.filter((m: any) => !(m.receiptNo === polNo || m.description?.includes(polNo)));
-        localStorage.setItem('elisam_cari_movements', JSON.stringify(updatedMovs));
-      } catch (err) {
-        console.error(err);
-      }
     }
   };
 

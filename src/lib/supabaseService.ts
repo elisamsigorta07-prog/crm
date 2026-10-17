@@ -24,13 +24,22 @@ export interface CariMovement {
   debitAmount: number;        // Borç (TL)
   creditAmount: number;       // Alacak (TL)
   notes?: string;
+  deletedAt?: string;
 }
 
-/** Çakışmasız (collision-proof) benzersiz CRM ID üretici */
+/** Yeni CRM kayıtları için tahmin edilmesi ve çakışması zor bir ID üretir. */
 export function generateUniqueCrmId(prefix: 'CUST' | 'CAR' | 'POL' | 'RENT'): string {
-  const ts = Date.now().toString(36).toUpperCase();
-  const rand = Math.floor(1000 + Math.random() * 9000).toString(36).toUpperCase();
-  return `${prefix}-${ts}${rand}`;
+  const cryptoApi = globalThis.crypto;
+  const randomId = cryptoApi?.randomUUID?.();
+  if (randomId) return `${prefix}-${randomId.toUpperCase()}`;
+
+  if (cryptoApi?.getRandomValues) {
+    const randomBytes = cryptoApi.getRandomValues(new Uint8Array(16));
+    const fallbackId = Array.from(randomBytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+    return `${prefix}-${fallbackId.toUpperCase()}`;
+  }
+
+  return `${prefix}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2).toUpperCase()}-${Math.random().toString(36).slice(2).toUpperCase()}`;
 }
 
 const SUPABASE_PAGE_SIZE = 1000;
@@ -212,19 +221,7 @@ export async function upsertCustomerToCloud(customer: Customer): Promise<void> {
     reference: cleanRef
   };
 
-  // LocalStorage update
-  try {
-    const saved = localStorage.getItem('elisam_customers');
-    const list: Customer[] = saved ? JSON.parse(saved) : [];
-    const updated = [sanitizedCustomer, ...list.filter(c => c.id !== customer.id)];
-    localStorage.setItem('elisam_customers', JSON.stringify(updated));
-  } catch (err) {
-    console.error(err);
-  }
-
-  // Cloud update
-  if (!isSupabaseConfigured()) return;
-  try {
+  if (isSupabaseConfigured()) {
     let customerNotes = customer.notes || '';
     if (cleanRef && !customerNotes.toLowerCase().includes('referans:') && !customerNotes.toLowerCase().includes('ref:')) {
       customerNotes = (customerNotes ? customerNotes + '\n' : '') + `Referans: ${cleanRef}`;
@@ -259,33 +256,44 @@ export async function upsertCustomerToCloud(customer: Customer): Promise<void> {
       ...(customer.vehicleBrand ? { vehicle_brand: customer.vehicleBrand } : {})
     };
 
-    try {
-      const { error } = await supabase.from('customers').upsert(extendedRow);
-      if (!error) return;
-    } catch (e) {}
-
-    await supabase.from('customers').upsert(baseRow);
-  } catch (err) {
-    console.error('upsertCustomerToCloud error:', err);
+    const { error: extendedError } = await supabase.from('customers').upsert(extendedRow);
+    if (extendedError) {
+      const { error: baseError } = await supabase.from('customers').upsert(baseRow);
+      if (baseError) throw new Error(baseError.message);
+    }
   }
+
+  const saved = localStorage.getItem('elisam_customers');
+  const list: Customer[] = saved ? JSON.parse(saved) : [];
+  const updated = [sanitizedCustomer, ...list.filter(c => c.id !== customer.id)];
+  localStorage.setItem('elisam_customers', JSON.stringify(updated));
 }
 
 export async function deleteCustomerFromCloud(customerId: string): Promise<void> {
-  try {
-    const saved = localStorage.getItem('elisam_customers');
-    if (saved) {
-      const list: Customer[] = JSON.parse(saved);
-      localStorage.setItem('elisam_customers', JSON.stringify(list.filter(c => c.id !== customerId)));
+  if (isSupabaseConfigured()) {
+    const { data: linkedMovements, error: movementCheckError } = await supabase
+      .from('cari_movements')
+      .select('id')
+      .eq('customer_id', customerId)
+      .limit(1);
+    if (movementCheckError) throw new Error(movementCheckError.message);
+    if (linkedMovements?.length) {
+      throw new Error('Bu cariye bağlı finans hareketleri var; müşteri silinmedi.');
     }
-  } catch (err) {
-    console.error(err);
+
+    const { data, error } = await supabase
+      .from('customers')
+      .delete()
+      .eq('id', customerId)
+      .select('id');
+    if (error) throw new Error(error.message);
+    if (!data?.length) throw new Error(`Silinecek müşteri bulunamadı: ${customerId}`);
   }
 
-  if (!isSupabaseConfigured()) return;
-  try {
-    await supabase.from('customers').delete().eq('id', customerId);
-  } catch (err) {
-    console.error('deleteCustomerFromCloud error:', err);
+  const saved = localStorage.getItem('elisam_customers');
+  if (saved) {
+    const list: Customer[] = JSON.parse(saved);
+    localStorage.setItem('elisam_customers', JSON.stringify(list.filter(c => c.id !== customerId)));
   }
 }
 
@@ -643,7 +651,7 @@ export async function fetchCariMovementsFromCloud(): Promise<CariMovement[]> {
   try {
     if (!isSupabaseConfigured()) {
       const saved = localStorage.getItem('elisam_cari_movements');
-      return saved ? JSON.parse(saved) : [];
+      return saved ? (JSON.parse(saved) as CariMovement[]).filter((movement) => !movement.deletedAt) : [];
     }
 
     const { data, error } = await fetchSupabaseTableAll('cari_movements', '*', {
@@ -669,10 +677,13 @@ export async function fetchCariMovementsFromCloud(): Promise<CariMovement[]> {
         movementType: m.movement_type,
         debitAmount: Number(m.debit_amount) || 0,
         creditAmount: Number(m.credit_amount) || 0,
-        notes: m.notes || undefined
+        notes: m.notes || undefined,
+        deletedAt: m.deleted_at || undefined
       }));
-      localStorage.setItem('elisam_cari_movements', JSON.stringify(mapped));
-      return mapped;
+      const activeMovements = mapped.filter((movement) => !movement.deletedAt);
+      localStorage.setItem('elisam_cari_movements', JSON.stringify(activeMovements));
+      localStorage.setItem('elisam_cari_movement_trash', JSON.stringify(mapped.filter((movement) => movement.deletedAt)));
+      return activeMovements;
     }
   } catch (err) {
     console.error('fetchCariMovementsFromCloud error:', err);
@@ -681,69 +692,274 @@ export async function fetchCariMovementsFromCloud(): Promise<CariMovement[]> {
   return saved ? JSON.parse(saved) : [];
 }
 
-export async function upsertCariMovementToCloud(mov: CariMovement): Promise<void> {
+export async function fetchCariMovementTrashFromCloud(): Promise<CariMovement[]> {
+  try {
+    if (isSupabaseConfigured()) {
+      const { data, error } = await fetchSupabaseTableAll('cari_movements', '*', {
+        column: 'created_at',
+        ascending: false,
+      });
+      if (error) throw new Error(error.message);
+      const trashed = (data || []).filter((row: any) => row.deleted_at).map((row: any) => ({
+        id: row.id,
+        date: row.date,
+        dueDate: row.due_date || undefined,
+        receiptNo: row.receipt_no || '-',
+        customerId: row.customer_id,
+        customerName: row.customer_name,
+        description: row.description || '',
+        movementType: row.movement_type,
+        debitAmount: Number(row.debit_amount) || 0,
+        creditAmount: Number(row.credit_amount) || 0,
+        notes: row.notes || undefined,
+        deletedAt: row.deleted_at as string
+      } satisfies CariMovement));
+      localStorage.setItem('elisam_cari_movement_trash', JSON.stringify(trashed));
+      return trashed;
+    }
+  } catch (err) {
+    console.error('fetchCariMovementTrashFromCloud error:', err);
+  }
+  const saved = localStorage.getItem('elisam_cari_movement_trash');
+  return saved ? JSON.parse(saved) : [];
+}
+
+function toCariMovementRow(mov: CariMovement) {
+  return {
+    id: mov.id,
+    date: mov.date,
+    due_date: mov.dueDate || null,
+    receipt_no: mov.receiptNo || null,
+    customer_id: mov.customerId,
+    customer_name: mov.customerName,
+    description: mov.description,
+    movement_type: mov.movementType,
+    debit_amount: mov.debitAmount,
+    credit_amount: mov.creditAmount,
+    notes: mov.notes || null,
+    deleted_at: null
+  };
+}
+
+function saveCariMovementToLocalCache(mov: CariMovement, rejectDuplicateId = false): void {
+  const saved = localStorage.getItem('elisam_cari_movements');
+  const list: CariMovement[] = saved ? JSON.parse(saved) : [];
+  if (rejectDuplicateId && list.some((item) => item.id === mov.id)) {
+    throw new Error(`Bu kayıt ID'si zaten mevcut: ${mov.id}`);
+  }
+  localStorage.setItem(
+    'elisam_cari_movements',
+    JSON.stringify([mov, ...list.filter((item) => item.id !== mov.id)])
+  );
+}
+
+/** Inserts a new movement; duplicate IDs fail instead of replacing an existing record. */
+export async function createCariMovementInCloud(mov: CariMovement): Promise<void> {
+  await createCariMovementsInCloud([mov]);
+}
+
+/** Inserts a batch in one database statement so a policy debit/collection pair cannot half-save. */
+export async function createCariMovementsInCloud(movements: CariMovement[]): Promise<void> {
+  if (movements.length === 0) return;
+
+  const submittedIds = movements.map((movement) => movement.id);
+  if (new Set(submittedIds).size !== submittedIds.length) {
+    throw new Error('Yeni hareketler arasında aynı kayıt ID\'si birden fazla kullanılmış.');
+  }
+
+  const submittedReceipts = movements
+    .map((movement) => movement.receiptNo?.trim())
+    .filter((receiptNo): receiptNo is string => Boolean(receiptNo && receiptNo !== '-'));
+  if (new Set(submittedReceipts).size !== submittedReceipts.length) {
+    throw new Error('Yeni hareketler arasında aynı fiş numarası birden fazla kullanılmış.');
+  }
+
+  if (isSupabaseConfigured()) {
+    const { data: existingIds, error: idCheckError } = await supabase
+      .from('cari_movements')
+      .select('id')
+      .in('id', submittedIds);
+    if (idCheckError) throw new Error(idCheckError.message);
+    if (existingIds?.length) throw new Error(`Kayıt ID'si zaten kullanılmış: ${existingIds[0].id}`);
+
+    if (submittedReceipts.length > 0) {
+      const { data: existingReceipts, error: receiptCheckError } = await supabase
+        .from('cari_movements')
+        .select('receipt_no')
+        .in('receipt_no', submittedReceipts);
+      if (receiptCheckError) throw new Error(receiptCheckError.message);
+      if (existingReceipts?.length) {
+        throw new Error(`Fiş numarası zaten kullanılmış: ${existingReceipts[0].receipt_no}`);
+      }
+    }
+
+    const { error } = await supabase
+      .from('cari_movements')
+      .insert(movements.map(toCariMovementRow));
+    if (error) throw new Error(error.message);
+  }
+
   try {
     const saved = localStorage.getItem('elisam_cari_movements');
     const list: CariMovement[] = saved ? JSON.parse(saved) : [];
-    const updated = [mov, ...list.filter(m => m.id !== mov.id)];
-    localStorage.setItem('elisam_cari_movements', JSON.stringify(updated));
-  } catch (err) {
-    console.error(err);
-  }
-
-  if (!isSupabaseConfigured()) return;
-  try {
-    const row = {
-      id: mov.id,
-      date: mov.date,
-      due_date: mov.dueDate || null,
-      receipt_no: mov.receiptNo || null,
-      customer_id: mov.customerId,
-      customer_name: mov.customerName,
-      description: mov.description,
-      movement_type: mov.movementType,
-      debit_amount: mov.debitAmount,
-      credit_amount: mov.creditAmount,
-      notes: mov.notes || null
-    };
-    await supabase.from('cari_movements').upsert(row);
-  } catch (err) {
-    console.error('upsertCariMovementToCloud error:', err);
-  }
-}
-
-export async function deleteCariMovementFromCloud(movementId: string): Promise<void> {
-  try {
-    const saved = localStorage.getItem('elisam_cari_movements');
-    if (saved) {
-      const list: CariMovement[] = JSON.parse(saved);
-      localStorage.setItem('elisam_cari_movements', JSON.stringify(list.filter(m => m.id !== movementId)));
+    const knownIds = new Set(list.map((item) => item.id));
+    const knownReceipts = new Set(list.map((item) => item.receiptNo?.trim()).filter(Boolean));
+    for (const movement of movements) {
+      if (knownIds.has(movement.id)) throw new Error(`Bu kayıt ID'si zaten mevcut: ${movement.id}`);
+      knownIds.add(movement.id);
+      const receiptNo = movement.receiptNo?.trim();
+      if (receiptNo && receiptNo !== '-' && knownReceipts.has(receiptNo)) {
+        throw new Error(`Fiş numarası zaten kullanılmış: ${receiptNo}`);
+      }
+      if (receiptNo && receiptNo !== '-') knownReceipts.add(receiptNo);
     }
+    localStorage.setItem('elisam_cari_movements', JSON.stringify([...movements, ...list]));
   } catch (err) {
-    console.error(err);
-  }
-
-  if (!isSupabaseConfigured()) return;
-  try {
-    await supabase.from('cari_movements').delete().eq('id', movementId);
-  } catch (err) {
-    console.error('deleteCariMovementFromCloud error:', err);
+    if (isSupabaseConfigured()) {
+      console.error('Cari hareket bulut kaydedildi, yerel önbellek güncellenemedi:', err);
+      return;
+    }
+    throw err;
   }
 }
 
-export async function clearCariMovementsFromCloud(): Promise<void> {
-  try {
-    localStorage.removeItem('elisam_cari_movements');
-  } catch (err) {
-    console.error(err);
+/** Updates an existing movement only; a missing ID is never recreated during an edit. */
+export async function updateCariMovementInCloud(mov: CariMovement): Promise<void> {
+  const receiptNo = mov.receiptNo?.trim();
+  if (isSupabaseConfigured()) {
+    const { data: currentRows, error: currentError } = await supabase
+      .from('cari_movements')
+      .select('id, receipt_no')
+      .eq('id', mov.id)
+      .limit(1);
+    if (currentError) throw new Error(currentError.message);
+    const current = currentRows?.[0];
+    if (!current) throw new Error(`Düzenlenecek kayıt bulunamadı: ${mov.id}`);
+
+    const currentReceipt = String(current.receipt_no || '').trim();
+    if (receiptNo && receiptNo !== '-' && receiptNo !== currentReceipt) {
+      const { data, error } = await supabase
+        .from('cari_movements')
+        .select('id')
+        .eq('receipt_no', receiptNo)
+        .neq('id', mov.id)
+        .limit(1);
+      if (error) throw new Error(error.message);
+      if (data?.length) throw new Error(`Fiş numarası başka bir harekette kullanılmış: ${receiptNo}`);
+    }
+    const { data, error } = await supabase
+      .from('cari_movements')
+      .update(toCariMovementRow(mov))
+      .eq('id', mov.id)
+      .is('deleted_at', null)
+      .select('id');
+    if (error) throw new Error(error.message);
+    if (!data?.length) throw new Error(`Düzenlenecek kayıt bulunamadı: ${mov.id}`);
+  } else {
+    const saved = localStorage.getItem('elisam_cari_movements');
+    const list: CariMovement[] = saved ? JSON.parse(saved) : [];
+    const current = list.find((item) => item.id === mov.id);
+    if (!current) throw new Error(`Düzenlenecek kayıt bulunamadı: ${mov.id}`);
+    const currentReceipt = current.receiptNo?.trim();
+    if (receiptNo && receiptNo !== '-' && receiptNo !== currentReceipt &&
+      list.some((item) => item.id !== mov.id && item.receiptNo?.trim() === receiptNo)) {
+      throw new Error(`Fiş numarası başka bir harekette kullanılmış: ${receiptNo}`);
+    }
   }
 
-  if (!isSupabaseConfigured()) return;
-  try {
-    await supabase.from('cari_movements').delete().neq('id', 'CLEAN_ALL');
-  } catch (err) {
-    console.error('clearCariMovementsFromCloud error:', err);
+  saveCariMovementToLocalCache(mov);
+}
+
+export async function deleteCariMovementFromCloud(movementId: string): Promise<CariMovement> {
+  const deletedAt = new Date().toISOString();
+  let trashedMovement: CariMovement | undefined;
+  if (isSupabaseConfigured()) {
+    const { data, error } = await supabase
+      .from('cari_movements')
+      .update({ deleted_at: deletedAt })
+      .eq('id', movementId)
+      .is('deleted_at', null)
+      .select('*');
+    if (error) throw new Error(error.message);
+    if (!data?.length) throw new Error(`Silinecek aktif kayıt bulunamadı: ${movementId}`);
+    const row = data[0];
+    trashedMovement = {
+      id: row.id,
+      date: row.date,
+      dueDate: row.due_date || undefined,
+      receiptNo: row.receipt_no || '-',
+      customerId: row.customer_id,
+      customerName: row.customer_name,
+      description: row.description || '',
+      movementType: row.movement_type,
+      debitAmount: Number(row.debit_amount) || 0,
+      creditAmount: Number(row.credit_amount) || 0,
+      notes: row.notes || undefined,
+      deletedAt: row.deleted_at || deletedAt
+    };
   }
+
+  const saved = localStorage.getItem('elisam_cari_movements');
+  const list: CariMovement[] = saved ? JSON.parse(saved) : [];
+  const cachedMovement = list.find((movement) => movement.id === movementId);
+  if (!isSupabaseConfigured() && !cachedMovement) throw new Error(`Silinecek kayıt bulunamadı: ${movementId}`);
+  if (!trashedMovement && cachedMovement) trashedMovement = { ...cachedMovement, deletedAt };
+  if (saved) {
+    localStorage.setItem('elisam_cari_movements', JSON.stringify(list.filter((movement) => movement.id !== movementId)));
+  }
+  if (trashedMovement) {
+    const savedTrash = localStorage.getItem('elisam_cari_movement_trash');
+    const trash: CariMovement[] = savedTrash ? JSON.parse(savedTrash) : [];
+    localStorage.setItem('elisam_cari_movement_trash', JSON.stringify([trashedMovement, ...trash.filter((movement) => movement.id !== movementId)]));
+  }
+  if (!trashedMovement) throw new Error(`Silinen kayıt bilgisi alınamadı: ${movementId}`);
+  return trashedMovement;
+}
+
+export async function restoreCariMovementFromTrash(movementId: string): Promise<CariMovement> {
+  if (isSupabaseConfigured()) {
+    const { data, error } = await supabase
+      .from('cari_movements')
+      .update({ deleted_at: null })
+      .eq('id', movementId)
+      .not('deleted_at', 'is', null)
+      .select('*');
+    if (error) throw new Error(error.message);
+    if (!data?.length) throw new Error(`Geri yüklenecek kayıt bulunamadı: ${movementId}`);
+
+    const row = data[0];
+    const restored: CariMovement = {
+      id: row.id,
+      date: row.date,
+      dueDate: row.due_date || undefined,
+      receiptNo: row.receipt_no || '-',
+      customerId: row.customer_id,
+      customerName: row.customer_name,
+      description: row.description || '',
+      movementType: row.movement_type,
+      debitAmount: Number(row.debit_amount) || 0,
+      creditAmount: Number(row.credit_amount) || 0,
+      notes: row.notes || undefined
+    };
+    const activeSaved = localStorage.getItem('elisam_cari_movements');
+    const active: CariMovement[] = activeSaved ? JSON.parse(activeSaved) : [];
+    localStorage.setItem('elisam_cari_movements', JSON.stringify([restored, ...active.filter((movement) => movement.id !== movementId)]));
+    const trashSaved = localStorage.getItem('elisam_cari_movement_trash');
+    const trash: CariMovement[] = trashSaved ? JSON.parse(trashSaved) : [];
+    localStorage.setItem('elisam_cari_movement_trash', JSON.stringify(trash.filter((movement) => movement.id !== movementId)));
+    return restored;
+  }
+
+  const trashSaved = localStorage.getItem('elisam_cari_movement_trash');
+  const trash: CariMovement[] = trashSaved ? JSON.parse(trashSaved) : [];
+  const trashed = trash.find((movement) => movement.id === movementId);
+  if (!trashed) throw new Error(`Geri yüklenecek kayıt bulunamadı: ${movementId}`);
+  const restored = { ...trashed, deletedAt: undefined };
+  const activeSaved = localStorage.getItem('elisam_cari_movements');
+  const active: CariMovement[] = activeSaved ? JSON.parse(activeSaved) : [];
+  localStorage.setItem('elisam_cari_movements', JSON.stringify([restored, ...active.filter((movement) => movement.id !== movementId)]));
+  localStorage.setItem('elisam_cari_movement_trash', JSON.stringify(trash.filter((movement) => movement.id !== movementId)));
+  return restored;
 }
 
 // -------------------------------------------------------------
@@ -1221,14 +1437,8 @@ export async function syncAllLocalDataToCloud(): Promise<{ success: boolean; mes
       }
     }
 
-    // 3. Sync Cari Movements
-    const savedMov = localStorage.getItem('elisam_cari_movements');
-    if (savedMov) {
-      const movs: CariMovement[] = JSON.parse(savedMov);
-      for (const m of movs) {
-        await upsertCariMovementToCloud(m);
-      }
-    }
+    // Cari movements are intentionally excluded: localStorage may be stale, and an
+    // ID-based upsert here could overwrite a newer financial record in Supabase.
 
     // 4. Sync Rent Vehicles
     const savedVeh = localStorage.getItem('elisam_rent_vehicles');
@@ -1266,7 +1476,10 @@ export async function syncAllLocalDataToCloud(): Promise<{ success: boolean; mes
       }
     }
 
-    return { success: true, message: 'Tüm Sigorta ve Rent A Car verileri Supabase bulut veritabanına başarıyla aktarıldı!' };
+    return {
+      success: true,
+      message: 'Sigorta ve Rent A Car verileri eşitlendi. Finans hareketleri olası eski yerel önbelleğin bulut kayıtlarını ezmesini önlemek için eşitleme dışında bırakıldı.'
+    };
   } catch (err: any) {
     return { success: false, message: `Senkronizasyon hatası: ${err.message}` };
   }
