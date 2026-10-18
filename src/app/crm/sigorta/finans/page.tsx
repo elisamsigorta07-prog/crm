@@ -120,7 +120,9 @@ export default function SigortaFinansPage() {
         const custs = cloudCusts || [];
         setMovements(movs);
         setTrashedMovements(cloudTrash || []);
-        setCustomers(mergeCustomersWithCariMovements(custs, movs));
+        // Finans / Cari Ekstre tamamen manuel tutulmaktadır. 
+        // Finans müşteri listesi poliçe kesimlerinden bağımsızdır; yalnızca cari hareketlerdeki müşterilerden oluşur.
+        setCustomers(mergeCustomersWithCariMovements([], movs));
       } catch (err) {
         console.error('Supabase initial load error:', err);
       }
@@ -647,7 +649,7 @@ export default function SigortaFinansPage() {
                 <label style={{ fontSize: '0.78rem', fontWeight: 800, color: '#334155' }}>
                   HESAP ÖZETİ GÖRÜNTÜLENECEK MÜŞTERİ:{' '}
                   <span style={{ fontWeight: 600, color: '#64748b' }}>
-                    ({allCustomerOptions.length} hesap — müşteriler + cari ekstre)
+                    ({allCustomerOptions.length} Cari Hesap)
                   </span>
                 </label>
                 {selectedCustomerId !== 'ALL' && (

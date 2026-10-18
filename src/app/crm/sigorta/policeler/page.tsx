@@ -660,70 +660,7 @@ export default function PolicelerPage() {
     // Async Cloud Save Policy
     upsertPolicyToCloud(newPolicyRecord);
 
-    // A policy edit must not rewrite or remove financial movements. Only a new policy
-    // creates its initial ledger rows; later financial changes belong in Finance.
-    if (!editingPolicy) try {
-      const savedMovs: CariMovement[] = JSON.parse(localStorage.getItem('elisam_cari_movements') || '[]');
-      const trashedMovs: CariMovement[] = JSON.parse(localStorage.getItem('elisam_cari_movement_trash') || '[]');
-      const allKnownMovs = [...savedMovs, ...trashedMovs];
-      const newMovements: CariMovement[] = [];
-      
-      const getNextReceiptNo = (currentMovements: CariMovement[]): string => {
-        if (!currentMovements || currentMovements.length === 0) return 'E000001';
-        const numbers = currentMovements
-          .map(m => {
-            const match = m.receiptNo?.match(/^E(\d+)$/i);
-            return match ? parseInt(match[1], 10) : 0;
-          })
-          .filter(n => !isNaN(n) && n > 0);
-        const maxNum = numbers.length > 0 ? Math.max(...numbers) : currentMovements.length;
-        return `E${String(maxNum + 1).padStart(6, '0')}`;
-      };
-
-      const formattedStartDate = startDate ? (startDate.includes('-') ? startDate.split('-').reverse().join('.') : startDate) : new Date().toLocaleDateString('tr-TR');
-      const formattedEndDate = endDate ? (endDate.includes('-') ? endDate.split('-').reverse().join('.') : endDate) : '';
-
-      // 1. Borç Kaydı: Poliçe Tahakkuku
-      const receiptNoDebt = getNextReceiptNo(allKnownMovs);
-      const debtMovement = {
-        id: generateUniqueCrmId('CAR'),
-        date: formattedStartDate,
-        dueDate: formattedEndDate || undefined,
-        receiptNo: receiptNoDebt,
-        customerId: customerId,
-        customerName: customerName.trim(),
-        description: `${finalPolicyNo} nolu ${finalCompany} ${finalType} Poliçesi Tahakkuku${plate ? ` (${plate})` : ''}`,
-        movementType: 'Poliçe Tahakkuku' as const,
-        debitAmount: prem,
-        creditAmount: 0,
-        notes: notes || 'Poliçe kesimi ile otomatik oluşturuldu.'
-      };
-      newMovements.push(debtMovement);
-
-      // 2. Tahsilat Kaydı (Peşin tahsilat yapıldıysa)
-      if (paid > 0) {
-        const receiptNoPaid = getNextReceiptNo([...allKnownMovs, debtMovement]);
-        const paidMovement = {
-          id: generateUniqueCrmId('CAR'),
-          date: formattedStartDate,
-          dueDate: undefined,
-          receiptNo: receiptNoPaid,
-          customerId: customerId,
-          customerName: customerName.trim(),
-          description: `${finalPolicyNo} nolu ${finalCompany} ${finalType} Poliçesi Tahsilatı (${paymentType})`,
-          movementType: paymentType === 'Peşin / Tek Çekim' ? ('Kredi Kartı Tahsilat' as const) : ('Banka Gelen Havale' as const),
-          debitAmount: 0,
-          creditAmount: paid,
-          notes: 'Poliçe kesiminde tahsil edildi.'
-        };
-        newMovements.push(paidMovement);
-      }
-      await createCariMovementsInCloud(newMovements);
-    } catch (err) {
-      console.error('Finans cari sync hatası:', err);
-      alert('Poliçe kaydedildi; cari hareketler kaydedilemedi. Finans kayıtları korunmuştur. Lütfen Finans bölümünden kontrol edin.');
-    }
-
+    // Finans / Cari Ekstre tamamen manuel tutulmaktadır; poliçe kesiminde otomatik cari hareket açılmaz.
     setIsAddModalOpen(false);
     resetForm();
   };

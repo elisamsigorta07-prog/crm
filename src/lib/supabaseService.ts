@@ -131,18 +131,16 @@ export async function fetchCustomersFromCloud(): Promise<Customer[]> {
       return saved ? JSON.parse(saved) : [];
     }
 
-    const [custResult, movResult] = await Promise.all([
-      supabase.from('customers').select('*').order('created_at', { ascending: false }),
-      fetchSupabaseTableAll('cari_movements', 'customer_id, customer_name'),
-    ]);
+    const { data, error } = await supabase
+      .from('customers')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-    if (custResult.error) {
-      console.warn('Supabase customers fetch error, using localStorage fallback:', custResult.error.message);
+    if (error) {
+      console.warn('Supabase customers fetch error, using localStorage fallback:', error.message);
       const saved = localStorage.getItem('elisam_customers');
       return saved ? JSON.parse(saved) : [];
     }
-
-    const data = custResult.data || [];
 
     const existingLocal: Customer[] = (() => {
       try {
@@ -189,24 +187,8 @@ export async function fetchCustomersFromCloud(): Promise<Customer[]> {
       };
     });
 
-    if (movResult.error) {
-      console.warn('Supabase cari_movements (müşteri listesi) fetch error:', movResult.error.message);
-    }
-
-    const movStubs: CariMovement[] = (movResult.data || []).map((m: any) => ({
-      id: '',
-      date: '',
-      customerId: m.customer_id ?? '',
-      customerName: m.customer_name ?? '',
-      description: '',
-      movementType: 'Cari Hareket Girişi',
-      debitAmount: 0,
-      creditAmount: 0,
-    }));
-
-    const merged = mergeCustomersWithCariMovements(mapped, movStubs);
-    localStorage.setItem('elisam_customers', JSON.stringify(merged));
-    return merged;
+    localStorage.setItem('elisam_customers', JSON.stringify(mapped));
+    return mapped;
   } catch (err) {
     console.error('fetchCustomersFromCloud error:', err);
   }
