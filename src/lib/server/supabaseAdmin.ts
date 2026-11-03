@@ -2,6 +2,7 @@ import 'server-only';
 import { createClient } from '@supabase/supabase-js';
 import { isCrmStaff, type CrmScope } from '../crmAccess.ts';
 import { rateLimitKey, sameOrigin } from './securityCore.ts';
+import { claimStorageRateSlot } from './storageRateLimitCore.ts';
 
 export class CrmApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
@@ -15,6 +16,13 @@ export function getSupabaseAdmin() {
 export async function consumeRateLimit(admin: ReturnType<typeof getSupabaseAdmin>, identity: string, limit = 120, seconds = 60) {
   const key = rateLimitKey(identity, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const { data, error } = await admin.rpc('crm_consume_rate_limit', { p_key: key, p_limit: limit, p_seconds: seconds });
+  if (error?.code === 'PGRST202') {
+    let allowed: boolean;
+    try { allowed = await claimStorageRateSlot(admin.storage.from('telegram-bot-state'), key, limit, seconds); }
+    catch { throw new CrmApiError(503, 'İstek sınırı kontrol edilemedi. Daha sonra tekrar deneyin.'); }
+    if (!allowed) throw new CrmApiError(429, 'Çok fazla istek gönderildi. Bir dakika sonra tekrar deneyin.');
+    return;
+  }
   if (error) throw new CrmApiError(503, 'Sunucu güvenlik kurulumu tamamlanmamış veya geçici olarak erişilemiyor.');
   if (data !== true) throw new CrmApiError(429, 'Çok fazla istek gönderildi. Bir dakika sonra tekrar deneyin.');
 }
