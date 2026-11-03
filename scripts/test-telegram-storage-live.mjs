@@ -7,6 +7,7 @@ import ts from 'typescript';
 import { randomUUID } from 'node:crypto';
 import { makeGrant, handleBotUpdate, formatPolicy, expiryRange } from '../src/lib/server/telegramCore.ts';
 import { policyFolder, versionName } from '../src/lib/server/policyStorageCore.ts';
+import { lookupDate } from '../src/lib/server/telegramLookupCore.ts';
 process.loadEnvFile('.env.local');
 const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 const anon = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -91,7 +92,7 @@ try {
     check(action.telegramId === id && action.generation === grant.generation, 'PDF callback not scoped to the paired user.');
   }
   const expiring = await deps.expiring(0); const range = expiryRange();
-  check(expiring.every(row => row.end_date >= range.first && row.end_date <= range.last), 'Expiry rows outside calendar window.');
+  check(expiring.every(row => lookupDate(row.end_date) >= range.first && lookupDate(row.end_date) <= range.last), 'Expiry rows outside calendar window.');
   await deps.pdf(id, 'NONEXISTENT-TELEGRAM-INTEGRATION-TEST', grant.generation);
   check(sent.at(-1).body.text.includes('artık bulunmuyor'), 'Missing policy PDF did not produce useful feedback.');
   // A synthetic policy identity with a stubbed existence check keeps every real

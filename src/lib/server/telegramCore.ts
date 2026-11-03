@@ -1,4 +1,5 @@
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { foldLookup } from './telegramLookupCore.ts';
 
 export const TELEGRAM_STATE_BUCKET = 'telegram-bot-state';
 export type TelegramGrant = { telegramId: string; label: string; enabled: boolean; generation: string; codeHash: string; expiresAt: number; updatedAt: string; updatedBy: string };
@@ -66,10 +67,11 @@ export function expiryRange(now = new Date()) {
 function clean(value: unknown) { return String(value ?? '—').replace(/[\u0000-\u0008\u000b-\u001f\u202a-\u202e\u2066-\u2069]/g, ' '); }
 const policyLabels: Record<string, string> = { policy_no: 'Poliçe no', customer_name: 'Ad soyad / unvan', customer_tc: 'TC / VKN', customer_phone: 'Telefon', type: 'Sigorta türü', company: 'Sigorta şirketi', start_date: 'Başlangıç', end_date: 'Bitiş', premium: 'Brüt prim', net_premium: 'Net prim', paid_amount: 'Ödenen', remaining_amount: 'Kalan', payment_type: 'Ödeme tipi', installment_count: 'Taksit sayısı', commission_rate: 'Komisyon oranı', payment_status: 'Ödeme durumu', status: 'Poliçe durumu', plate: 'Plaka', document_serial: 'Belge seri', vehicle_usage: 'Araç kullanımı', vehicle_brand: 'Marka', vehicle_type: 'Model', vehicle_model_year: 'Model yılı', reference: 'Referans', notes: 'Notlar' };
 export function formatPolicy(row: PolicySummary) {
-  const lines = Object.entries(row).filter(([key, value]) => !['id', 'customer_id', 'created_at', 'updated_at', 'customer'].includes(key) && value !== null && value !== '').map(([key, value]) => `${policyLabels[key] || key}: ${clean(typeof value === 'object' ? JSON.stringify(value) : value)}`);
+  const lines = Object.entries(row).filter(([key, value]) => !['id', 'customer_id', 'created_at', 'updated_at', 'customer', 'record_kind'].includes(key) && value !== null && value !== '').map(([key, value]) => `${policyLabels[key] || key}: ${clean(typeof value === 'object' ? JSON.stringify(value) : value)}`);
+  if (row.record_kind === 'customer') lines.unshift('Müşteri kartı: Bu kişiye bağlı ayrı poliçe kaydı bulunamadı.\n');
   const customer = row.customer;
   if (customer && typeof customer === 'object') {
-    const labels: Record<string, string> = { name: 'Ad soyad', identity_no: 'TC / VKN', phone: 'Telefon', email: 'E-posta', address: 'Adres', birth_date: 'Doğum tarihi', reference: 'Referans', notes: 'Müşteri notları' };
+    const labels: Record<string, string> = { name: 'Ad soyad', type: 'Müşteri türü', identity_no: 'TC / VKN', phone: 'Telefon', email: 'E-posta', address: 'Adres', birth_date: 'Doğum tarihi', reference: 'Referans', notes: 'Müşteri notları' };
     lines.push('\nMüşteri kartı');
     for (const [key, value] of Object.entries(customer)) if (!['id', 'created_at', 'updated_at'].includes(key) && value !== null && value !== '') lines.push(`${labels[key] || key}: ${clean(typeof value === 'object' ? JSON.stringify(value) : value)}`);
   }
@@ -98,6 +100,7 @@ export async function handleBotUpdate(update: unknown, deps: BotDependencies) {
   const message = privateMessage(update);
   if (!message) return;
   const { id, text } = message; const { name, argument } = command(text);
+  const label = foldLookup(text);
   if (message.callbackId) await deps.ack(message.callbackId);
   if (name === '/kimlik') { await deps.send(id, `Telegram kullanıcı kimliğin: ${id}\nBu kimliği CRM yöneticine ilet. Kimlik tek başına erişim vermez.`); return; }
   const grant = await deps.grant(id);
@@ -112,20 +115,20 @@ export async function handleBotUpdate(update: unknown, deps: BotDependencies) {
   }
   const session = grant?.enabled ? await deps.session(id, grant.generation) : null;
   if (!isPaired(grant, session)) { await deps.send(id, 'Erişim yetkin yok veya eşleştirme kodun geçersiz. /kimlik ile kimliğini öğren; yöneticinden kişisel kod iste. Ardından /eslestir KOD yaz. CRM şifreni bu sohbete yazma.'); return; }
-  if (name === '/cikis' || text === 'Erişimi kapat') { await deps.logout(id, grant!.generation); await deps.send(id, 'Bot erişimin kapatıldı. Tekrar erişmek için yöneticinden yeni eşleştirme kodu iste.'); return; }
+  if (name === '/cikis' || label === 'erisimi kapat') { await deps.logout(id, grant!.generation); await deps.send(id, 'Bot erişimin kapatıldı. Tekrar erişmek için yöneticinden yeni eşleştirme kodu iste.'); return; }
   let query: BotQuery | null = null;
   if (message.callbackId) {
     const action = await deps.action(text.slice(4));
     if (!action || action.telegramId !== id || action.generation !== grant!.generation || action.expiresAt <= Date.now()) { await deps.send(id, 'Butonun süresi dolmuş veya bu hesaba ait değil. Yeniden sorgulama yap.'); return; }
     if (action.kind === 'pdf') { await deps.pdf(id, action.policyId, grant!.generation); return; }
     query = action.query;
-  } else if (text === 'Poliçe sorgula' || (name === '/ara' && !argument)) {
+  } else if (label === 'police sorgula' || (name === '/ara' && !argument)) {
     await deps.send(id, 'TC kimlik numarası, ad soyad veya poliçe numarasını yaz. Eşleşen kişilerin sistemdeki poliçelerini ve müşteri bilgilerini getireceğim.'); return;
-  } else if (name === '/bitenler' || text === 'Bitişi yaklaşan poliçeler') {
+  } else if (name === '/bitenler' || label === 'bitisi yaklasan policeler') {
     query = { kind: 'expiring', term: '', offset: 0 };
   } else if (name === '/ara' || !name) {
     let term: string;
-    if (text === 'Yardım') { await deps.send(id, BOT_HELP); return; }
+    if (label === 'yardim') { await deps.send(id, BOT_HELP); return; }
     try { term = searchTerm(name === '/ara' ? argument : text); } catch { await deps.send(id, 'TC, ad soyad veya poliçe numarası yaz (3–60 karakter).'); return; }
     query = { kind: 'search', term, offset: 0 };
   }

@@ -13,15 +13,29 @@ gereklidir. Bu çalışma siteyi yayımlamaz ve kendiliğinden webhook kaydetmez
 - Bilgiler doğrudan `policies` ve `customers` kayıtlarından gelir. PDF yüklenmiş
   olması gerekmez. Sadece eski tarayıcı yerel belleğinde duran bilgiler botta
   görünmez; Supabase'de kayıtlı olmalıdır.
+- Kimlik araması 11 haneli TC ve 10 haneli VKN'yi destekler; kayıt veya aramadaki
+  boşluk/tireler eşleştirmeyi bozmaz. Türkçe I/İ/ı/i, harf büyüklüğü ve aksan
+  farkları isimlerde normalleştirilir. Poliçe numarasının ayırıcıları atlanabilir.
+- Ayrı poliçe satırı olmayan eşleşmelerde müşteri kartının kayıtlı bilgileri yine
+  gösterilir; bunlara var olmayan bir poliçe/PDF üretilmez. Müşteri kartı sonucuna
+  PDF butonu eklenmez. Aynı isimli farklı kişilerin kayıtları TC aramasında
+  birleştirilmez; bağlantıda kayıt kimliği veya tam kimlik numarası esas alınır.
 - Her poliçenin bilgileri ayrı mesajlarda gönderilir. Uzun içerikler bölünür;
   sonuçlar beşer kayıtla sayfalanır ve **Sonraki 5 poliçe** butonu kullanılır.
 - **Bitişi yaklaşan poliçeler** bugünden üç takvim ayı sonuna kadar tarar.
   Ay sonunda hedef ayın son günü kullanılır. Saat dilimi Europe/Istanbul'dur.
+  ISO, gün.ay.yıl ve gün/ay/yıl biçimleri önce takvim tarihi olarak doğrulanır;
+  metin sıralamasıyla tarih karşılaştırması yapılmaz.
 - **PDF gönder** sadece mevcut özel depodaki güncel PDF'yi Telegram dosyası olarak
   gönderir. PDF yoksa bunu açıklar; poliçe bilgileri yine gelir. Kaldırılan ek
   sürümleri gönderilmez. PDF veya yeni poliçe oluşturulmaz.
 - Bot bu sürümde sorgulama yapar; poliçe veya müşteri verisini değiştirmez.
   Otomatik zamanlanmış bildirimler bu sürümde bulunmaz.
+- Telegram'ın komut menüsü `/start`, `/ara`, `/bitenler`, `/kimlik`, `/eslestir`
+  ve `/cikis` kısayollarını içerir. Bunlar BotFather'a elle girilmek zorunda
+  değildir: webhook kurulum komutu menüyü de kaydedip doğrular. Komut listesinin
+  görünmesi webhook'un çalıştığını kanıtlamaz. Sohbet içindeki hazır klavye ve
+  PDF/sayfalama butonları, uygulamanın verdiği yanıtlara eklenir.
 
 ## Erişim
 
@@ -50,8 +64,10 @@ silmez. `protect_content` kullanılır, ancak bu tam bir veri kopyalama engeli d
 
 Canlı kullanım öncesi proje kökündeki `GUVENLIK-KURULUM.md` uygulanmalıdır.
 Güvenlik güncellemesi veritabanında atomik istek sınırı ekler. 3 Kasım isteğiyle
-MFA zorunluluğu kaldırılmıştır. Güvenlik SQL'si uygulanana kadar eski anonim tablo erişimi devam eder ve
-güvenlik RPC'sine bağlı bot sorguları güvenli biçimde başarısız olur. Yönetici
+MFA zorunluluğu kaldırılmıştır. Güvenlik SQL'si uygulanana kadar eski anonim tablo erişimi devam eder.
+Botu SQL'den bağımsız kullanmak için, istek sınırı RPC'si henüz mevcut değilse
+özel `telegram-bot-state` deposunda atomik, üzerine yazılmayan zaman penceresi
+slotları kullanılır. Depoya erişilemezse kontrol atlanmaz; istek reddedilir. Yönetici
 paneli e-posta ve şifreyle kullanılır. Daha önce açıkta bulunan eski
 şifrenin riski yalnızca bot kimlik kontrolüyle giderilemez.
 
@@ -60,6 +76,10 @@ paneli e-posta ve şifreyle kullanılır. Daha önce açıkta bulunan eski
 1. Resmî `https://t.me/BotFather` hesabında `/newbot` ile bot hesabı oluşturun.
 2. Tokenı `.env.local` dosyasına yalnızca sunucuda `TELEGRAM_BOT_TOKEN` olarak
    ekleyin. `NEXT_PUBLIC_` öneki kullanmayın; sohbet veya kaynak koduna koymayın.
+   Mevcut satırları silmeden en alta `TELEGRAM_BOT_TOKEN=YENI_TOKEN` eklenir.
+   Sohbete gönderilmiş token BotFather üzerinden yenilenmeli; yeni değer yalnızca
+   yerel dosyaya ve hosting ortam değişkenlerine girilmelidir. `.env.local`
+   GitHub'a gönderilmez ve hosting ortamını kendiliğinden güncellemez.
 3. `npm run crm:telegram:setup` özel `telegram-bot-state` Storage deposunu hazırlar,
    eksikse `TELEGRAM_WEBHOOK_SECRET` üretip `.env.local` dosyasına ekler. Yeni SQL
    tablosu veya genel Storage RLS izni eklenmez. JSON üyelikler, eşleştirmeler ve
@@ -80,6 +100,8 @@ değiştirilmez. Eşleştirme tek nesne oluşturma ve sürüm kimliğiyle korunu
 
 Üyelik geçmişi ve süresi dolan buton nesneleri otomatik temizlenmez; depo bakımında
 yalnızca süresi dolmuş butonlar ve eski nesil oturum kayıtları kaldırılabilir.
+SQL ertelendiğinde biriken `rate-limits` slotlarının eski zaman pencereleri de
+depo bakımında temizlenmelidir; bunlar iş kaydı veya müşteri PDF'si değildir.
 Eski tarayıcıdaki `elisam_telegram_config` ayarı panel açıldığında kaldırılır.
 
 ## Doğrulama
@@ -88,6 +110,9 @@ Eski tarayıcıdaki `elisam_telegram_config` ayarı panel açıldığında kald�
 kod kullanımını, süre sonunu, iptali, TC/isim/numara sorgusunu, üç aylık tarih
 aralığını, sayfalamayı, PDF yetki sınırlarını ve ayrıntıların korunmasını sınar.
 Gerçek Telegram teslimi için BotFather tokenı ve canlı HTTPS webhook gerekir.
+Arama, SQL göçü gerektirmeyen hafif bir sunucu dizini kullanır. Her tabloda
+50.000 kayıt sınırı vardır; kapasite aşılırsa eksik sonuç üretmek yerine hata
+verilir. Yalnızca seçilen sayfadaki ayrıntılar okunup gönderilir.
 `node scripts/test-telegram-storage-live.mjs` gerçek Supabase üzerinde geçici
 bot kayıtları ve sahte kimliğe ait sentetik PDF kullanır; Telegram taşımasını
 taklit eder. Gerçek iş kayıtları veya müşteri PDF'leri değiştirilmez ve geçici

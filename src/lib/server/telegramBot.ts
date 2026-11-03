@@ -4,6 +4,7 @@ import { getSupabaseAdmin, CrmApiError } from './supabaseAdmin';
 import { expiryRange, formatPolicy, isPaired, TELEGRAM_STATE_BUCKET, type TelegramGrant, type TelegramSession, type BotDependencies, type BotAction, type PolicySummary, type BotQuery } from './telegramCore';
 import { originalFilename, policyFolder, POLICY_BUCKET } from './policyStorageCore';
 import { validatePolicyPdf } from '../policyPdfValidation';
+import { expiringLookup, searchLookup, type LookupRow, type LookupSelection } from './telegramLookupCore';
 
 type Admin = ReturnType<typeof getSupabaseAdmin>;
 export function telegramState(admin: Admin) {
@@ -79,52 +80,71 @@ export function botDependencies(admin: Admin): BotDependencies {
     await state.write(`actions/${key}.json`, action, false);
     return { text, callback_data: `act:${key}` };
   }
-  async function enrich(rows: PolicySummary[]) {
-    const ids = [...new Set(rows.map(p => p.customer_id).filter((id): id is string => typeof id === 'string'))];
-    if (!ids.length) return rows;
-    const customers = await admin.from('customers').select('*').in('id', ids);
-    if (customers.error) throw new CrmApiError(503, 'Müşteri kartları okunamadı.');
-    const map = new Map(customers.data.map(c => [String(c.id), c]));
-    return rows.map(p => ({ ...p, customer: map.get(String(p.customer_id)) || null }));
+  async function indexTable(table: 'policies' | 'customers', columns: string) {
+    const rows: LookupRow[] = [];
+    for (let offset = 0; offset <= 50000; offset += 1000) {
+      const result = await admin.from(table).select(columns).order('id', { ascending: true }).range(offset, offset + 999);
+      if (result.error) throw new CrmApiError(503, 'Sorgu kayıtları okunamadı.');
+      if (offset === 50000 && result.data.length) throw new CrmApiError(503, 'Sorgu dizini kapasitesi aşıldı. Yöneticiyle görüşün.');
+      rows.push(...result.data as unknown as LookupRow[]);
+      if (result.data.length < 1000) return rows;
+    }
+    throw new CrmApiError(503, 'Sorgu tamamlanamadı.');
+  }
+  async function loadIndex() {
+    const [policies, customers] = await Promise.all([
+      indexTable('policies', 'id,policy_no,customer_id,customer_name,customer_tc,end_date'),
+      indexTable('customers', 'id,name,identity_no'),
+    ]);
+    return { policies, customers };
+  }
+  async function materialize(selections: LookupSelection[]) {
+    const ids = selections.filter(s => s.kind === 'policy').map(s => s.id);
+    const customerIds = [...new Set(selections.map(s => s.customerId).filter((id): id is string => !!id))];
+    const [policies, customers] = await Promise.all([
+      ids.length ? admin.from('policies').select('*').in('id', ids) : Promise.resolve({ data: [], error: null }),
+      customerIds.length ? admin.from('customers').select('*').in('id', customerIds) : Promise.resolve({ data: [], error: null }),
+    ]);
+    if (policies.error || customers.error) throw new CrmApiError(503, 'Kayıt ayrıntıları okunamadı.');
+    const policyMap = new Map((policies.data as LookupRow[]).map(p => [String(p.id), p]));
+    const customerMap = new Map((customers.data as LookupRow[]).map(c => [String(c.id), c]));
+    const rows: PolicySummary[] = [];
+    for (const selected of selections) {
+      const customer = selected.customerId ? customerMap.get(selected.customerId) || null : null;
+      if (selected.kind === 'customer') {
+        if (customer) rows.push({ id: 'customer:' + selected.id, record_kind: 'customer', policy_no: null, customer_name: String(customer.name || ''), type: null, company: null, end_date: null, customer });
+      } else {
+        const policy = policyMap.get(selected.id);
+        if (policy) rows.push({ ...policy, id: String(policy.id), policy_no: policy.policy_no == null ? null : String(policy.policy_no), customer_name: policy.customer_name == null ? null : String(policy.customer_name), type: policy.type == null ? null : String(policy.type), company: policy.company == null ? null : String(policy.company), end_date: policy.end_date == null ? null : String(policy.end_date), customer });
+      }
+    }
+    return rows;
   }
   return {
     ...state,
     action: (key: string) => state.read<BotAction>(`actions/${key}.json`),
     async ack(callbackId) { await telegramApi('answerCallbackQuery', { callback_query_id: callbackId }); },
     async search(term, offset) {
-      const tc = /^\d{11}$/.test(term);
-      const customersQuery = admin.from('customers').select('id');
-      const [customers, exactPolicies] = await Promise.all([
-        tc ? customersQuery.eq('identity_no', term).limit(101) : customersQuery.ilike('name', `%${term}%`).limit(101),
-        admin.from('policies').select('customer_id').eq('policy_no', term).limit(101),
-      ]);
-      if (customers.error || exactPolicies.error) throw new CrmApiError(503, 'Müşteri sorgulanamadı.');
-      if (customers.data.length > 100 || exactPolicies.data.length > 100) throw new CrmApiError(400, 'Çok fazla kişi eşleşti; daha uzun bir ad veya tam TC yazın.');
-      const ids = [...new Set([...customers.data.map(c => c.id), ...exactPolicies.data.map(p => p.customer_id)].filter(id => id !== null))];
-      const filters = tc ? [`customer_tc.eq.${term}`, `policy_no.eq.${term}`] : [`customer_name.ilike."%${term}%"`, `policy_no.ilike."%${term}%"`];
-      if (ids.length) filters.push(`customer_id.in.(${ids.map(id => '"' + String(id).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"').join(',')})`);
-      const { data, error } = await admin.from('policies').select('*').or(filters.join(',')).order('end_date', { ascending: true }).order('id', { ascending: true }).range(offset, offset + 5);
-      if (error) throw new CrmApiError(503, 'Poliçeler sorgulanamadı.');
-      return enrich(data as PolicySummary[]);
+      const index = await loadIndex();
+      return materialize(searchLookup(index.policies, index.customers, term).slice(offset, offset + 6));
     },
     async expiring(offset) {
       const { first, last } = expiryRange();
-      const { data, error } = await admin.from('policies').select('*').gte('end_date', first).lte('end_date', last).order('end_date', { ascending: true }).order('id', { ascending: true }).range(offset, offset + 5);
-      if (error) throw new CrmApiError(503, 'Poliçeler sorgulanamadı.');
-      return enrich(data as PolicySummary[]);
+      const index = await loadIndex();
+      return materialize(expiringLookup(index.policies, index.customers, first, last).slice(offset, offset + 6));
     },
     send,
     async results(id: string, rows: PolicySummary[], query: BotQuery, generation: string) {
       if (!await allowed(id, generation)) return;
-      if (!rows.length) { await send(id, 'Eşleşen poliçe bulunamadı.'); return; }
+      if (!rows.length) { await send(id, 'Eşleşen müşteri veya poliçe bulunamadı. TC/VKN, ad soyad veya poliçe numarasını kontrol et.'); return; }
       const expiresAt = Date.now() + 30 * 60_000;
       for (const policy of rows.slice(0, 5)) {
         if (!await allowed(id, generation)) return;
         const chunks = formatPolicy(policy);
-        const pdf = await actionButton({ kind: 'pdf', telegramId: id, generation, expiresAt, policyId: String(policy.id) }, 'PDF gönder');
+        const pdf = policy.record_kind === 'customer' ? null : await actionButton({ kind: 'pdf', telegramId: id, generation, expiresAt, policyId: String(policy.id) }, 'PDF gönder');
         for (let i = 0; i < chunks.length; i++) {
           if (!await allowed(id, generation)) return;
-          await send(id, chunks[i], i === chunks.length - 1 ? { inline_keyboard: [[pdf]] } : keyboard);
+          await send(id, chunks[i], pdf && i === chunks.length - 1 ? { inline_keyboard: [[pdf]] } : keyboard);
         }
       }
       if (rows.length > 5 && await allowed(id, generation)) {
