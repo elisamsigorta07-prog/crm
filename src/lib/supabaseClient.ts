@@ -10,6 +10,9 @@ export const isSupabaseConfigured = () => {
   return true;
 };
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const crmAuth = createClient(supabaseUrl, supabaseAnonKey, { auth: { storageKey: 'elisam_crm_auth' } });
+// Every CRM table request now carries the same verified Auth session. Database
+// RLS is the security boundary; there is no separate anonymous business client.
+export const supabase = crmAuth;
 
 

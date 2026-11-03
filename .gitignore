@@ -39,3 +39,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Generated PDF/OCR runtime assets (prepared by npm scripts)
+/public/vendor/
+
+# Temporary, potentially sensitive PDF inspection artifacts
+/tmp/pdfs/
+/tmp/private/

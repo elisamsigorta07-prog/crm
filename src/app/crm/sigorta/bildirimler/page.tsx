@@ -80,7 +80,7 @@ export default function SigortaBildirimlerPage() {
   const [urgencyFilter, setUrgencyFilter] = useState<UrgencyFilter>('ALL');
   const [companyFilter, setCompanyFilter] = useState('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
-  
+
   // Sıralama durumu (Varsayılan: En acilden uzağa)
   const [sortField, setSortField] = useState<SortField>('daysRemaining');
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
@@ -92,10 +92,6 @@ export default function SigortaBildirimlerPage() {
   // Bilgi & Zamanlama paneli açık/kapalı
   const [isScheduleExpanded, setIsScheduleExpanded] = useState(true);
 
-  // Telegram ayarları (localStorage)
-  const [telegramConfig, setTelegramConfig] = useState({ botToken: '', chatId: '', notifyExpiry: true });
-  const [telegramSending, setTelegramSending] = useState(false);
-  const [telegramStatus, setTelegramStatus] = useState<string | null>(null);
 
   // Özel mesaj önizleme ve düzenleme modalı
   const [activeMessageModal, setActiveMessageModal] = useState<RenewalItem | null>(null);
@@ -114,11 +110,6 @@ export default function SigortaBildirimlerPage() {
         if (cloudPols) setPolicies(cloudPols);
         if (cloudCusts) setCustomers(cloudCusts);
 
-        // Telegram konfigürasyonunu yükle
-        try {
-          const conf = localStorage.getItem('elisam_telegram_config');
-          if (conf) setTelegramConfig(JSON.parse(conf));
-        } catch (e) {}
       } catch (err) {
         console.error('Bildirim sayfası veri yükleme hatası:', err);
       } finally {
@@ -334,7 +325,7 @@ export default function SigortaBildirimlerPage() {
   // WhatsApp Mesajı Üretme
   const generateWhatsAppMessage = (item: RenewalItem): string => {
     const plateText = item.plate ? ` (${item.plate} plakalı araç)` : '';
-    
+
     if (item.daysRemaining < 0) {
       return `Sayın ${item.customerName},\n\nElisam Sigorta'dan bildirilmektedir.\n${item.policyNo} numaralı ${item.type} poliçenizin süresi ${item.endDate} tarihinde (geçtiğimiz günlerde) sona ermiştir${plateText}.\n\n⚠️ Olası trafik cezaları veya hasar anında teminatsız kalmamanız adına, en avantajlı yenileme teklifinizi hemen hazırlayalım.\n\nİletişim ve teklif onayı için:\n📞 0551 438 77 71\nElisam Sigorta • Alanya`;
     } else if (item.daysRemaining === 0) {
@@ -367,42 +358,7 @@ export default function SigortaBildirimlerPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Tekil Telegram Bildirimi
-  const handleSendTelegram = async (item: RenewalItem) => {
-    if (!telegramConfig.botToken || !telegramConfig.chatId) {
-      alert('Lütfen önce Ayarlar -> Hatırlatmalar & Telegram bölümünden Bot Token ve Chat ID bilgilerinizi kaydedin.');
-      return;
-    }
-    setTelegramSending(true);
-    try {
-      const msg = `🔔 *Poliçe Yenileme Bildirimi*\n\n` +
-        `👤 *Müşteri:* ${item.customerName}\n` +
-        `📱 *Telefon:* ${item.customerPhone}\n` +
-        `📄 *Poliçe No:* \`${item.policyNo}\`\n` +
-        `🛡️ *Tür:* ${item.type} (${item.company})\n` +
-        `${item.plate ? `🚗 *Plaka:* ${item.plate}\n` : ''}` +
-        `📅 *Bitiş Tarihi:* ${item.endDate}\n` +
-        `⏳ *Kalan Süre:* ${item.daysRemaining < 0 ? `⚠️ ${Math.abs(item.daysRemaining)} Gün Önce Bitti!` : `${item.daysRemaining} Gün Kaldı`}\n` +
-        `💰 *Prim:* ${item.premium > 0 ? `${formatMoneyDisplay(item.premium)} ₺` : 'Belirtilmemiş'}\n\n` +
-        `📞 [Müşteriyi Ara](tel:${item.customerPhone.replace(/\s+/g, '')})`;
-
-      const res = await fetch(`https://api.telegram.org/bot${telegramConfig.botToken}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: telegramConfig.chatId, text: msg, parse_mode: 'Markdown' })
-      });
-      const data = await res.json();
-      if (data.ok) {
-        alert(`✓ ${item.customerName} için Telegram bildirimi başarıyla iletildi!`);
-      } else {
-        alert('Telegram Hatası: ' + data.description);
-      }
-    } catch (err: any) {
-      alert('Telegram gönderilemedi: ' + err.message);
-    } finally {
-      setTelegramSending(false);
-    }
-  };
+  const openTelegramSettings = () => window.location.assign('/crm/sigorta/ayarlar');
 
   // Toplu Seçim İşlemleri
   const handleToggleSelect = (id: string) => {
@@ -414,52 +370,6 @@ export default function SigortaBildirimlerPage() {
       setSelectedIds([]);
     } else {
       setSelectedIds(sortedItems.map(i => i.id));
-    }
-  };
-
-  // Toplu Telegram Özeti Gönder
-  const handleSendBatchTelegram = async () => {
-    if (selectedIds.length === 0) {
-      alert('Lütfen önce bildirim göndermek istediğiniz poliçeleri seçin.');
-      return;
-    }
-    if (!telegramConfig.botToken || !telegramConfig.chatId) {
-      alert('Lütfen önce Ayarlar bölümünden Telegram Bot Token ve Chat ID bilgilerinizi kaydedin.');
-      return;
-    }
-    setTelegramSending(true);
-    try {
-      const selected = sortedItems.filter(i => selectedIds.includes(i.id));
-      let text = `📋 *ELİSAM SİGORTA - TOPLU YENİLEME BİLDİRİMİ*\n`;
-      text += `📅 *Rapor Tarihi:* ${new Date().toLocaleDateString('tr-TR')} ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}\n`;
-      text += `📊 *Toplam Seçilen:* ${selected.length} Adet Poliçe\n\n`;
-
-      selected.slice(0, 20).forEach((item, idx) => {
-        text += `*${idx + 1}. ${item.customerName}*\n`;
-        text += `   • Poliçe: \`${item.policyNo}\` (${item.type})\n`;
-        text += `   • Bitiş: ${item.endDate} (${item.daysRemaining < 0 ? '⚠️ Süresi Geçti' : `${item.daysRemaining} gün kaldı`})\n`;
-        text += `   • Tel: ${item.customerPhone} ${item.plate ? `| Plaka: ${item.plate}` : ''}\n\n`;
-      });
-
-      if (selected.length > 20) {
-        text += `_...ve ${selected.length - 20} poliçe daha._\n`;
-      }
-
-      const res = await fetch(`https://api.telegram.org/bot${telegramConfig.botToken}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: telegramConfig.chatId, text, parse_mode: 'Markdown' })
-      });
-      const data = await res.json();
-      if (data.ok) {
-        alert(`✓ ${selected.length} adet poliçe hatırlatma özeti Telegram kanalınıza başarıyla iletildi!`);
-      } else {
-        alert('Telegram Hatası: ' + data.description);
-      }
-    } catch (err: any) {
-      alert('Hata oluştu: ' + err.message);
-    } finally {
-      setTelegramSending(false);
     }
   };
 
@@ -576,7 +486,7 @@ export default function SigortaBildirimlerPage() {
 
   return (
     <div style={{ paddingBottom: '50px' }}>
-      
+
       {/* 1. ÜST BAŞLIK VE HIZLI AKSİYONLAR */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '20px' }}>
         <div>
@@ -589,7 +499,7 @@ export default function SigortaBildirimlerPage() {
                 Hatırlatıcı & Yenileme Bildirim Merkezi
               </h1>
               <p style={{ fontSize: '0.85rem', color: '#64748b', margin: '3px 0 0 0' }}>
-                Poliçe bitiş sürelerine göre akıllı bildirimler, WhatsApp & Telegram hatırlatmaları ve otomatik zamanlama takvimi
+                Poliçe bitiş sürelerine göre bildirimler ve WhatsApp hatırlatmaları. Telegram sorgulama botuna erişim Ayarlar bölümünden yönetilir.
               </p>
             </div>
           </div>
@@ -674,7 +584,7 @@ export default function SigortaBildirimlerPage() {
         {isScheduleExpanded && (
           <div style={{ padding: '18px', backgroundColor: '#f8fafc' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px' }}>
-              
+
               <div style={{ padding: '12px', backgroundColor: 'white', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#0284c7', fontWeight: 750, fontSize: '0.85rem', marginBottom: '6px' }}>
                   <CalendarDays size={16} /> 1. Aşama: 30 Gün Kaldı (1 Ay)
@@ -727,7 +637,7 @@ export default function SigortaBildirimlerPage() {
 
       {/* 3. METRİK VE HIZLI FİLTRE KARTLARI */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '10px', marginBottom: '20px' }}>
-        
+
         <button
           onClick={() => setUrgencyFilter('ALL')}
           style={{
@@ -855,10 +765,10 @@ export default function SigortaBildirimlerPage() {
         justifyContent: 'space-between',
         gap: '12px'
       }}>
-        
+
         {/* Sol: Arama ve Seçimler */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 320px', flexWrap: 'wrap' }}>
-          
+
           <div style={{ position: 'relative', flex: '1 1 200px' }}>
             <Search size={16} color="#94a3b8" style={{ position: 'absolute', left: '10px', top: '10px' }} />
             <input
@@ -913,7 +823,7 @@ export default function SigortaBildirimlerPage() {
 
         {/* Sağ: Toplu Seçim ve Bildirim Butonları */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          
+
           {selectedIds.length > 0 && (
             <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#2563eb', padding: '4px 8px', backgroundColor: '#eff6ff', borderRadius: '6px' }}>
               {selectedIds.length} Seçildi
@@ -936,8 +846,8 @@ export default function SigortaBildirimlerPage() {
           </button>
 
           <button
-            onClick={handleSendBatchTelegram}
-            disabled={selectedIds.length === 0 || telegramSending}
+            onClick={openTelegramSettings}
+
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -945,14 +855,14 @@ export default function SigortaBildirimlerPage() {
               padding: '8px 12px',
               borderRadius: '8px',
               border: 'none',
-              backgroundColor: selectedIds.length > 0 ? '#0284c7' : '#e2e8f0',
-              color: selectedIds.length > 0 ? 'white' : '#94a3b8',
+              backgroundColor: '#0284c7',
+              color: 'white',
               fontSize: '0.82rem',
               fontWeight: 700,
-              cursor: selectedIds.length > 0 ? 'pointer' : 'not-allowed'
+              cursor: 'pointer'
             }}
           >
-            <SendHorizontal size={14} /> Seçilenlere Telegram Özeti Gönder
+            <SendHorizontal size={14} /> Telegram Botu Yönetimi
           </button>
 
         </div>
@@ -967,12 +877,12 @@ export default function SigortaBildirimlerPage() {
         overflow: 'hidden',
         boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
       }}>
-        
+
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '1050px' }}>
             <thead>
               <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '2px solid #cbd5e1' }}>
-                
+
                 <th style={{ width: '40px', padding: '12px 14px', textAlign: 'center' }}>
                   <input
                     type="checkbox"
@@ -1196,7 +1106,7 @@ export default function SigortaBildirimlerPage() {
                       {/* HIZLI AKSİYONLAR (WHATSAPP, TELEGRAM, ARAMA, KOPYALA) */}
                       <td style={{ padding: '12px 14px', textAlign: 'center' }}>
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-                          
+
                           {/* WhatsApp Butonu */}
                           <button
                             onClick={() => handleSendWhatsApp(item)}
@@ -1239,9 +1149,9 @@ export default function SigortaBildirimlerPage() {
 
                           {/* Telegram Bot Butonu */}
                           <button
-                            onClick={() => handleSendTelegram(item)}
-                            title="Acente Telegram Botuna Bildir"
-                            disabled={telegramSending}
+                            onClick={openTelegramSettings}
+                            title="Telegram botu yönetimi"
+
                             style={{
                               padding: '6px 8px',
                               backgroundColor: '#0284c7',
@@ -1337,7 +1247,7 @@ export default function SigortaBildirimlerPage() {
             boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
             overflow: 'hidden'
           }}>
-            
+
             <div style={{ padding: '16px 20px', backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
                 <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0f172a' }}>

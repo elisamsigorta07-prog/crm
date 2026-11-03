@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Building2, Shield, Users, Save, Plus, Trash2, Bell } from 'lucide-react';
-import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
 import styles from '../layout.module.css';
+import TelegramBotSettings from '@/components/common/TelegramBotSettings';
+import CrmUsersSettings from '@/components/common/CrmUsersSettings';
 
 export default function AyarlarPage() {
   const [activeTab, setActiveTab] = useState<'acente' | 'sirketler' | 'kullanicilar' | 'hatirlatmalar'>('acente');
@@ -29,65 +30,6 @@ export default function AyarlarPage() {
     setTimeout(() => setReminderSaved(false), 2500);
   };
 
-  // Telegram bot state
-  const loadTelegramConfig = () => {
-    if (typeof window === 'undefined') return { botToken: '', chatId: '', notifyExpiry: true, notifyInstallments: true, notifyNewPolicy: true };
-    try { return JSON.parse(localStorage.getItem('elisam_telegram_config') || 'null') || { botToken: '', chatId: '', notifyExpiry: true, notifyInstallments: true, notifyNewPolicy: true }; } catch { return { botToken: '', chatId: '', notifyExpiry: true, notifyInstallments: true, notifyNewPolicy: true }; }
-  };
-  const [botToken, setBotToken] = useState(() => loadTelegramConfig().botToken);
-  const [chatId, setChatId] = useState(() => loadTelegramConfig().chatId);
-  const [notifyExpiry, setNotifyExpiry] = useState(() => loadTelegramConfig().notifyExpiry);
-  const [notifyInstallments, setNotifyInstallments] = useState(() => loadTelegramConfig().notifyInstallments);
-  const [notifyNewPolicy, setNotifyNewPolicy] = useState(() => loadTelegramConfig().notifyNewPolicy);
-  const [telegramStatus, setTelegramStatus] = useState<string | null>(null);
-  const [isTestingTelegram, setIsTestingTelegram] = useState(false);
-
-  const handleSaveTelegram = (e: React.FormEvent) => {
-    e.preventDefault();
-    const data = { botToken, chatId, notifyExpiry, notifyInstallments, notifyNewPolicy };
-    if (typeof window !== 'undefined') localStorage.setItem('elisam_telegram_config', JSON.stringify(data));
-    setReminderSaved(true);
-    setTimeout(() => setReminderSaved(false), 2500);
-  };
-
-  const handleTestTelegram = async () => {
-    if (!botToken || !chatId) {
-      alert('Lütfen önce Telegram Bot Token ve Chat ID bilgilerinizi girin.');
-      return;
-    }
-    setIsTestingTelegram(true);
-    setTelegramStatus(null);
-    try {
-      const message = `🔔 *Elisam Sigorta CRM - Test Bildirimi*\n\n✅ Telegram Bot entegrasyonu başarıyla kuruldu!\n⏰ Zaman: ${new Date().toLocaleString('tr-TR')}\n\nPoliçe bitişleri ve taksit hatırlatmaları bu kanala otomatik olarak iletilecektir.`;
-      const url = `https://api.telegram.org/bot${botToken.trim()}/sendMessage`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: chatId.trim(),
-          text: message,
-          parse_mode: 'Markdown'
-        })
-      });
-      const resData = await res.json();
-      if (resData.ok) {
-        setTelegramStatus('success');
-      } else {
-        setTelegramStatus(`error: ${resData.description || 'Bağlantı kurulamadı.'}`);
-      }
-    } catch (err: any) {
-      setTelegramStatus(`error: ${err.message || 'Ağ hatası oluştu.'}`);
-    } finally {
-      setIsTestingTelegram(false);
-    }
-  };
-
-  const handleSaveAllReminders = (e: React.FormEvent) => {
-    e.preventDefault();
-    handleSaveReminders(e);
-    handleSaveTelegram(e);
-  };
-
   // Agency info state
   const [agencyName, setAgencyName] = useState('Elisam Sigorta Aracılık Hizmetleri');
   const [taxNo, setTaxNo] = useState('1234567890');
@@ -98,67 +40,6 @@ export default function AyarlarPage() {
   // Companies state
   const [companies, setCompanies] = useState<any[]>([]);
   const [newCompName, setNewCompName] = useState('');
-
-  // Users state
-  const [users, setUsers] = useState<any[]>([]);
-  const [newUsernamePrefix, setNewUsernamePrefix] = useState('');
-  const [newUserPassword, setNewUserPassword] = useState('');
-
-  useEffect(() => {
-    if (activeTab === 'kullanicilar') {
-      fetchUsers();
-    }
-  }, [activeTab]);
-
-  const fetchUsers = async () => {
-    if (!isSupabaseConfigured()) {
-      setUsers([
-        { id: 1, username: 'admin@elisamsigorta07.com', password: '••••••••', role: 'Yönetici' }
-      ]);
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase.from('app_users').select('*').order('created_at', { ascending: false });
-      if (!error && data) {
-        setUsers(data);
-      }
-    } catch (err) {
-      console.warn("Supabase kullanıcıları çekilemedi:", err);
-    }
-  };
-
-  const handleAddUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newUsernamePrefix || !newUserPassword) return;
-
-    const fullUsername = `${newUsernamePrefix}@elisamsigorta07.com`;
-
-    if (!isSupabaseConfigured()) {
-      setUsers([{ id: Date.now(), username: fullUsername, password: newUserPassword, role: 'Kullanıcı' }, ...users]);
-      setNewUsernamePrefix('');
-      setNewUserPassword('');
-      alert('Kullanıcı yerel listeye eklendi. (Supabase ortam değişkenleri tanımlandığında kalıcı olarak veritabanına yazılacaktır)');
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase.from('app_users').insert([
-        { username: fullUsername, password: newUserPassword, role: 'Kullanıcı' }
-      ]).select();
-
-      if (error) {
-        alert('Kullanıcı eklenirken hata: ' + error.message);
-      } else if (data) {
-        setUsers([data[0], ...users]);
-        setNewUsernamePrefix('');
-        setNewUserPassword('');
-        alert('Kullanıcı başarıyla oluşturuldu.');
-      }
-    } catch (err) {
-      alert('Veritabanına bağlanılamadı.');
-    }
-  };
 
   const handleSaveAgency = (e: React.FormEvent) => {
     e.preventDefault();
@@ -329,85 +210,14 @@ export default function AyarlarPage() {
           </div>
         )}
 
-        {/* Tab 3: Users */}
-        {activeTab === 'kullanicilar' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: '#2d3748' }}>CRM Yetkili Kullanıcı Listesi</h3>
-            </div>
-
-            <form onSubmit={handleAddUser} style={{ backgroundColor: '#f8fafc', padding: '20px', borderRadius: '10px', border: '1px solid #edf2f7', marginBottom: '25px' }}>
-              <h4 style={{ fontSize: '0.9rem', fontWeight: 600, color: '#4a5568', marginBottom: '15px' }}>Yeni Kullanıcı Tanımla</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: '15px', alignItems: 'end' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', color: '#718096', marginBottom: '6px' }}>Kullanıcı Adı</label>
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <input 
-                      type="text" 
-                      value={newUsernamePrefix}
-                      onChange={(e) => setNewUsernamePrefix(e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, ''))}
-                      placeholder="adsoyad"
-                      style={{ padding: '10px', borderRadius: '8px 0 0 8px', border: '1px solid #e2e8f0', outline: 'none', borderRight: 'none', width: '100%' }}
-                      required
-                    />
-                    <div style={{ padding: '10px 15px', backgroundColor: '#edf2f7', border: '1px solid #e2e8f0', borderRadius: '0 8px 8px 0', fontSize: '0.85rem', color: '#4a5568', fontWeight: 600, whiteSpace: 'nowrap' }}>
-                      @elisamsigorta07.com
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.85rem', color: '#718096', marginBottom: '6px' }}>Şifre Belirle</label>
-                  <input 
-                    type="text" 
-                    value={newUserPassword}
-                    onChange={(e) => setNewUserPassword(e.target.value)}
-                    placeholder="Şifre giriniz..."
-                    style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #e2e8f0', outline: 'none' }}
-                    required
-                  />
-                </div>
-                <div>
-                  <button type="submit" className={styles.btnCrm} style={{ height: '42px', padding: '0 20px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Plus size={16} /> Kaydet
-                  </button>
-                </div>
-              </div>
-            </form>
-
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.85rem', fontWeight: 600, color: '#718096', borderBottom: '1px solid #edf2f7' }}>Kullanıcı Adı / E-Posta</th>
-                  <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.85rem', fontWeight: 600, color: '#718096', borderBottom: '1px solid #edf2f7' }}>Şifre</th>
-                  <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.85rem', fontWeight: 600, color: '#718096', borderBottom: '1px solid #edf2f7' }}>Rol / Yetki</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((u) => (
-                  <tr key={u.id}>
-                    <td style={{ padding: '14px 16px', borderBottom: '1px solid #edf2f7', fontWeight: 600, color: '#2d3748' }}>{u.username}</td>
-                    <td style={{ padding: '14px 16px', borderBottom: '1px solid #edf2f7', fontSize: '0.9rem', color: '#4a5568', fontFamily: 'monospace' }}>{u.password}</td>
-                    <td style={{ padding: '14px 16px', borderBottom: '1px solid #edf2f7' }}>
-                      <span style={{ padding: '4px 10px', backgroundColor: u.role === 'Yönetici' ? '#ebf8ff' : '#f7fafc', color: u.role === 'Yönetici' ? '#2b6cb0' : '#4a5568', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 600 }}>
-                        {u.role}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {users.length === 0 && (
-                  <tr><td colSpan={3} style={{ textAlign: 'center', padding: '20px', color: '#a0aec0' }}>Kullanıcı bulunamadı veya Supabase'e henüz bağlanılmadı.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {activeTab === 'kullanicilar' && <CrmUsersSettings />}
 
         {/* Tab 4: Hatırlatmalar & Telegram Bot */}
         {activeTab === 'hatirlatmalar' && (
           <div style={{ maxWidth: '720px' }}>
             
             {/* Form */}
-            <form onSubmit={handleSaveAllReminders}>
+            <form onSubmit={handleSaveReminders}>
               
               {/* 1. Kısım: Uygulama İçi Hatırlatma Günleri */}
               <div style={{ marginBottom: '28px', paddingBottom: '24px', borderBottom: '1px solid #edf2f7' }}>
@@ -454,111 +264,12 @@ export default function AyarlarPage() {
                 ))}
               </div>
 
-              {/* 2. Kısım: Telegram Botu Entegrasyonu */}
-              <div style={{ marginBottom: '28px', padding: '20px', backgroundColor: '#f0fdf4', borderRadius: '14px', border: '1px solid #bbf7d0' }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-                  <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: '#166534', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1.3rem' }}>🤖</span> Telegram Bildirim Botu Entegrasyonu
-                  </h3>
-                  <span style={{ fontSize: '0.75rem', fontWeight: 700, padding: '4px 10px', borderRadius: '20px', backgroundColor: botToken && chatId ? '#dcfce7' : '#fef3c7', color: botToken && chatId ? '#15803d' : '#b45309' }}>
-                    {botToken && chatId ? '🟢 Entegre Edildi' : '🟡 Kurulum Bekliyor'}
-                  </span>
-                </div>
-
-                <p style={{ fontSize: '0.86rem', color: '#15803d', lineHeight: '1.5', marginBottom: '18px' }}>
-                  Poliçe bitişleri, yaklaşan ödemeler ve geciken taksitler anında Telegram grubunuza veya özel botunuza otomatik mesaj olarak gönderilir.
-                </p>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '14px', marginBottom: '18px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#166534', marginBottom: '6px' }}>Telegram Bot Token</label>
-                    <input 
-                      type="text"
-                      value={botToken}
-                      onChange={(e) => setBotToken(e.target.value)}
-                      placeholder="Örn: 7829418294:AAHF279182hkshf9812..."
-                      style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1px solid #86efac', outline: 'none', fontFamily: 'monospace', fontSize: '0.9rem', backgroundColor: '#ffffff' }}
-                    />
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, color: '#166534', marginBottom: '6px' }}>Telegram Chat ID / Grup ID</label>
-                    <input 
-                      type="text"
-                      value={chatId}
-                      onChange={(e) => setChatId(e.target.value)}
-                      placeholder="Örn: 591823901 veya -1009182741"
-                      style={{ width: '100%', padding: '11px', borderRadius: '8px', border: '1px solid #86efac', outline: 'none', fontFamily: 'monospace', fontSize: '0.9rem', backgroundColor: '#ffffff' }}
-                    />
-                  </div>
-                </div>
-
-                {/* Bildirim Seçenekleri */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '18px', backgroundColor: '#ffffff', padding: '12px 16px', borderRadius: '10px', border: '1px solid #bbf7d0' }}>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.86rem', color: '#166534', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={notifyExpiry} onChange={(e) => setNotifyExpiry(e.target.checked)} style={{ accentColor: '#16a34a' }} />
-                    <strong>Poliçe Yenileme Bildirimleri</strong> (Yaklaşan poliçeleri otomatik ilet)
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.86rem', color: '#166534', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={notifyInstallments} onChange={(e) => setNotifyInstallments(e.target.checked)} style={{ accentColor: '#16a34a' }} />
-                    <strong>Taksit & Borç Bildirimleri</strong> (Vadesi gelen/geçen taksitleri ilet)
-                  </label>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.86rem', color: '#166534', cursor: 'pointer' }}>
-                    <input type="checkbox" checked={notifyNewPolicy} onChange={(e) => setNotifyNewPolicy(e.target.checked)} style={{ accentColor: '#16a34a' }} />
-                    <strong>Yeni Poliçe Kesim Bildirimi</strong> (Sistemde yeni poliçe oluşturulduğunda bildir)
-                  </label>
-                </div>
-
-                {/* Telegram Test Butonu */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-                  <button 
-                    type="button" 
-                    onClick={handleTestTelegram} 
-                    disabled={isTestingTelegram}
-                    style={{ 
-                      padding: '10px 18px', 
-                      backgroundColor: '#15803d', 
-                      color: '#ffffff', 
-                      border: 'none', 
-                      borderRadius: '8px', 
-                      fontWeight: 700, 
-                      fontSize: '0.88rem', 
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    {isTestingTelegram ? '⏳ Test Gönderiliyor...' : '📲 Telegram Bağlantısını Test Et'}
-                  </button>
-
-                  {telegramStatus === 'success' && (
-                    <span style={{ color: '#15803d', fontWeight: 700, fontSize: '0.88rem' }}>
-                      ✅ Harika! Test bildirimi Telegram&apos;a başarıyla ulaştı.
-                    </span>
-                  )}
-                  {telegramStatus && telegramStatus.startsWith('error') && (
-                    <span style={{ color: '#dc2626', fontWeight: 600, fontSize: '0.85rem' }}>
-                      ❌ Hata: {telegramStatus.replace('error: ', '')}
-                    </span>
-                  )}
-                </div>
-
-                {/* Bot Kurulum Rehberi */}
-                <div style={{ marginTop: '16px', padding: '12px 14px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  <strong style={{ fontSize: '0.82rem', color: '#334155', display: 'block', marginBottom: '6px' }}>💡 3 Adımda Bot Kurulumu:</strong>
-                  <ol style={{ margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: '#64748b', lineHeight: '1.6' }}>
-                    <li>Telegram&apos;da <code>@BotFather</code> hesabına gidin, <code>/newbot</code> yazarak bot oluşturup <strong>Token</strong> alın.</li>
-                    <li>Botunuzu grubunuza veya özel sohbetinize ekleyip bir mesaj yazın. <code>@userinfobot</code> ile <strong>Chat ID</strong> nizi öğrenin.</li>
-                    <li>Yukarıdaki kutulara yapıştırıp &ldquo;Test Et&rdquo; butonuna basın.</li>
-                  </ol>
-                </div>
-              </div>
+              <TelegramBotSettings />
 
               {/* Kaydet Butonu */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
                 <button type="submit" className={styles.btnCrm} style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 24px', fontSize: '0.95rem' }}>
-                  <Save size={18} /> Tüm Hatırlatma & Telegram Ayarlarını Kaydet
+                  <Save size={18} /> Hatırlatma Ayarlarını Kaydet
                 </button>
                 {reminderSaved && (
                   <span style={{ color: '#16a34a', fontWeight: 700, fontSize: '0.92rem' }}>✓ Ayarlar Başarıyla Kaydedildi!</span>

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import styles from './layout.module.css';
 import GlobalCrmSearch from '@/components/common/GlobalCrmSearch';
+import CrmSessionGate, { CrmIdentity, CrmLogout } from '@/components/common/CrmSessionGate';
 
 export default function RentCrmLayout({
   children,
@@ -45,7 +46,7 @@ export default function RentCrmLayout({
   ];
 
   return (
-    <div className={styles.crmLayout}>
+    <CrmSessionGate scope="rent"><div className={styles.crmLayout}>
       {/* Mobile Drawer Backdrop */}
       {isMobileNavOpen && (
         <div className={styles.backdrop} onClick={() => setIsMobileNavOpen(false)} />
@@ -84,10 +85,10 @@ export default function RentCrmLayout({
           })}
         </nav>
 
-        <Link href="/crm/rent-a-car/login" className={styles.logoutBtn}>
+        <CrmLogout scope="rent" className={styles.logoutBtn}>
           <LogOut size={18} />
           Çıkış Yap
-        </Link>
+        </CrmLogout>
       </aside>
 
       {/* Main Area */}
@@ -111,8 +112,7 @@ export default function RentCrmLayout({
             
             <div className={styles.userProfile}>
               <div className={styles.userInfo}>
-                <span className={styles.userName}>Eray Baysal</span>
-                <span className={styles.userRole}>Filo Yöneticisi</span>
+                <CrmIdentity nameClass={styles.userName} roleClass={styles.userRole} />
               </div>
               <div className={styles.avatar}>EB</div>
             </div>
@@ -123,7 +123,7 @@ export default function RentCrmLayout({
           {children}
         </main>
       </div>
-    </div>
+    </div></CrmSessionGate>
   );
 }
 

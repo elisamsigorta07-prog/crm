@@ -3,25 +3,42 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "postinstall": "node scripts/prepare-pdf-assets.mjs",
+    "predev": "node scripts/prepare-pdf-assets.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/prepare-pdf-assets.mjs",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:policy-pdf": "node --test tests/policy-pdf.test.mjs tests/policy-pdf-combinations.test.mjs tests/policy-pdf-review.test.mjs",
+    "test:policy-ocr": "node scripts/test-policy-ocr.mjs",
+    "crm:setup": "node scripts/setup-policy-storage.mjs",
+    "test:policy-storage": "node --test tests/policy-storage.test.mjs",
+    "crm:telegram:setup": "node scripts/setup-telegram-bot.mjs",
+    "test:telegram": "node --test tests/telegram-bot.test.mjs",
+    "test:security": "node --test tests/crm-security.test.mjs tests/crm-security-sql.test.mjs",
+    "security:audit:cloud": "node scripts/audit-crm-security.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.112.3",
+    "@tesseract.js-data/eng": "^1.0.0",
+    "@tesseract.js-data/tur": "^1.0.0",
     "lucide-react": "^1.24.0",
-    "next": "16.2.10",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
+    "next": "^16.4.4",
+    "pdfjs-dist": "^6.4.299",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "server-only": "^0.0.1",
+    "tesseract.js": "^7.0.0",
     "write-excel-file": "^4.1.1"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.14",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.2.10",
+    "eslint-config-next": "^16.4.4",
     "typescript": "^5"
   }
 }

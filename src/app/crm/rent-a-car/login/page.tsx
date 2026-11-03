@@ -4,7 +4,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CarFront, ArrowLeft, LogIn } from 'lucide-react';
-import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
+import { crmAuth, isSupabaseConfigured } from '@/lib/supabaseClient';
+
+import { isCrmStaff } from '@/lib/crmAccess';
 
 export default function RentCrmLogin() {
   const router = useRouter();
@@ -17,18 +19,6 @@ export default function RentCrmLogin() {
     setIsLoading(true);
 
     const cleanUsername = email.trim().toLowerCase();
-    const isFallbackAdmin =
-      (cleanUsername === 'admin@elisamsigorta07.com' ||
-       cleanUsername === 'admin@elisamrent.com' ||
-       cleanUsername === 'admin') &&
-      password === 'elisam2026.1';
-
-    if (isFallbackAdmin) {
-      router.push('/crm/rent-a-car/dashboard');
-      setIsLoading(false);
-      return;
-    }
-
     if (!isSupabaseConfigured()) {
       alert("Hatalı kullanıcı adı veya şifre!");
       setIsLoading(false);
@@ -36,19 +26,14 @@ export default function RentCrmLogin() {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('app_users')
-        .select('*')
-        .eq('username', email.trim())
-        .eq('password', password)
-        .single();
-        
-      if (data) {
-        router.push('/crm/rent-a-car/dashboard');
-      } else {
-        alert("Hatalı e-posta veya şifre!");
+      const loginEmail = ['admin', 'admin@elisamrent.com'].includes(cleanUsername) ? 'admin@elisamsigorta07.com' : cleanUsername;
+      const { data, error } = await crmAuth.auth.signInWithPassword({ email: loginEmail, password });
+      if (!error && isCrmStaff(data.user, 'rent')) router.replace('/crm/rent-a-car/dashboard');
+      else {
+        if (data.session) await crmAuth.auth.signOut({ scope: 'local' });
+        alert('Giriş yapılamadı. Kullanıcı adı ve şifrenizi kontrol edin.');
       }
-    } catch (err) {
+    } catch {
       alert("Giriş yapılamadı veya hatalı şifre.");
     } finally {
       setIsLoading(false);

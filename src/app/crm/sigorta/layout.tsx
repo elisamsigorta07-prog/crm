@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import styles from './layout.module.css';
 import GlobalCrmSearch from '@/components/common/GlobalCrmSearch';
+import CrmSessionGate, { CrmIdentity, CrmLogout } from '@/components/common/CrmSessionGate';
 
 export default function SigortaCrmLayout({
   children,
@@ -63,7 +64,7 @@ export default function SigortaCrmLayout({
   }, [pathname]);
 
   // If we are on the login page, don't show the sidebar/layout
-  if (pathname === '/crm/sigorta/login') {
+  if (pathname === '/crm/sigorta/login' || pathname === '/crm/sigorta/hesap-kurulum') {
     return <>{children}</>;
   }
 
@@ -78,6 +79,7 @@ export default function SigortaCrmLayout({
   ];
 
   return (
+    <CrmSessionGate>
     <div className={styles.crmLayout}>
       {/* Mobile Drawer Backdrop */}
       {isMobileNavOpen && (
@@ -133,10 +135,10 @@ export default function SigortaCrmLayout({
           })}
         </nav>
 
-        <Link href="/crm/sigorta/login" className={styles.logoutBtn}>
+        <CrmLogout className={styles.logoutBtn}>
           <LogOut size={18} />
           Çıkış Yap
-        </Link>
+        </CrmLogout>
       </aside>
 
       {/* Main Content Area */}
@@ -161,8 +163,7 @@ export default function SigortaCrmLayout({
             
             <div className={styles.userProfile}>
               <div className={styles.userInfo}>
-                <span className={styles.userName}>Eray Baysal</span>
-                <span className={styles.userRole}>Yönetici</span>
+                <CrmIdentity nameClass={styles.userName} roleClass={styles.userRole} />
               </div>
               <div className={styles.avatar}>EB</div>
             </div>
@@ -175,5 +176,6 @@ export default function SigortaCrmLayout({
         </main>
       </div>
     </div>
+    </CrmSessionGate>
   );
 }

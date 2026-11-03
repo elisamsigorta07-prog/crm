@@ -4,7 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ShieldCheck, ArrowLeft, LogIn } from 'lucide-react';
-import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
+import { crmAuth, isSupabaseConfigured } from '@/lib/supabaseClient';
+import { isCrmStaff } from '@/lib/crmAccess';
 
 export default function SigortaCrmLogin() {
   const router = useRouter();
@@ -17,17 +18,6 @@ export default function SigortaCrmLogin() {
     setIsLoading(true);
 
     const cleanUsername = email.trim().toLowerCase();
-    const isFallbackAdmin =
-      (cleanUsername === 'admin@elisamsigorta07.com' ||
-       cleanUsername === 'admin@elisamrent.com' ||
-       cleanUsername === 'admin') &&
-      password === 'elisam2026.1';
-
-    if (isFallbackAdmin) {
-      router.push('/crm/sigorta/dashboard');
-      setIsLoading(false);
-      return;
-    }
 
     if (!isSupabaseConfigured()) {
       alert("Hatalı kullanıcı adı veya şifre!");
@@ -36,19 +26,15 @@ export default function SigortaCrmLogin() {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('app_users')
-        .select('*')
-        .eq('username', email.trim())
-        .eq('password', password)
-        .single();
+      const { data, error } = await crmAuth.auth.signInWithPassword({ email: cleanUsername === 'admin' ? 'admin@elisamsigorta07.com' : cleanUsername, password });
         
-      if (data) {
-        router.push('/crm/sigorta/dashboard');
+      if (!error && isCrmStaff(data.user)) {
+        router.replace('/crm/sigorta/dashboard');
       } else {
-        alert("Hatalı e-posta veya şifre!");
+        if (data.session) await crmAuth.auth.signOut({ scope: 'local' });
+        alert('Giriş yapılamadı. Kullanıcı adı veya e-posta adresinizi ve şifrenizi kontrol edin.');
       }
-    } catch (err) {
+    } catch {
       alert("Giriş yapılamadı veya hatalı şifre.");
     } finally {
       setIsLoading(false);
@@ -64,7 +50,7 @@ export default function SigortaCrmLogin() {
             <ShieldCheck size={40} />
           </div>
           <h1 style={{ fontSize: '1.8rem', color: '#031924', marginBottom: '5px' }}>Sigorta CRM</h1>
-          <p style={{ color: '#666', fontSize: '0.95rem' }}>Personel giriş paneli</p>
+          <p style={{ color: '#666', fontSize: '0.95rem' }}>Hesabınızla giriş yapın</p>
         </div>
 
         <form onSubmit={handleSubmit}>

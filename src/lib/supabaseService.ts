@@ -512,7 +512,7 @@ export async function fetchPoliciesFromCloud(): Promise<Policy[]> {
   return [];
 }
 
-export async function upsertPolicyToCloud(policy: Policy): Promise<void> {
+export async function upsertPolicyToCloud(policy: Policy, requireCloud = false): Promise<void> {
   const cleanRef = sanitizeReference(policy.reference, policy.notes);
   const sanitizedPolicy: Policy = {
     ...policy,
@@ -601,9 +601,11 @@ export async function upsertPolicyToCloud(policy: Policy): Promise<void> {
       } catch (e) {}
     }
     
-    await supabase.from('policies').upsert(baseRow);
+    const { error: finalError } = await supabase.from('policies').upsert(baseRow);
+    if (finalError) throw new Error('Poliçe buluta kaydedilemedi. Lütfen bağlantınızı kontrol edip tekrar deneyin.');
   } catch (err) {
     console.error('upsertPolicyToCloud error:', err);
+    if (requireCloud) throw err;
   }
 }
 

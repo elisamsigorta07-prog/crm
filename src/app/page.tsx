@@ -144,7 +144,7 @@ export default function Home() {
         <div className={styles.marqueeWrapper}>
           <div className={styles.marqueeContent}>
             <div className={styles.marqueeCard}>
-              <img src="/agencies/ALLİNAZ.png" alt="Allianz Sigorta" className={`${styles.marqueeLogo} ${styles.logoAllianz}`} />
+              <img src={encodeURI('/agencies/ALLİNAZ.png')} alt="Allianz Sigorta" className={`${styles.marqueeLogo} ${styles.logoAllianz}`} />
             </div>
             <div className={styles.marqueeCard}>
               <img src="/agencies/ak-sigorta-logo-png_seeklogo-5491.png" alt="Aksigorta" className={`${styles.marqueeLogo} ${styles.logoAksigorta}`} />
@@ -164,7 +164,7 @@ export default function Home() {
           </div>
           <div className={styles.marqueeContent} aria-hidden="true">
             <div className={styles.marqueeCard}>
-              <img src="/agencies/ALLİNAZ.png" alt="Allianz Sigorta" className={`${styles.marqueeLogo} ${styles.logoAllianz}`} />
+              <img src={encodeURI('/agencies/ALLİNAZ.png')} alt="Allianz Sigorta" className={`${styles.marqueeLogo} ${styles.logoAllianz}`} />
             </div>
             <div className={styles.marqueeCard}>
               <img src="/agencies/ak-sigorta-logo-png_seeklogo-5491.png" alt="Aksigorta" className={`${styles.marqueeLogo} ${styles.logoAksigorta}`} />
@@ -275,7 +275,7 @@ export default function Home() {
           }}>
             <div onClick={() => setSelectedBanner('/banners/ANA SAYFA UYGUN BİR YER.png')} style={{ display: 'block', cursor: 'pointer', transition: 'transform 0.2s', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }} onMouseOver={e => e.currentTarget.style.transform = 'translateY(-5px)'} onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}>
               <img 
-                src="/banners/ANA SAYFA UYGUN BİR YER.png" 
+                src={encodeURI('/banners/ANA SAYFA UYGUN BİR YER.png')}
                 alt="Elisam Sigorta Fırsatları" 
                 style={{ width: '100%', display: 'block' }}
               />
@@ -283,7 +283,7 @@ export default function Home() {
             
             <div onClick={() => setSelectedBanner('/banners/ÖZEL SAĞLIK.png')} style={{ display: 'block', cursor: 'pointer', transition: 'transform 0.2s', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }} onMouseOver={e => e.currentTarget.style.transform = 'translateY(-5px)'} onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}>
               <img 
-                src="/banners/ÖZEL SAĞLIK.png" 
+                src={encodeURI('/banners/ÖZEL SAĞLIK.png')}
                 alt="Özel Sağlık Sigortası" 
                 style={{ width: '100%', display: 'block' }}
               />
@@ -291,7 +291,7 @@ export default function Home() {
 
             <div onClick={() => setSelectedBanner('/banners/SEYEHAT SİGORTASI.png')} style={{ display: 'block', cursor: 'pointer', transition: 'transform 0.2s', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 15px rgba(0,0,0,0.05)' }} onMouseOver={e => e.currentTarget.style.transform = 'translateY(-5px)'} onMouseOut={e => e.currentTarget.style.transform = 'translateY(0)'}>
               <img 
-                src="/banners/SEYEHAT SİGORTASI.png" 
+                src={encodeURI('/banners/SEYEHAT SİGORTASI.png')}
                 alt="Seyahat Sigortası" 
                 style={{ width: '100%', display: 'block' }}
               />
@@ -935,7 +935,7 @@ export default function Home() {
               &times;
             </button>
             <img 
-              src={selectedBanner} 
+              src={encodeURI(selectedBanner)}
               alt="Büyütülmüş Banner" 
               style={{ width: '100%', height: 'auto', borderRadius: '16px', objectFit: 'contain', maxHeight: '85vh' }} 
               onClick={(e) => e.stopPropagation()}

@@ -57,9 +57,17 @@ import {
 import { formatExcelText, formatExcelCurrency, resolvePlateAndDocSerial, extractReferenceFromNotes, sanitizeReference } from '@/lib/excelHelper';
 import { downloadExcelSingleSheet } from '@/lib/excelExport';
 import styles from '../layout.module.css';
+import PolicyPdfImport from '@/components/common/PolicyPdfImport';
+import PolicyDocumentView from '@/components/common/PolicyDocumentView';
+import type { PolicyPdfFields } from '@/lib/policyPdfFields';
+import { validatePolicyPdf } from '@/lib/policyPdfReader';
+import { savePolicyDocument, removePolicyDocument } from '@/lib/policyDocuments';
 
 export type SortField = 'startDate' | 'endDate' | 'customerName' | 'premium' | 'policyNo' | 'status';
 export type SortOrder = 'asc' | 'desc';
+
+const policyTypes = ['Trafik', 'Kasko', 'DASK', 'Konut', 'İşyeri', 'Özel Sağlık', 'Tamamlayıcı Sağlık (TSS)', 'Yabancı Sağlık', 'Seyahat Sağlık', 'Ferdi Kaza', 'Nakliyat', 'Mesleki Sorumluluk', 'TARSİM Tarım', 'Tekne / Yat'];
+const policyCompanies = ['HDI Sigorta', 'Ak Sigorta', 'Sompo Sigorta', 'Allianz', 'Anadolu Sigorta', 'Quick Sigorta', 'Emaa Sigorta', 'Türkiye Sigorta', 'Axa Sigorta', 'Ray Sigorta', 'Neova Sigorta', 'Hepiyi Sigorta', 'Generali Sigorta', 'Unico Sigorta', 'Corpus Sigorta', 'Koru Sigorta', 'Bereket Sigorta', 'Mapfre Sigorta', 'Orient Sigorta', 'Ankara Sigorta', 'Zurich Sigorta'];
 
 export const parseDateToTimestamp = (dateStr?: string): number => {
   if (!dateStr) return 0;
@@ -150,8 +158,13 @@ export default function PolicelerPage() {
   const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
 
   // Auto-paste / Form Mode
-  const [addMode, setAddMode] = useState<'Manuel' | 'Otomatik'>('Manuel');
+  const [addMode, setAddMode] = useState<'Manuel' | 'Otomatik' | 'PDF'>('Manuel');
   const [autoText, setAutoText] = useState('');
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [removePdf, setRemovePdf] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [pdfError, setPdfError] = useState('');
 
   // Form State - Müşteri Bilgileri
   const [selectedExistingCustomerId, setSelectedExistingCustomerId] = useState('NEW');
@@ -244,6 +257,10 @@ export default function PolicelerPage() {
 
   // Reset form helper
   const resetForm = () => {
+    setPdfFile(null);
+    setRemovePdf(false);
+    setPdfError('');
+    setPdfBusy(false);
     setSelectedExistingCustomerId('NEW');
     setCustomerSearchInput('');
     setCustomerName('');
@@ -289,6 +306,7 @@ export default function PolicelerPage() {
 
   // Open Edit Modal
   const handleOpenEditModal = (pol: Policy) => {
+    resetForm();
     setEditingPolicy(pol);
     setPolicyNo(pol.policyNo || pol.id);
     setCustomerName(pol.customerName);
@@ -316,8 +334,10 @@ export default function PolicelerPage() {
     setVehicleRegistrationDate(pol.vehicleRegistrationDate || matchedCust?.vehicleRegistrationDate || '');
     setVehicleValue(pol.vehicleValue ? formatMoneyInput(String(pol.vehicleValue)) : (matchedCust?.vehicleValue ? formatMoneyInput(String(matchedCust.vehicleValue)) : ''));
 
-    setType(pol.type);
-    setCompany(pol.company);
+    setType(policyTypes.includes(pol.type) ? pol.type : 'DIGER');
+    setCustomType(policyTypes.includes(pol.type) ? '' : pol.type);
+    setCompany(policyCompanies.includes(pol.company) ? pol.company : 'DIGER');
+    setCustomCompany(policyCompanies.includes(pol.company) ? '' : pol.company);
     setStartDate(formatToInputDate(pol.startDate) || new Date().toISOString().split('T')[0]);
     setEndDate(formatToInputDate(pol.endDate) || '');
     setPremium(pol.premium ? formatMoneyInput(String(pol.premium)) : '');
@@ -365,6 +385,24 @@ export default function PolicelerPage() {
       if (found.vehicleRegistrationDate) setVehicleRegistrationDate(found.vehicleRegistrationDate);
       if (found.vehicleValue) setVehicleValue(found.vehicleValue);
     }
+  };
+
+  const applyPdfFields = (fields: PolicyPdfFields, file: File) => {
+    if (fields.customerName) { setCustomerName(fields.customerName); setSelectedExistingCustomerId('NEW'); }
+    if (fields.customerTc) setCustomerTc(fields.customerTc);
+    if (fields.customerPhone) setCustomerPhone(fields.customerPhone);
+    if (fields.customerEmail) setCustomerEmail(fields.customerEmail);
+    if (fields.policyNo) setPolicyNo(fields.policyNo);
+    // Custom options keep previously unseen companies and products editable.
+    if (fields.company) { setCompany(policyCompanies.includes(fields.company) ? fields.company : 'DIGER'); setCustomCompany(fields.company); }
+    if (fields.type) { setType(policyTypes.includes(fields.type) ? fields.type : 'DIGER'); setCustomType(fields.type); }
+    if (fields.startDate) setStartDate(fields.startDate);
+    if (fields.endDate) setEndDate(fields.endDate);
+    if (fields.premium) setPremium(formatMoneyDisplay(normalizeMoney(fields.premium)));
+    if (fields.netPremium) setNetPremium(formatMoneyDisplay(normalizeMoney(fields.netPremium)));
+    if (fields.plate) setPlate(fields.plate);
+    if (fields.documentSerial) setDocumentSerial(fields.documentSerial);
+    setPdfFile(file); setRemovePdf(false); setPdfError('');
   };
 
   // Auto-paste text parser
@@ -530,6 +568,7 @@ export default function PolicelerPage() {
   // Save Policy & Customer in One Single Action
   const handleSavePolicyAndCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving || pdfBusy) return;
     if (!customerName || !premium) {
       alert('Lütfen en azından Müşteri Adı ve Prim Tutarını girin.');
       return;
@@ -538,6 +577,16 @@ export default function PolicelerPage() {
     const finalType = type === 'DIGER' ? (customType.trim() || 'Özel Sigorta') : type;
     const finalCompany = company === 'DIGER' ? (customCompany.trim() || 'Diğer Sigorta') : company;
     const finalPolicyNo = policyNo.trim() || `POL-${Math.floor(100000 + Math.random() * 900000)}`;
+    const recordId = editingPolicy?.id || finalPolicyNo;
+    if (policies.some(p => p.id !== editingPolicy?.id && (p.policyNo || p.id) === finalPolicyNo)) {
+      alert('Bu poliçe numarası zaten kayıtlı. Mevcut poliçeyi düzenleyin.');
+      return;
+    }
+    setIsSaving(true);
+    setPdfError('');
+    let policyPersisted = false;
+    setPolicyNo(finalPolicyNo);
+    try {
     const prem = normalizeMoney(premium);
     const netPrem = netPremium ? normalizeMoney(netPremium) : undefined;
     const paid = paidAmount ? normalizeMoney(paidAmount) : (paymentType === 'Peşin / Tek Çekim' ? prem : 0);
@@ -621,7 +670,7 @@ export default function PolicelerPage() {
 
     // 2. SAVE / UPDATE POLICY
     const newPolicyRecord: Policy = {
-      id: finalPolicyNo,
+      id: recordId,
       policyNo: finalPolicyNo,
       customerId,
       customerName,
@@ -652,17 +701,28 @@ export default function PolicelerPage() {
       notes: notes ? notes.trim() : ''
     };
 
+    await upsertPolicyToCloud(newPolicyRecord, true);
+    policyPersisted = true;
+    // Keep the saved identity on partial failure so retrying PDF upload never
+    // creates a second policy or loses the connection to the existing one.
+    setEditingPolicy(newPolicyRecord);
     if (editingPolicy) {
       setPolicies(policies.map(p => p.id === editingPolicy.id ? newPolicyRecord : p));
     } else {
       setPolicies([newPolicyRecord, ...policies]);
     }
-    // Async Cloud Save Policy
-    upsertPolicyToCloud(newPolicyRecord);
+    if (pdfFile) await savePolicyDocument(recordId, pdfFile);
+    else if (removePdf) await removePolicyDocument(recordId);
 
     // Finans / Cari Ekstre tamamen manuel tutulmaktadır; poliçe kesiminde otomatik cari hareket açılmaz.
     setIsAddModalOpen(false);
     resetForm();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Kayıt tamamlanamadı. Lütfen tekrar deneyin.';
+      setPdfError(policyPersisted ? `Poliçe kaydedildi, PDF işlemi tamamlanamadı: ${message} Aynı kayıtta tekrar deneyebilirsiniz.` : message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Delete Policy
@@ -698,32 +758,7 @@ export default function PolicelerPage() {
     window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
-  // Telegram Reminder
-  const sendTelegramReminder = async (pol: Policy) => {
-    try {
-      const config = JSON.parse(localStorage.getItem('elisam_telegram_config') || '{}');
-      if (!config.botToken || !config.chatId) {
-        alert('Lütfen önce Ayarlar -> Hatırlatmalar & Telegram bölümünden Bot Token ve Chat ID bilgilerinizi kaydedin.');
-        return;
-      }
-
-      const text = `📄 *Poliçe Bilgilendirmesi*\n\n👤 *Müşteri:* ${pol.customerName}\n📱 *Telefon:* ${pol.customerPhone || '-'}\n📄 *Poliçe No:* \`${pol.policyNo || pol.id}\`\n🛡️ *Tür / Şirket:* ${pol.type} - ${pol.company}\n📅 *Vade:* ${pol.startDate} -> ${pol.endDate}\n💰 *Toplam Prim:* ${formatMoneyDisplay(pol.premium)} ₺\n📊 *Durum:* ${pol.status}\n\n⏰ *Kayıt Tarihi:* ${new Date().toLocaleString('tr-TR')}`;
-
-      const res = await fetch(`https://api.telegram.org/bot${config.botToken}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: config.chatId, text, parse_mode: 'Markdown' })
-      });
-      const data = await res.json();
-      if (data.ok) {
-        alert(`✓ ${pol.customerName} poliçe özeti Telegram botunuza başarıyla iletildi!`);
-      } else {
-        alert(`Telegram Hatası: ${data.description}`);
-      }
-    } catch (err: any) {
-      alert('Telegram mesajı gönderilemedi: ' + err.message);
-    }
-  };
+  const openTelegramSettings = () => window.location.assign('/crm/sigorta/ayarlar');
 
   // Hızlı Tarih Aralığı Belirleme
   const handleSetDateRange = (preset: 'bu_hafta' | 'bu_ay' | 'bu_yil' | 'gelecek_30' | 'gecmis') => {
@@ -1555,16 +1590,17 @@ export default function PolicelerPage() {
                   Müşteri ve poliçe bilgilerini tek seferde girin veya metin yapıştırarak saniyeler içinde otomatik doldurun.
                 </div>
               </div>
-              <button onClick={() => setIsAddModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
+              <button disabled={pdfBusy || isSaving} onClick={() => setIsAddModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8' }}>
                 <X size={24} />
               </button>
             </div>
 
             {/* Mode Selector (Manuel vs Otomatik Metin Yapıştır) */}
             {!editingPolicy && (
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '20px' }}>
                 <button
                   type="button"
+                  disabled={pdfBusy || isSaving}
                   onClick={() => setAddMode('Manuel')}
                   style={{
                     flex: 1,
@@ -1582,6 +1618,7 @@ export default function PolicelerPage() {
                 </button>
                 <button
                   type="button"
+                  disabled={pdfBusy || isSaving}
                   onClick={() => setAddMode('Otomatik')}
                   style={{
                     flex: 1,
@@ -1600,6 +1637,10 @@ export default function PolicelerPage() {
                   }}
                 >
                   <ClipboardPaste size={16} /> 📋 Otomatik Metin Yapıştır & Doldur
+                </button>
+                <button type="button" disabled={pdfBusy || isSaving} onClick={() => setAddMode('PDF')}
+                  style={{ flex: 1, minWidth: 150, padding: '10px 14px', borderRadius: 10, border: addMode === 'PDF' ? '2px solid #2563eb' : '1px solid #cbd5e1', background: addMode === 'PDF' ? '#eff6ff' : '#f8fafc', color: '#1d4ed8', fontWeight: 750, cursor: 'pointer' }}>
+                  📄 PDF’den Al
                 </button>
               </div>
             )}
@@ -1623,7 +1664,10 @@ export default function PolicelerPage() {
               </div>
             )}
 
+            {addMode === 'PDF' && <PolicyPdfImport onApply={applyPdfFields} onBusyChange={setPdfBusy} />}
+
             <form onSubmit={handleSavePolicyAndCustomer}>
+              <fieldset disabled={isSaving || pdfBusy} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
               
               {/* KART 1: MÜŞTERİ BİLGİLERİ */}
               <div style={{ padding: '16px', backgroundColor: '#f8fafc', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '18px' }}>
@@ -2084,6 +2128,24 @@ export default function PolicelerPage() {
                 />
               </div>
 
+              <section style={{ padding: 16, background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 12, marginBottom: 20 }}>
+                <h3 style={{ marginTop: 0 }}>📎 Poliçe PDF dosyası</h3>
+                {editingPolicy && !pdfFile && !removePdf && <PolicyDocumentView key={editingPolicy.id} policyId={editingPolicy.id} />}
+                <label htmlFor="policy-pdf-attachment">PDF ekle veya mevcut dosyayı değiştir (en fazla 20 MB)</label>
+                <input id="policy-pdf-attachment" type="file" accept=".pdf,application/pdf" onChange={async e => {
+                  const file = e.target.files?.[0]; e.target.value = '';
+                  if (!file) return;
+                  setPdfBusy(true);
+                  try { await validatePolicyPdf(file); setPdfFile(file); setRemovePdf(false); setPdfError(''); }
+                  catch (error) { setPdfError(error instanceof Error ? error.message : 'PDF seçilemedi.'); }
+                  finally { setPdfBusy(false); }
+                }} />
+                {pdfFile && <p>Seçilen: <strong>{pdfFile.name}</strong> ({(pdfFile.size / 1024 / 1024).toFixed(2)} MB)
+                  {' '}<button type="button" onClick={() => setPdfFile(null)}>Seçimi iptal et</button></p>}
+                {editingPolicy && <label style={{ display: 'block', marginTop: 10 }}><input type="checkbox" checked={removePdf} onChange={e => { setRemovePdf(e.target.checked); if (e.target.checked) setPdfFile(null); }} /> Kayıtlı PDF ekini kaydederken kaldır</label>}
+                <p style={{ fontSize: '0.82rem', color: '#475569' }}>PDF, güvenli CRM oturumuyla Supabase özel deposuna yüklenir. Bulut kaydı doğrulanmadan işlem tamamlandı sayılmaz. Dosyaya yetkili hesapla diğer cihazlardan da erişilebilir.</p>
+              </section>
+              {pdfError && <p role="alert" style={{ color: '#b91c1c' }}>{pdfError}</p>}
               {/* BUTONLAR */}
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
                 <button 
@@ -2095,13 +2157,15 @@ export default function PolicelerPage() {
                 </button>
                 <button 
                   type="submit" 
+                  disabled={isSaving || pdfBusy}
                   className={styles.btnCrm} 
                   style={{ padding: '11px 26px', fontSize: '0.95rem', fontWeight: 750 }}
                 >
-                  ✓ Poliçeyi Kes ve Müşteriyi Kaydet
+                  {isSaving ? 'Kaydediliyor…' : '✓ Poliçeyi Kes ve Müşteriyi Kaydet'}
                 </button>
               </div>
 
+              </fieldset>
             </form>
           </div>
         </div>
@@ -2218,6 +2282,7 @@ export default function PolicelerPage() {
 
             {/* Not Geçmişi & Not Ekleme */}
             <div style={{ padding: '14px', backgroundColor: '#ffffff', borderRadius: '10px', border: '1px solid #e2e8f0', marginBottom: '20px' }}>
+              <PolicyDocumentView key={selectedPolicy.id} policyId={selectedPolicy.id} />
               <div style={{ fontSize: '0.82rem', fontWeight: 750, color: '#334155', marginBottom: '8px' }}>Poliçe & Müşteri Notları:</div>
               <div style={{ fontSize: '0.86rem', color: '#1e293b', whiteSpace: 'pre-wrap', backgroundColor: '#f8fafc', padding: '14px', borderRadius: '8px', minHeight: '80px', maxHeight: '350px', overflowY: 'auto', border: '1px solid #e2e8f0', lineHeight: '1.6', fontFamily: 'inherit' }}>
                 {selectedPolicy.notes || 'Kayıtlı özel not bulunmuyor.'}
@@ -2263,7 +2328,7 @@ export default function PolicelerPage() {
                 </button>
 
                 <button
-                  onClick={() => sendTelegramReminder(selectedPolicy)}
+                  onClick={openTelegramSettings}
                   style={{
                     padding: '9px 16px',
                     backgroundColor: '#0088cc',
@@ -2278,7 +2343,7 @@ export default function PolicelerPage() {
                     gap: '6px'
                   }}
                 >
-                  <Send size={16} /> Telegram
+                  <Send size={16} /> Telegram Botu Yönetimi
                 </button>
               </div>
 
